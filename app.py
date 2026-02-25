@@ -5,6 +5,8 @@ import os
 import socket
 import subprocess
 import sys
+import threading
+import webbrowser
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -118,12 +120,15 @@ if __name__ == "__main__":
 
     from studio.timing.routes import _check_alignment_available
 
+    url = f"http://localhost:{port}"
+
     print()
     print(f"  \033[1mScriptToScene Studio\033[0m")
-    print(f"  \033[92m>\033[0m http://localhost:{port}")
+    print(f"  \033[92m>\033[0m {url}")
     print(f"  \033[90m-\033[0m Alignment: {'available' if _check_alignment_available() else 'unavailable'}")
     print(f"  \033[90m-\033[0m Scene webhook: {N8N_WEBHOOK_URL}")
     print(f"  \033[90m-\033[0m Asset webhook: {N8N_ASSET_WEBHOOK_URL}")
     print()
 
+    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

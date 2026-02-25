@@ -1,0 +1,77 @@
+/* ================================================================
+   ScriptToScene Studio — Unified Design Tokens
+   Shared across the main studio app and timeline-editor sub-app.
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ---- Surface Palette ---- */
+  --bg-darkest:       #0a0e13;
+  --bg-dark:          #0f1520;
+  --bg-surface:       #161d2a;
+  --bg-surface-hover: #1c2536;
+  --bg-elevated:      #222d3d;
+
+  /* Aliases used by the editor layout */
+  --bg-primary:   var(--bg-darkest);
+  --bg-secondary: var(--bg-dark);
+  --bg-tertiary:  var(--bg-surface);
+
+  /* ---- Text ---- */
+  --text:           #e8edf3;
+  --text-secondary: #8899aa;
+  --text-muted:     #6b7f93;
+
+  /* Aliases for editor */
+  --text-primary: var(--text);
+
+  /* ---- Accent ---- */
+  --accent:       #4ECDC4;
+  --accent-hover: #5edfd6;
+  --accent-glow:  rgba(78, 205, 196, 0.20);
+  --accent-dim:   rgba(78, 205, 196, 0.08);
+
+  /* Aliases for editor */
+  --accent-primary:   var(--accent);
+  --accent-secondary: #A78BFA;   /* soft violet for audio tracks / secondary highlights */
+  --accent-warning:   #FFB347;
+  --accent-error:     #FF6B6B;
+  --accent-success:   #4ECDC4;
+  --accent-info:      #56CCF2;
+
+  /* ---- Coral / Danger ---- */
+  --coral: #FF6B6B;
+
+  /* Alias for editor status */
+  --status-error: var(--coral);
+
+  /* ---- Borders ---- */
+  --border:       #1e2a3a;
+  --border-hover: #2a3a4e;
+
+  /* Aliases for editor */
+  --border-color: var(--border);
+  --border-light: #2a3a4e;
+
+  /* ---- Glass / Depth ---- */
+  --glass-bg:  rgba(255, 255, 255, 0.02);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.50);
+
+  /* ---- Radius ---- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* ---- Typography ---- */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'DM Sans', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+
+  /* ---- Layout (studio sidebar) ---- */
+  --sidebar-w:         220px;
+  --sidebar-collapsed:  64px;
+}

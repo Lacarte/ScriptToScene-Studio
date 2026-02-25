@@ -128,7 +128,7 @@
     background: var(--bg-elevated);
     color: var(--accent-primary);
     border-color: var(--accent-primary);
-    box-shadow: 0 0 8px rgba(0, 229, 160, 0.2);
+    box-shadow: 0 0 8px rgba(78, 205, 196, 0.2);
 }
 
 /* Minimal control buttons - borderless, smaller */
@@ -161,7 +161,7 @@
 
 .time-display {
     font-size: 0.75rem;
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-family: var(--font-mono);
     color: var(--text-secondary);
     display: flex;
     gap: 4px;
@@ -297,8 +297,8 @@
     height: 100%;
     background: linear-gradient(
         90deg,
-        rgba(0, 229, 160, 0.1),
-        rgba(0, 229, 160, 0.4)
+        rgba(78, 205, 196, 0.1),
+        rgba(78, 205, 196, 0.4)
     );
     border-radius: 3px;
     pointer-events: none;
@@ -320,7 +320,7 @@
     width: 8px;
     background: radial-gradient(
         ellipse at right,
-        rgba(0, 229, 160, 0.8),
+        rgba(78, 205, 196, 0.8),
         transparent
     );
     filter: blur(2px);
@@ -343,7 +343,7 @@
 }
 
 .timeline-header-marker.scrubbing .header-marker-indicator {
-    box-shadow: 0 0 10px var(--accent-error), 0 0 20px rgba(255, 68, 68, 0.4);
+    box-shadow: 0 0 10px var(--accent-error), 0 0 20px rgba(255, 107, 107, 0.4);
 }
 
 .toolbar-left,
@@ -553,7 +553,7 @@
 }
 
 .history-item.current {
-    background: rgba(0, 224, 194, 0.1);
+    background: rgba(78, 205, 196, 0.1);
     border-left: 3px solid var(--accent-primary);
 }
 
@@ -630,7 +630,7 @@
     align-items: center;
     gap: 6px;
     padding: 6px 12px;
-    background: rgba(239, 68, 68, 0.15);
+    background: rgba(255, 107, 107, 0.15);
     border: 1px solid var(--status-error);
     border-radius: var(--radius-sm);
     cursor: pointer;
@@ -638,7 +638,7 @@
 }
 
 .error-indicator:hover {
-    background: rgba(239, 68, 68, 0.25);
+    background: rgba(255, 107, 107, 0.25);
 }
 
 .error-indicator.hidden {
@@ -677,7 +677,7 @@
     background: var(--bg-secondary);
     border: 1px solid var(--status-error);
     border-radius: var(--radius-md);
-    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.2);
+    box-shadow: 0 8px 24px rgba(255, 107, 107, 0.2);
     z-index: 1000;
     display: none;
     overflow: hidden;
@@ -693,7 +693,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 12px;
-    background: rgba(239, 68, 68, 0.1);
+    background: rgba(255, 107, 107, 0.1);
     border-bottom: 1px solid var(--border-color);
     font-size: 0.75rem;
     font-weight: 600;
@@ -909,12 +909,12 @@
 
 .scene-clip:hover {
     border-color: var(--accent-primary);
-    box-shadow: 0 0 8px rgba(0, 229, 160, 0.2);
+    box-shadow: 0 0 8px rgba(78, 205, 196, 0.2);
 }
 
 .scene-clip.selected {
     border: 1px dotted var(--accent-primary) !important;
-    box-shadow: 0 0 8px rgba(0, 229, 160, 0.4);
+    box-shadow: 0 0 8px rgba(78, 205, 196, 0.4);
 }
 
 .scene-clip-thumb {
@@ -994,7 +994,7 @@
     position: relative;
     flex-shrink: 0;
     height: 32px;
-    background: linear-gradient(135deg, var(--accent-secondary) 0%, rgba(224, 64, 251, 0.3) 100%);
+    background: linear-gradient(135deg, var(--accent-secondary) 0%, rgba(167, 139, 250, 0.3) 100%);
     border-radius: var(--radius-sm);
     border: 1px solid var(--accent-secondary);
     display: flex;
@@ -1013,7 +1013,7 @@
     right: 0;
     width: 8px;
     height: 100%;
-    background: rgba(224, 64, 251, 0.5);
+    background: rgba(167, 139, 250, 0.5);
     cursor: ew-resize;
     opacity: 0;
     transition: opacity 0.15s ease;
@@ -1029,7 +1029,7 @@
 }
 
 .audio-clip.audio-clip-error {
-    background: linear-gradient(135deg, rgba(255, 100, 100, 0.3) 0%, rgba(255, 100, 100, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(255, 107, 107, 0.3) 0%, rgba(255, 107, 107, 0.1) 100%);
     border: 1px dashed var(--accent-error);
     opacity: 0.7;
 }
@@ -1099,7 +1099,7 @@
     padding-left: 96px;
     font-size: 0.6rem;
     color: var(--text-muted);
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-family: var(--font-mono);
     flex-shrink: 0;
 }
 
@@ -1531,7 +1531,7 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     padding: 16px;
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-family: var(--font-mono);
     font-size: 0.75rem;
     line-height: 1.5;
     color: var(--text-secondary);
@@ -1601,7 +1601,7 @@
 .media-loading-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(13, 13, 18, 0.95);
+    background: rgba(10, 14, 19, 0.95);
     display: flex;
     align-items: center;
     justify-content: center;

@@ -1,27 +1,5 @@
-:root {
-    --bg-primary: #0d0d12;
-    --bg-secondary: #13131a;
-    --bg-tertiary: #1a1a24;
-    --bg-elevated: #222230;
-    --text-primary: #f0f0f5;
-    --text-secondary: #9898a8;
-    --text-muted: #5a5a6e;
-    --accent-primary: #00e5a0;
-    --accent-secondary: #e040fb;
-    --accent-warning: #ffc107;
-    --accent-error: #ff5252;
-    --accent-success: #4cff8e;
-    --accent-info: #40c4ff;
-    --border-color: rgba(255, 255, 255, 0.06);
-    --border-light: rgba(255, 255, 255, 0.1);
-    --glass-bg: rgba(255, 255, 255, 0.02);
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.45);
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-}
+/* Unified theme — shared with the main studio app */
+@import url('shared-theme.css');
 
 * {
     box-sizing: border-box;
@@ -32,7 +10,7 @@
 body {
     background: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: var(--font-body);
     height: 100vh;
     display: grid;
     grid-template-rows: 64px 1fr;
@@ -160,14 +138,14 @@ body {
 }
 
 .auth-button.connected {
-    background: rgba(0, 229, 160, 0.1);
-    border-color: rgba(0, 229, 160, 0.3);
+    background: rgba(78, 205, 196, 0.1);
+    border-color: rgba(78, 205, 196, 0.3);
     color: var(--accent-primary);
 }
 
 .auth-button.connected:hover {
-    background: rgba(255, 82, 82, 0.1);
-    border-color: rgba(255, 82, 82, 0.3);
+    background: rgba(255, 107, 107, 0.1);
+    border-color: rgba(255, 107, 107, 0.3);
     color: var(--accent-error);
 }
 
@@ -277,7 +255,7 @@ body {
 }
 
 .project-item.selected {
-    background: linear-gradient(135deg, rgba(0, 229, 160, 0.08), rgba(64, 196, 255, 0.04));
+    background: linear-gradient(135deg, rgba(78, 205, 196, 0.08), rgba(86, 204, 242, 0.04));
     border-style: dotted;
     border-color: var(--accent-primary);
 }
@@ -515,7 +493,7 @@ body {
 .timeline-scroll-indicator-left svg {
     color: var(--accent-primary);
     opacity: 0.8;
-    filter: drop-shadow(0 0 8px rgba(0, 229, 160, 0.4));
+    filter: drop-shadow(0 0 8px rgba(78, 205, 196, 0.4));
     transition: transform 0.2s ease;
 }
 
@@ -834,7 +812,7 @@ body {
 }
 
 .history-item.current {
-    background: rgba(0, 224, 194, 0.1);
+    background: rgba(78, 205, 196, 0.1);
     border-left: 3px solid var(--accent-primary);
 }
 
@@ -981,7 +959,7 @@ body {
 .btn-stage:hover {
     background: var(--accent-success);
     border-color: var(--accent-success);
-    box-shadow: 0 0 12px rgba(0, 229, 160, 0.3);
+    box-shadow: 0 0 12px rgba(78, 205, 196, 0.3);
 }
 
 .btn-stage svg {
@@ -1411,7 +1389,7 @@ body {
 .form-textarea:focus {
     outline: none;
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.1);
+    box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.1);
 }
 
 .form-input.input-error,
@@ -1510,7 +1488,7 @@ body {
 
 .btn-danger {
     background: transparent;
-    border: 1px solid rgba(255, 82, 82, 0.4);
+    border: 1px solid rgba(255, 107, 107, 0.4);
     color: var(--accent-error);
 }
 
@@ -1518,7 +1496,7 @@ body {
     background: var(--accent-error);
     border-color: var(--accent-error);
     color: white;
-    box-shadow: 0 4px 15px rgba(255, 82, 82, 0.25);
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.25);
 }
 
 .form-actions {
@@ -1545,20 +1523,20 @@ body {
 }
 
 .save-saving {
-    background: rgba(64, 196, 255, 0.15);
-    border: 1px solid rgba(64, 196, 255, 0.3);
+    background: rgba(86, 204, 242, 0.15);
+    border: 1px solid rgba(86, 204, 242, 0.3);
     color: var(--accent-info);
 }
 
 .save-saved {
-    background: rgba(76, 255, 142, 0.15);
-    border: 1px solid rgba(76, 255, 142, 0.3);
+    background: rgba(78, 205, 196, 0.15);
+    border: 1px solid rgba(78, 205, 196, 0.3);
     color: var(--accent-success);
 }
 
 .save-error {
-    background: rgba(255, 82, 82, 0.15);
-    border: 1px solid rgba(255, 82, 82, 0.3);
+    background: rgba(255, 107, 107, 0.15);
+    border: 1px solid rgba(255, 107, 107, 0.3);
     color: var(--accent-error);
 }
 
@@ -1607,21 +1585,21 @@ body {
 }
 
 .validation-error {
-    background: rgba(255, 82, 82, 0.08);
+    background: rgba(255, 107, 107, 0.08);
     border-left: 3px solid var(--accent-error);
 }
 
 .validation-error:hover {
-    background: rgba(255, 82, 82, 0.12);
+    background: rgba(255, 107, 107, 0.12);
 }
 
 .validation-warning {
-    background: rgba(255, 193, 7, 0.08);
+    background: rgba(255, 179, 71, 0.08);
     border-left: 3px solid var(--accent-warning);
 }
 
 .validation-warning:hover {
-    background: rgba(255, 193, 7, 0.12);
+    background: rgba(255, 179, 71, 0.12);
 }
 
 .no-errors {
@@ -1629,8 +1607,8 @@ body {
     text-align: center;
     padding: 16px !important;
     cursor: default !important;
-    background: rgba(76, 255, 142, 0.05) !important;
-    border: 1px solid rgba(76, 255, 142, 0.15) !important;
+    background: rgba(78, 205, 196, 0.05) !important;
+    border: 1px solid rgba(78, 205, 196, 0.15) !important;
     border-left: 3px solid var(--accent-success) !important;
     border-radius: var(--radius-sm) !important;
 }
@@ -1770,7 +1748,7 @@ body {
 
 .btn-primary:hover {
     background: #00c98a;
-    box-shadow: 0 4px 15px rgba(0, 229, 160, 0.3);
+    box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
 }
 
 .btn-secondary {
@@ -1902,7 +1880,7 @@ kbd {
 
 /* Selection */
 ::selection {
-    background: rgba(0, 229, 160, 0.25);
+    background: rgba(78, 205, 196, 0.25);
     color: var(--text-primary);
 }
 
@@ -2016,7 +1994,7 @@ kbd {
 .loading-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(13, 13, 18, 0.9);
+    background: rgba(10, 14, 19, 0.9);
     display: flex;
     flex-direction: column;
     align-items: center;

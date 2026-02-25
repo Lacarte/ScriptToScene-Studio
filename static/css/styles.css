@@ -1,28 +1,13 @@
 /* ================================================================
-   ScriptToScene Studio — Shared Styles
+   ScriptToScene Studio — App Styles
    ================================================================ */
 
-:root {
-  --bg-darkest: #0a0e13;
-  --bg-dark: #0f1520;
-  --bg-surface: #161d2a;
-  --bg-surface-hover: #1c2536;
-  --border: #1e2a3a;
-  --border-hover: #2a3a4e;
-  --text: #e8edf3;
-  --text-secondary: #8899aa;
-  --text-muted: #6b7f93;
-  --accent: #4ECDC4;
-  --accent-hover: #5edfd6;
-  --coral: #FF6B6B;
-  --sidebar-w: 220px;
-  --sidebar-collapsed: 64px;
-}
+@import url('shared-theme.css');
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: var(--font-body);
   margin: 0;
   background: var(--bg-dark);
   color: var(--text);

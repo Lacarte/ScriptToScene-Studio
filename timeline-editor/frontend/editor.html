@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Editor - Script-to-Scene</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editor.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <a href="index.html" class="back-link" title="Back to Timeline Editor">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5" />
+                    <path d="M12 19l-7-7 7-7" />
+                </svg>
+            </a>
+            <h1>Video Editor</h1>
+            <span class="project-name" id="project-name">No project loaded</span>
+        </div>
+        <div class="header-right">
+            <div class="history-controls">
+                <button id="undo-btn" class="btn btn-icon" title="Undo (Ctrl+Z)" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                </button>
+                <button id="redo-btn" class="btn btn-icon" title="Redo (Ctrl+Y)" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"></path>
+                    </svg>
+                </button>
+                <div class="history-dropdown-container">
+                    <button id="history-btn" class="btn btn-icon history-toggle" title="View History">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span id="history-badge" class="history-badge">0</span>
+                    </button>
+                    <div id="history-dropdown" class="history-dropdown">
+                        <div class="history-dropdown-header">
+                            <span>Edit History</span>
+                            <button id="clear-history-btn" class="btn-clear-history" title="Clear all history">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <ul id="history-list" class="history-list">
+                            <li class="history-empty">No history yet</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="error-dropdown-container">
+                <div id="error-indicator" class="error-indicator hidden" title="Scenes with errors">
+                    <span class="error-dot"></span>
+                    <span id="error-count" class="error-count">0</span>
+                </div>
+                <div id="error-dropdown" class="error-dropdown">
+                    <div class="error-dropdown-header">
+                        <span>Scene Errors</span>
+                    </div>
+                    <ul id="error-list" class="error-list">
+                        <li class="error-empty">No errors</li>
+                    </ul>
+                </div>
+            </div>
+            <button id="preview-json" class="btn btn-secondary" title="Preview Export JSON">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+                JSON
+            </button>
+            <button id="export-mp4" class="btn btn-stage" title="Export MP4 Video">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Export
+            </button>
+        </div>
+    </header>
+
+    <div class="editor-layout">
+        <!-- Preview Panel -->
+        <section class="preview-panel">
+            <div class="preview-container">
+                <canvas id="preview-canvas" width="1080" height="1920"></canvas>
+                <div class="preview-placeholder" id="preview-placeholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <rect x="2" y="2" width="20" height="20" rx="2" />
+                        <circle cx="8" cy="8" r="2" />
+                        <path d="M21 15l-5-5L5 21" />
+                    </svg>
+                    <span>Select media folder to preview</span>
+                </div>
+            </div>
+            <div class="preview-controls">
+                <button id="play-btn" class="control-btn-minimal" title="Play/Pause">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="6 4 18 12 6 20 6 4" />
+                    </svg>
+                </button>
+                <button id="loop-btn" class="control-btn-minimal" title="Toggle Loop">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M17 4l3 3-3 3"/><path d="M4 10V9a3 3 0 013-3h13"/>
+                        <path d="M7 20l-3-3 3-3"/><path d="M20 14v1a3 3 0 01-3 3H4"/>
+                    </svg>
+                </button>
+                <div class="time-display">
+                    <span id="current-time">0:00</span>
+                    <span>/</span>
+                    <span id="total-time">0:00</span>
+                </div>
+                <input type="range" id="time-scrubber" class="time-scrubber" min="0" max="100" value="0">
+                <button id="volume-btn" class="control-btn-minimal" title="Volume">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    </svg>
+                </button>
+            </div>
+        </section>
+
+        <!-- Timeline Panel -->
+        <section class="timeline-panel">
+            <div class="timeline-resize-handle" id="timeline-resize-handle"></div>
+            <div class="timeline-toolbar">
+                <div class="toolbar-left">
+                    <button id="select-folder" class="btn btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        </svg>
+                        Select Media Folder
+                    </button>
+                    <span class="media-status" id="media-status">No media loaded</span>
+                </div>
+                <div class="toolbar-right">
+                    <div class="zoom-controls">
+                        <button id="zoom-out" class="control-btn" title="Zoom Out">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="M21 21l-4.35-4.35" />
+                                <path d="M8 11h6" />
+                            </svg>
+                        </button>
+                        <span class="zoom-level" id="zoom-level">100%</span>
+                        <button id="zoom-in" class="control-btn" title="Zoom In">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="M21 21l-4.35-4.35" />
+                                <path d="M11 8v6M8 11h6" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="timeline-header-marker" id="timeline-header-marker">
+                    <div class="header-marker-track"></div>
+                    <div class="header-marker-trail"></div>
+                    <div class="header-marker-indicator"></div>
+                </div>
+            </div>
+
+            <!-- Playhead -->
+            <div class="timeline-playhead" id="timeline-playhead">
+                <div class="playhead-marker"></div>
+                <div class="playhead-line"></div>
+            </div>
+
+            <!-- Timeline Tracks -->
+            <div class="timeline-tracks" id="timeline-tracks">
+                <!-- Video Track -->
+                <div class="track" data-track="video">
+                    <div class="track-header">
+                        <span class="track-label">Video</span>
+                    </div>
+                    <div class="track-content" id="video-track">
+                        <!-- Scenes will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Audio Track -->
+                <div class="track" data-track="audio">
+                    <div class="track-header">
+                        <span class="track-label">Audio</span>
+                        <button id="add-audio" class="track-btn" title="Add Audio">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M12 5v14M5 12h14" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="track-content" id="audio-track">
+                        <div class="audio-placeholder">Click + to add background audio</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Time Ruler -->
+            <div class="time-ruler" id="time-ruler">
+                <!-- Time markers will be generated -->
+            </div>
+        </section>
+
+        <!-- Properties Panel -->
+        <aside class="properties-panel">
+            <div class="panel-section">
+                <h3>Scene Properties</h3>
+                <div id="scene-properties" class="properties-content">
+                    <div class="placeholder-text">Select a scene to edit</div>
+                </div>
+            </div>
+            <div class="panel-section">
+                <h3>Project Info</h3>
+                <div id="project-info" class="properties-content">
+                    <div class="info-row">
+                        <span class="info-label">Scenes</span>
+                        <span class="info-value" id="info-scenes">0</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Duration</span>
+                        <span class="info-value" id="info-duration">0:00</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Resolution</span>
+                        <span class="info-value">1080x1920</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Export JSON Modal -->
+    <div id="export-modal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3>Export JSON</h3>
+                <button class="modal-close" id="close-export-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="export-json" class="json-preview"></pre>
+            </div>
+            <div class="modal-footer">
+                <button id="copy-export-json" class="btn btn-secondary">Copy JSON</button>
+                <button id="download-export-json" class="btn btn-stage">Download JSON</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Progress Modal -->
+    <div id="export-progress-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="export-progress-title">Exporting Video...</h3>
+            </div>
+            <div class="modal-body">
+                <div class="export-progress-container">
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="export-progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span id="export-progress-percent">0%</span>
+                        <span id="export-progress-message">Starting export...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" id="export-progress-footer">
+                <button id="cancel-export" class="btn btn-secondary">Cancel</button>
+                <button id="download-export" class="btn btn-stage hidden">Download MP4</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Data Message (hidden by default, shown only when no data) -->
+    <div id="no-data-overlay" class="no-data-overlay hidden">
+        <div class="no-data-content">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="18" x2="12" y2="12" />
+                <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+            <h2>No Timeline Data</h2>
+            <p>Stage a project from the Timeline Editor to begin editing.</p>
+            <a href="index.html" class="btn btn-stage">Go to Timeline Editor</a>
+        </div>
+    </div>
+
+    <script type="module" src="js/video-editor.js"></script>
+</body>
+
+</html>

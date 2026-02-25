@@ -1,0 +1,10 @@
+venv/
+python312/
+__pycache__/
+*.pyc
+logs/
+output/
+bin/
+exports/
+working-assets/
+logs-studio/

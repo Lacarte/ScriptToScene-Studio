@@ -1,0 +1,8 @@
+flask
+flask-cors
+loguru
+numpy
+requests
+soundfile
+stable-ts
+openai-whisper

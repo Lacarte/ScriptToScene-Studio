@@ -439,17 +439,27 @@
           <span id="scenes-btn-label">Generate Scene Script</span>
         </button>
 
-        <!-- Payload Preview (shown when webhook is OFF) -->
+        <!-- Payload Preview Panel (shown after Generate) -->
         <div id="scenes-payload-preview" style="display:none;margin-top:16px">
-          <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-darkest);overflow:hidden">
+          <div style="border:1px solid var(--border);border-radius:12px;background:var(--bg-darkest);overflow:hidden">
+            <!-- Header -->
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
               <span class="font-mono text-xs" style="color:var(--accent)">Webhook Payload Preview</span>
               <div style="display:flex;gap:6px">
                 <button onclick="scenesPayloadCopy()" class="action-btn hover-accent" style="padding:4px 10px;font-size:10px">Copy</button>
-                <button onclick="$('#scenes-payload-preview').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
+                <button onclick="scenesTogglePayloadPreview()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
               </div>
             </div>
-            <pre id="scenes-payload-preview-content" class="font-mono" style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.6;margin:0;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
+            <!-- JSON Content -->
+            <pre id="scenes-payload-preview-content" class="font-mono" style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.6;margin:0;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
+            <!-- Webhook URL + Send -->
+            <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">
+              <input type="text" id="scenes-preview-webhook-url" class="input-field font-mono" style="flex:1;padding:8px 12px;font-size:11px;border-radius:8px" placeholder="Webhook URL...">
+              <button id="scenes-send-preview-btn" onclick="scenesSendPreviewToWebhook()" style="padding:8px 20px;border-radius:8px;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;border:none;cursor:pointer;color:white;background:linear-gradient(135deg,var(--accent),#3BA89F);box-shadow:0 2px 12px rgba(78,205,196,0.25);transition:all 0.2s;white-space:nowrap">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:4px"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                Send
+              </button>
+            </div>
           </div>
         </div>
 

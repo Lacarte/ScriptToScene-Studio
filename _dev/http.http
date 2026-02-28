@@ -1,0 +1,92 @@
+### ============================================================
+### ScriptToScene Studio — REST Client Tests
+### ============================================================
+
+@base = http://localhost:5000
+@webhook = https://n8n-production-6197.up.railway.app/webhook/scene-generator
+@webhook_test = https://n8n-production-6197.up.railway.app/webhook-test/scene-generator
+
+### ----------------------------------------------------------
+### 1. Health check — GET webhook URL config
+### ----------------------------------------------------------
+
+GET {{base}}/api/scenes/webhook-url
+
+### ----------------------------------------------------------
+### 2. Generate scenes (send to production webhook)
+### ----------------------------------------------------------
+
+POST {{base}}/api/scenes/generate
+Content-Type: application/json
+
+{
+  "script": "The violin had been silent for twenty years, sealed in its velvet-lined case in the attic. When the old man's granddaughter found it, she lifted the bow and drew it across the strings. The sound was thin and ghostly at first, but the wood remembered. By the third note, the kitchen below fell quiet. By the seventh, her grandfather had risen from his chair, tears tracking down weathered cheeks. The violin remembered everything.",
+  "style": "cinematic",
+  "segments": [
+    { "index": 0, "words": "The violin had been silent for twenty years," },
+    { "index": 1, "words": "sealed in its velvet-lined case in the attic." },
+    { "index": 2, "words": "When the old man's granddaughter found it," },
+    { "index": 3, "words": "she lifted the bow and drew it across the strings." },
+    { "index": 4, "words": "The sound was thin and ghostly at first," },
+    { "index": 5, "words": "but the wood remembered. By the third note," },
+    { "index": 7, "words": "the kitchen below fell quiet. By the seventh," },
+    { "index": 8, "words": "her grandfather had risen from his chair," },
+    { "index": 9, "words": "tears tracking down weathered cheeks. The violin remembered everything." }
+  ],
+  "source_folder": "the-violin-had-been-silent-fo-20260224-1_20260224_183800",
+  "aspect_ratio": "9:16",
+  "webhook_url": "{{webhook}}"
+}
+
+### ----------------------------------------------------------
+### 3. Generate scenes (test webhook — will return empty body)
+### ----------------------------------------------------------
+
+POST {{base}}/api/scenes/generate
+Content-Type: application/json
+
+{
+  "script": "The violin had been silent for twenty years.",
+  "style": "cinematic",
+  "segments": [
+    { "index": 0, "words": "The violin had been silent for twenty years," },
+    { "index": 1, "words": "sealed in its velvet-lined case in the attic." }
+  ],
+  "source_folder": "test",
+  "aspect_ratio": "9:16",
+  "webhook_url": "{{webhook_test}}"
+}
+
+### ----------------------------------------------------------
+### 4. Direct webhook call (bypass Flask, hit n8n directly)
+### ----------------------------------------------------------
+
+POST {{webhook}}
+Content-Type: application/json
+
+{
+  "script": "The violin had been silent for twenty years, sealed in its velvet-lined case in the attic.",
+  "style": "cinematic",
+  "segments": [
+    { "index": 0, "words": "The violin had been silent for twenty years," },
+    { "index": 1, "words": "sealed in its velvet-lined case in the attic." }
+  ]
+}
+
+### ----------------------------------------------------------
+### 5. List scene history
+### ----------------------------------------------------------
+
+GET {{base}}/api/scenes/history
+
+### ----------------------------------------------------------
+### 6. List alignment history
+### ----------------------------------------------------------
+
+GET {{base}}/api/alignment/history
+
+### ----------------------------------------------------------
+### 7. List segmenter history
+### ----------------------------------------------------------
+
+GET {{base}}/api/segmenter/history

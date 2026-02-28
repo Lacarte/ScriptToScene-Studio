@@ -49,11 +49,51 @@ def generate_scenes():
 
     try:
         resp = http_requests.post(webhook_url, json=webhook_payload, timeout=120)
-        if resp.status_code != 200:
-            logger.error("Scene webhook returned {}: {}", resp.status_code, resp.text[:200])
-            return jsonify({"error": f"Webhook returned {resp.status_code}"}), 502
 
-        result = resp.json()
+        if resp.status_code != 200:
+            # Extract useful error details from n8n response
+            body_text = resp.text[:500]
+            logger.error("Scene webhook returned {} — {}", resp.status_code, body_text)
+            error_msg = f"Webhook returned {resp.status_code}"
+            try:
+                err_data = resp.json()
+                msg = err_data.get("message", "")
+                hint = err_data.get("hint", "")
+                if msg:
+                    error_msg = msg
+                if hint:
+                    error_msg += f". {hint}"
+            except Exception:
+                if body_text:
+                    error_msg += f": {body_text[:200]}"
+            return jsonify({"error": error_msg}), 502
+
+        # Handle empty or non-JSON responses (common with n8n test webhooks)
+        body = resp.text.strip()
+        if not body:
+            logger.warning("Webhook returned empty body")
+            return jsonify({
+                "error": "Webhook returned an empty response. If using n8n, make sure "
+                         "the workflow is activated and uses the production URL (/webhook/) "
+                         "instead of the test URL (/webhook-test/)."
+            }), 502
+
+        try:
+            result = json.loads(body)
+        except json.JSONDecodeError:
+            logger.error("Webhook returned non-JSON response")
+            return jsonify({
+                "error": f"Webhook returned non-JSON response: {body[:200]}"
+            }), 502
+
+        # n8n returns an array — unwrap the first element
+        if isinstance(result, list):
+            if not result:
+                return jsonify({"error": "Webhook returned an empty array"}), 502
+            result = result[0]
+
+        if not isinstance(result, dict):
+            return jsonify({"error": "Webhook returned unexpected format (expected JSON object)"}), 502
 
         # Save to disk
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -73,8 +113,11 @@ def generate_scenes():
     except http_requests.Timeout:
         return jsonify({"error": "Webhook timed out (120s)"}), 504
     except http_requests.RequestException as e:
-        logger.error("Scene webhook error: {}", e)
-        return jsonify({"error": f"Webhook error: {str(e)}"}), 502
+        logger.error("Scene webhook request error: {!r}", e)
+        return jsonify({"error": f"Webhook connection error: {e}"}), 502
+    except Exception as e:
+        logger.exception("Unexpected error in scene generation")
+        return jsonify({"error": f"Server error: {e}"}), 500
 
 
 @scenes_bp.route("/api/scenes/history")

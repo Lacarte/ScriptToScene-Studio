@@ -93,6 +93,8 @@ body {
 /* ---- Hover Utilities ---- */
 .hover-accent { transition: all 0.2s; }
 .hover-accent:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+#scenes-send-preview-btn:hover:not(:disabled) { box-shadow: 0 4px 18px rgba(78,205,196,0.35); transform: translateY(-1px); }
+#scenes-send-preview-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .hover-coral-border { transition: all 0.2s; }
 .hover-coral-border:hover { border-color: var(--coral) !important; color: var(--coral) !important; }
 .hover-word-chip { transition: background 0.15s; }

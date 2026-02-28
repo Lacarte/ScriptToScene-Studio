@@ -176,41 +176,82 @@ function _buildWebhookPayload(segData) {
 
 // ---- Generate ----
 
-async function handleGenerateScenes() {
+// ---- Generate: always show preview first ----
+
+function handleGenerateScenes() {
   if (!STATE.scenesSegData || !STATE.scenesSegData.segments) {
     toast('Select a segmentation source first', 'error');
     return;
   }
 
-  const webhookEnabled = $('#scenes-webhook-toggle').checked;
-  const webhookPayload = _buildWebhookPayload(STATE.scenesSegData);
   const meta = STATE.scenesSegData.metadata || {};
+  const payload = {
+    ..._buildWebhookPayload(STATE.scenesSegData),
+    source_folder: meta.source_folder || '',
+    aspect_ratio: $('#scenes-aspect').value,
+  };
 
-  // If webhook is off, just show the payload preview
-  if (!webhookEnabled) {
-    const payload = {
-      ...webhookPayload,
-      source_folder: meta.source_folder || '',
-      aspect_ratio: $('#scenes-aspect').value,
-    };
-    $('#scenes-payload-preview-content').textContent = JSON.stringify(payload, null, 2);
-    $('#scenes-payload-preview').style.display = '';
-    toast('Payload preview generated (webhook disabled)');
+  // Populate the preview
+  $('#scenes-payload-preview-content').textContent = JSON.stringify(payload, null, 2);
+
+  // Sync the inline webhook URL from the settings field
+  $('#scenes-preview-webhook-url').value = $('#scenes-webhook-url').value || '';
+
+  // Show the preview panel
+  $('#scenes-payload-preview').style.display = '';
+
+  // Scroll to the preview
+  $('#scenes-payload-preview').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ---- Toggle Preview (close button) ----
+
+function scenesTogglePayloadPreview() {
+  const panel = $('#scenes-payload-preview');
+  panel.style.display = panel.style.display === 'none' ? '' : 'none';
+}
+
+// ---- Copy Payload ----
+
+function scenesPayloadCopy() {
+  const text = $('#scenes-payload-preview-content').textContent;
+  navigator.clipboard.writeText(text)
+    .then(() => toast('Payload copied'))
+    .catch(() => toast('Copy failed', 'error'));
+}
+
+// ---- Send Preview Payload to Webhook ----
+
+async function scenesSendPreviewToWebhook() {
+  if (!STATE.scenesSegData || !STATE.scenesSegData.segments) {
+    toast('Select a segmentation source first', 'error');
     return;
   }
 
-  const btn = $('#scenes-generate-btn');
+  // Use the URL from the preview panel's inline input
+  const webhookUrl = $('#scenes-preview-webhook-url').value.trim();
+  if (!webhookUrl) {
+    toast('Enter a webhook URL before sending', 'error');
+    $('#scenes-preview-webhook-url').focus();
+    return;
+  }
+
+  // Also sync back to the main settings field + localStorage
+  $('#scenes-webhook-url').value = webhookUrl;
+  localStorage.setItem('sts-scenes-webhook-url', webhookUrl);
+
+  const btn = $('#scenes-send-preview-btn');
+  const origHTML = btn.innerHTML;
   btn.disabled = true;
-  $('#scenes-btn-label').textContent = 'Generating...';
-  $('#scenes-btn-spinner').style.display = 'inline-block';
-  $('#scenes-results').style.display = 'none';
+  btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:-2px;margin-right:6px"></span>Sending...';
 
   try {
+    const meta = STATE.scenesSegData.metadata || {};
     const payload = {
-      ...webhookPayload,
+      ..._buildWebhookPayload(STATE.scenesSegData),
       source_folder: meta.source_folder || '',
       aspect_ratio: $('#scenes-aspect').value,
-      webhook_url: $('#scenes-webhook-url').value || '',
+      webhook_url: webhookUrl,
     };
 
     const res = await fetch('/api/scenes/generate', {
@@ -219,26 +260,21 @@ async function handleGenerateScenes() {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Scene generation failed');
+    if (!res.ok) throw new Error(data.error || 'Send failed');
 
     STATE.scenesResult = data;
     renderSceneResults(data);
-    toast('Scene script generated');
+    toast('Sent to webhook successfully');
     loadScenesHistory();
+
+    // Collapse the preview after successful send
+    $('#scenes-payload-preview').style.display = 'none';
   } catch (e) {
-    toast(e.message || 'Scene generation failed', 'error');
+    toast(e.message || 'Failed to send to webhook', 'error');
   } finally {
     btn.disabled = false;
-    $('#scenes-btn-label').textContent = 'Generate Scene Script';
-    $('#scenes-btn-spinner').style.display = 'none';
+    btn.innerHTML = origHTML;
   }
-}
-
-function scenesPayloadCopy() {
-  const text = $('#scenes-payload-preview-content').textContent;
-  navigator.clipboard.writeText(text)
-    .then(() => toast('Payload copied'))
-    .catch(() => toast('Copy failed', 'error'));
 }
 
 // ---- Render Results ----

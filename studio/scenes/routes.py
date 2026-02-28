@@ -17,15 +17,38 @@ scenes_bp = Blueprint("scenes", __name__)
 # Routes
 # ---------------------------------------------------------------------------
 
+@scenes_bp.route("/api/scenes/webhook-url")
+def get_webhook_url():
+    """Return the current scene webhook URL."""
+    return jsonify({"url": N8N_WEBHOOK_URL})
+
+
 @scenes_bp.route("/api/scenes/generate", methods=["POST"])
 def generate_scenes():
-    """Forward alignment data to n8n webhook for AI scene generation."""
+    """Forward segmented data to n8n webhook for AI scene generation.
+
+    Accepts JSON body:
+      - script: full transcript text
+      - style: visual style preset
+      - segments: array of {index, words} (non-filler segments only)
+      - source_folder, aspect_ratio: optional metadata
+      - webhook_url: optional override for the webhook URL
+    """
     data = request.get_json(silent=True)
-    if not data or not data.get("alignment"):
-        return jsonify({"error": "No alignment data provided"}), 400
+    if not data or not data.get("segments"):
+        return jsonify({"error": "No segments data provided"}), 400
+
+    # Build the webhook payload (only what n8n needs)
+    webhook_payload = {
+        "script": data.get("script", ""),
+        "style": data.get("style", "cinematic"),
+        "segments": data.get("segments", []),
+    }
+
+    webhook_url = data.get("webhook_url") or N8N_WEBHOOK_URL
 
     try:
-        resp = http_requests.post(N8N_WEBHOOK_URL, json=data, timeout=120)
+        resp = http_requests.post(webhook_url, json=webhook_payload, timeout=120)
         if resp.status_code != 200:
             logger.error("Scene webhook returned {}: {}", resp.status_code, resp.text[:200])
             return jsonify({"error": f"Webhook returned {resp.status_code}"}), 502

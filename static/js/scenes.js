@@ -1,72 +1,204 @@
 /* ================================================================
    ScriptToScene Studio — Scenes Module (AI Scene Script Generator)
+   Consumes segmenter output → builds n8n webhook payload → renders results.
    ================================================================ */
 
-function useCurrentAlignmentForScenes() {
-  if (!STATE.alignResult || !STATE.alignResult.alignment) {
-    toast('No alignment result available. Run alignment in TIMING first.', 'error');
+// ---- State ----
+// STATE.scenesSegData  — full segmenter result (metadata + segments)
+// STATE.scenesResult   — generated scenes from webhook
+
+// ---- Source Selection ----
+
+function scenesUseCurrentSegment() {
+  if (!STATE.segmenterResult || !STATE.segmenterResult.segments) {
+    toast('No segmenter result available. Run the segmenter first.', 'error');
     return;
   }
-  STATE.scenesAlignment = STATE.alignResult;
-  const wordCount = STATE.alignResult.alignment.length;
-  const duration = wordCount ? STATE.alignResult.alignment[wordCount - 1].end : 0;
-  $('#scenes-source-info').textContent = `${wordCount} words · ${duration.toFixed(1)}s from ${STATE.alignResult.folder || 'current result'}`;
-  $('#scenes-source-info').style.color = 'var(--accent)';
-  $('#scenes-json-preview').style.display = '';
-  $('#scenes-json-preview').textContent = JSON.stringify(STATE.alignResult.alignment.slice(0, 5), null, 2) + (wordCount > 5 ? '\n... (' + (wordCount - 5) + ' more words)' : '');
-  toast('Alignment loaded');
+  STATE.scenesSegData = STATE.segmenterResult;
+  _updateScenesSource();
+  toast('Segmentation loaded');
 }
 
-function pickHistoryForScenes() {
-  if (!STATE.alignHistory.length) {
-    toast('No alignment history. Run alignment first.', 'error');
+async function scenesPickSegHistory() {
+  let items;
+  try {
+    items = await api('/api/segmenter/history');
+  } catch (e) {
+    toast('Failed to load segmenter history', 'error');
     return;
   }
-  const modal = $('#history-picker-modal');
+  if (!items.length) {
+    toast('No segmenter history. Run the segmenter first.', 'error');
+    return;
+  }
+
+  const modal = $('#scenes-seg-picker-modal');
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
 
-  $('#history-picker-list').innerHTML = STATE.alignHistory.map((h, i) => {
-    const text = h.transcript || '';
-    const truncated = text.length > 50 ? text.slice(0, 50) + '...' : text;
+  $('#scenes-seg-picker-list').innerHTML = items.map((h, i) => {
+    const src = h.source_folder || '';
+    const truncated = src.length > 45 ? src.slice(0, 45) + '...' : src;
     return `
-    <div class="hist-item" style="cursor:pointer" onclick="selectHistoryForScenes(${i})">
+    <div class="hist-item" style="cursor:pointer" onclick="scenesSelectSegHistory('${esc(h.folder)}')">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px">
         <div style="flex:1;min-width:0">
           <p style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">${esc(truncated)}</p>
-          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.word_count} words · ${h.duration_seconds}s · ${timeAgo(h.timestamp)}</p>
+          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.segment_count} segments · ${h.total_duration.toFixed(1)}s · avg ${h.avg_duration.toFixed(2)}s</p>
         </div>
-        <span class="font-mono" style="font-size:9px;color:var(--text-muted);flex-shrink:0;background:var(--bg-darkest);padding:2px 6px;border-radius:4px">${esc(h.source_file || '')}</span>
+        <span class="font-mono" style="font-size:9px;color:var(--text-muted);flex-shrink:0;background:var(--bg-darkest);padding:2px 6px;border-radius:4px">${timeAgo(h.segmented_at)}</span>
       </div>
     </div>`;
   }).join('');
 }
 
-function selectHistoryForScenes(idx) {
-  const h = STATE.alignHistory[idx];
-  if (!h) return;
-  STATE.scenesAlignment = { folder: h.folder, alignment: h.word_alignment, transcript: h.transcript };
-  const wordCount = h.word_count || (h.word_alignment ? h.word_alignment.length : 0);
-  $('#scenes-source-info').textContent = `${wordCount} words · ${h.duration_seconds}s from ${h.source_file || h.folder}`;
-  $('#scenes-source-info').style.color = 'var(--accent)';
-  $('#scenes-json-preview').style.display = '';
-  const alignment = h.word_alignment || [];
-  $('#scenes-json-preview').textContent = JSON.stringify(alignment.slice(0, 5), null, 2) + (alignment.length > 5 ? '\n... (' + (alignment.length - 5) + ' more words)' : '');
-  closeHistoryPicker();
-  toast('Alignment loaded from history');
+async function scenesSelectSegHistory(folder) {
+  scenesCloseSegPicker();
+  try {
+    const res = await fetch(`/api/segmenter/${encodeURIComponent(folder)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load');
+    STATE.scenesSegData = data;
+    _updateScenesSource();
+    toast('Segmentation loaded from history');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
 }
 
-function closeHistoryPicker() {
-  const modal = $('#history-picker-modal');
+function scenesCloseSegPicker() {
+  const modal = $('#scenes-seg-picker-modal');
   modal.classList.add('hidden');
   modal.style.display = '';
 }
 
-async function handleGenerateScenes() {
-  if (!STATE.scenesAlignment || !STATE.scenesAlignment.alignment) {
-    toast('Select an alignment source first', 'error');
+function scenesHandleUpload(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.segments || !data.segments.length) throw new Error('No segments array found');
+      STATE.scenesSegData = data;
+      _updateScenesSource();
+      toast('Segmentation loaded from file');
+    } catch (err) {
+      toast('Invalid segmentation JSON: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function _updateScenesSource() {
+  const d = STATE.scenesSegData;
+  if (!d || !d.segments) {
+    $('#scenes-source-info').textContent = 'No segmentation selected';
+    $('#scenes-source-info').style.color = 'var(--text-muted)';
+    $('#scenes-json-preview').style.display = 'none';
     return;
   }
+  const stats = d.stats || {};
+  const meta = d.metadata || {};
+  const segCount = stats.segment_count || d.segments.filter(s => !s.is_filler).length;
+  const dur = meta.total_duration || 0;
+  const src = meta.source_folder || d.output_folder || 'uploaded';
+  $('#scenes-source-info').textContent = `${segCount} segments · ${dur.toFixed(1)}s from ${src}`;
+  $('#scenes-source-info').style.color = 'var(--accent)';
+
+  // Preview the full webhook payload that will be sent
+  const preview = _buildWebhookPayload(d);
+  $('#scenes-json-preview').style.display = '';
+  $('#scenes-json-preview').textContent = JSON.stringify(preview, null, 2);
+}
+
+// ---- Webhook Toggle ----
+
+async function scenesInitWebhookUrl() {
+  try {
+    const data = await api('/api/scenes/webhook-url');
+    STATE._scenesDefaultWebhookUrl = data.url || '';
+  } catch (e) {
+    STATE._scenesDefaultWebhookUrl = '';
+  }
+  // Restore from localStorage, fall back to server default
+  const saved = localStorage.getItem('sts-scenes-webhook-url');
+  $('#scenes-webhook-url').value = saved !== null ? saved : STATE._scenesDefaultWebhookUrl;
+
+  // Restore toggle state
+  const savedToggle = localStorage.getItem('sts-scenes-webhook-enabled');
+  if (savedToggle === 'false') {
+    $('#scenes-webhook-toggle').checked = false;
+    scenesToggleWebhook();
+  }
+}
+
+function scenesToggleWebhook() {
+  const on = $('#scenes-webhook-toggle').checked;
+  const dot = $('#scenes-webhook-dot');
+  localStorage.setItem('sts-scenes-webhook-enabled', on);
+  if (on) {
+    dot.style.transform = 'translateX(16px)';
+    dot.style.background = 'var(--accent)';
+    $('#scenes-webhook-url-row').style.display = 'flex';
+    $('#scenes-webhook-off-msg').style.display = 'none';
+    $('#scenes-btn-label').textContent = 'Generate Scene Script';
+  } else {
+    dot.style.transform = 'translateX(0)';
+    dot.style.background = 'var(--text-muted)';
+    $('#scenes-webhook-url-row').style.display = 'none';
+    $('#scenes-webhook-off-msg').style.display = '';
+    $('#scenes-btn-label').textContent = 'Preview Payload';
+  }
+}
+
+function scenesResetWebhookUrl() {
+  $('#scenes-webhook-url').value = STATE._scenesDefaultWebhookUrl || '';
+  localStorage.removeItem('sts-scenes-webhook-url');
+  toast('Webhook URL reset to default');
+}
+
+// ---- Webhook Payload Builder ----
+
+function _buildWebhookPayload(segData) {
+  const meta = segData.metadata || {};
+  const segments = (segData.segments || [])
+    .filter(s => !s.is_filler)
+    .map(s => ({ index: s.index, words: s.words }));
+
+  return {
+    script: meta.transcript || '',
+    style: $('#scenes-style').value || meta.style || 'cinematic',
+    segments: segments,
+  };
+}
+
+// ---- Generate ----
+
+async function handleGenerateScenes() {
+  if (!STATE.scenesSegData || !STATE.scenesSegData.segments) {
+    toast('Select a segmentation source first', 'error');
+    return;
+  }
+
+  const webhookEnabled = $('#scenes-webhook-toggle').checked;
+  const webhookPayload = _buildWebhookPayload(STATE.scenesSegData);
+  const meta = STATE.scenesSegData.metadata || {};
+
+  // If webhook is off, just show the payload preview
+  if (!webhookEnabled) {
+    const payload = {
+      ...webhookPayload,
+      source_folder: meta.source_folder || '',
+      aspect_ratio: $('#scenes-aspect').value,
+    };
+    $('#scenes-payload-preview-content').textContent = JSON.stringify(payload, null, 2);
+    $('#scenes-payload-preview').style.display = '';
+    toast('Payload preview generated (webhook disabled)');
+    return;
+  }
+
   const btn = $('#scenes-generate-btn');
   btn.disabled = true;
   $('#scenes-btn-label').textContent = 'Generating...';
@@ -75,12 +207,12 @@ async function handleGenerateScenes() {
 
   try {
     const payload = {
-      alignment: STATE.scenesAlignment.alignment,
-      transcript: STATE.scenesAlignment.transcript || '',
-      source_folder: STATE.scenesAlignment.folder || '',
-      style: $('#scenes-style').value,
+      ...webhookPayload,
+      source_folder: meta.source_folder || '',
       aspect_ratio: $('#scenes-aspect').value,
+      webhook_url: $('#scenes-webhook-url').value || '',
     };
+
     const res = await fetch('/api/scenes/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,6 +233,15 @@ async function handleGenerateScenes() {
     $('#scenes-btn-spinner').style.display = 'none';
   }
 }
+
+function scenesPayloadCopy() {
+  const text = $('#scenes-payload-preview-content').textContent;
+  navigator.clipboard.writeText(text)
+    .then(() => toast('Payload copied'))
+    .catch(() => toast('Copy failed', 'error'));
+}
+
+// ---- Render Results ----
 
 function renderSceneResults(data) {
   $('#scenes-results').style.display = '';
@@ -125,6 +266,42 @@ function renderSceneResults(data) {
     </div>
   `).join('');
 }
+
+// ---- Preview ----
+
+function toggleScenesPreview() {
+  const panel = $('#scenes-script-preview');
+  const btn = $('#scenes-preview-btn');
+  if (!STATE.scenesResult || !STATE.scenesResult.scenes) return;
+
+  const isVisible = panel.style.display !== 'none';
+  if (isVisible) {
+    panel.style.display = 'none';
+    btn.textContent = 'Preview Script';
+    return;
+  }
+
+  // Build readable script preview
+  const scenes = STATE.scenesResult.scenes;
+  const lines = scenes.map(s => {
+    let header = `[Scene ${s.scene_id}] ${(s.start || 0).toFixed(2)}s - ${(s.end || 0).toFixed(2)}s`;
+    if (s.emotion) header += `  |  ${s.emotion}`;
+    if (s.intensity_level !== undefined) header += `  |  L${s.intensity_level}`;
+
+    let body = '';
+    if (s.text_fragment) body += `  "${s.text_fragment}"\n`;
+    if (s.visual_prompt) body += `  Visual: ${s.visual_prompt}\n`;
+    if (s.camera_motion) body += `  Camera: ${s.camera_motion}\n`;
+
+    return header + '\n' + body;
+  });
+
+  $('#scenes-script-preview-content').textContent = lines.join('\n');
+  panel.style.display = '';
+  btn.textContent = 'Hide Preview';
+}
+
+// ---- Actions ----
 
 function copyScenesJSON() {
   if (!STATE.scenesResult) return;
@@ -197,3 +374,4 @@ async function loadScenesProject(projectId) {
 
 // Init
 loadScenesHistory();
+scenesInitWebhookUrl();

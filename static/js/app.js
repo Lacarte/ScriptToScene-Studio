@@ -11,7 +11,7 @@ window.STATE = {
   alignFile: null,
   alignResult: null,
   alignHistory: [],
-  scenesAlignment: null,
+  scenesSegData: null,
   scenesResult: null,
   assetsSceneData: null,
   assetStatuses: {},

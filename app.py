@@ -42,11 +42,13 @@ app = Flask(__name__, static_folder=None)
 CORS(app)
 
 from studio.timing import timing_bp
+from studio.segmenter import segmenter_bp
 from studio.scenes import scenes_bp
 from studio.assets import assets_bp
 from studio.editor import editor_bp
 
 app.register_blueprint(timing_bp)
+app.register_blueprint(segmenter_bp)
 app.register_blueprint(scenes_bp)
 app.register_blueprint(assets_bp)
 app.register_blueprint(editor_bp)

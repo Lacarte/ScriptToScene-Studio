@@ -6,3 +6,4 @@ requests
 soundfile
 stable-ts
 openai-whisper
+python-dotenv

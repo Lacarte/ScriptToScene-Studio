@@ -62,17 +62,31 @@
     </div>
   </div>
 
-  <!-- History Picker Modal (for SCENES page) -->
-  <div id="history-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
+  <!-- Scenes Segmenter Picker Modal -->
+  <div id="scenes-seg-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
+    aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
+    <div class="card w-full max-w-md p-5" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display text-base font-semibold" style="color:var(--text)">Pick Segmentation</h3>
+        <button onclick="scenesCloseSegPicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="scenes-seg-picker-list" style="overflow-y:auto;flex:1"></div>
+    </div>
+  </div>
+
+  <!-- Segmenter Picker Modal -->
+  <div id="seg-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
     <div class="card w-full max-w-md p-5" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-display text-base font-semibold" style="color:var(--text)">Pick Alignment</h3>
-        <button onclick="closeHistoryPicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
+        <button onclick="segClosePickerModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
-      <div id="history-picker-list" style="overflow-y:auto;flex:1"></div>
+      <div id="seg-picker-list" style="overflow-y:auto;flex:1"></div>
     </div>
   </div>
 
@@ -105,6 +119,14 @@
           <circle cx="19" cy="17" r="2" />
         </svg>
         <span class="nav-label">TIMING</span>
+      </button>
+      <button class="nav-item" onclick="switchPage('segmenter')" data-page="segmenter">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          viewBox="0 0 24 24">
+          <path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h6" />
+          <path d="M18 10v8" /><path d="M15 13l3-3 3 3" />
+        </svg>
+        <span class="nav-label">SEGMENTER</span>
       </button>
       <button class="nav-item" onclick="switchPage('scenes')" data-page="scenes">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -152,6 +174,12 @@
         <path d="M4 7h16M4 12h16M4 17h10" /><circle cx="19" cy="17" r="2" />
       </svg>
       TIMING
+    </button>
+    <button onclick="switchPage('segmenter')" data-page="segmenter">
+      <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+        <path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h6" /><path d="M18 10v8" /><path d="M15 13l3-3 3 3" />
+      </svg>
+      SEGMENTER
     </button>
     <button onclick="switchPage('scenes')" data-page="scenes">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
@@ -254,6 +282,89 @@
     </div>
 
     <!-- ========================================================== -->
+    <!-- PAGE: SEGMENTER                                            -->
+    <!-- ========================================================== -->
+    <div id="page-segmenter" class="page">
+      <div class="max-w-2xl mx-auto px-6 py-8">
+
+        <!-- Header -->
+        <div class="mb-6">
+          <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Segmenter</h2>
+          <p class="text-sm mt-1" style="color:var(--text-secondary)">Split alignment into timed segments for scene generation</p>
+        </div>
+
+        <!-- Alignment Source -->
+        <section class="card p-5 mb-4">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Alignment Source</label>
+          <div class="flex gap-3 mb-3 flex-wrap">
+            <button onclick="segUseCurrentResult()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
+            <button onclick="segPickHistory()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
+            <label class="action-btn hover-accent" style="padding:6px 14px;font-size:11px;cursor:pointer">
+              Upload JSON
+              <input type="file" accept=".json" style="display:none" onchange="segHandleUpload(this)">
+            </label>
+          </div>
+          <div id="seg-source-info" class="font-mono" style="font-size:12px;color:var(--text-muted)">No alignment selected</div>
+        </section>
+
+        <!-- Config -->
+        <section class="card p-5 mb-4">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Segment Config</label>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-3" style="max-width:500px">
+            <div>
+              <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
+                <span>Target Min</span><span id="seg-val-target_min" class="font-mono" style="color:var(--accent)">1.5s</span>
+              </div>
+              <input type="range" min="0.5" max="3.0" step="0.1" value="1.5" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('target_min', this.value)">
+            </div>
+            <div>
+              <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
+                <span>Target Max</span><span id="seg-val-target_max" class="font-mono" style="color:var(--accent)">3.0s</span>
+              </div>
+              <input type="range" min="2.0" max="6.0" step="0.1" value="3.0" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('target_max', this.value)">
+            </div>
+            <div>
+              <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
+                <span>Hard Max</span><span id="seg-val-hard_max" class="font-mono" style="color:var(--accent)">4.0s</span>
+              </div>
+              <input type="range" min="3.0" max="8.0" step="0.1" value="4.0" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('hard_max', this.value)">
+            </div>
+            <div>
+              <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
+                <span>Gap Filler</span><span id="seg-val-gap_filler" class="font-mono" style="color:var(--accent)">0.3s</span>
+              </div>
+              <input type="range" min="0.1" max="1.0" step="0.05" value="0.3" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('gap_filler', this.value)">
+            </div>
+          </div>
+        </section>
+
+        <!-- Run Button -->
+        <button id="seg-run-btn" onclick="handleRunSegmenter()" class="gen-btn w-full"
+          style="padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;letter-spacing:0.02em;color:white;cursor:pointer;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);border:none;position:relative;overflow:hidden">
+          <span id="seg-btn-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
+          <span id="seg-btn-label">Run Segmenter</span>
+        </button>
+
+        <!-- Results -->
+        <div id="seg-results" style="display:none;margin-top:20px">
+          <section class="card p-5">
+            <div class="flex items-center justify-between mb-3">
+              <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Results</label>
+              <div style="display:flex;gap:6px">
+                <button onclick="copySegJSON()" class="action-btn hover-accent">Copy JSON</button>
+                <button onclick="downloadSegJSON()" class="action-btn hover-accent">Download</button>
+              </div>
+            </div>
+            <div id="seg-stats" class="font-mono" style="font-size:11px;color:var(--text-secondary);margin-bottom:12px"></div>
+            <div id="seg-timeline" style="margin-bottom:16px"></div>
+            <div id="seg-list" style="display:flex;flex-direction:column;gap:6px;max-height:600px;overflow-y:auto;padding-right:4px"></div>
+          </section>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
     <!-- PAGE: SCENES (AI Scene Script Generator)                   -->
     <!-- ========================================================== -->
     <div id="page-scenes" class="page">
@@ -265,15 +376,19 @@
           <p class="text-sm mt-1" style="color:var(--text-secondary)">Transform word-level timestamps into AI-powered visual scene scripts</p>
         </div>
 
-        <!-- Alignment Source -->
+        <!-- Segmentation Source -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Alignment Source</label>
-          <div class="flex gap-3 mb-3">
-            <button onclick="useCurrentAlignmentForScenes()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
-            <button onclick="pickHistoryForScenes()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Segmentation Source</label>
+          <div class="flex gap-3 mb-3 flex-wrap">
+            <button onclick="scenesUseCurrentSegment()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
+            <button onclick="scenesPickSegHistory()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
+            <label class="action-btn hover-accent" style="padding:6px 14px;font-size:11px;cursor:pointer">
+              Upload JSON
+              <input type="file" accept=".json" style="display:none" onchange="scenesHandleUpload(this)">
+            </label>
           </div>
-          <div id="scenes-source-info" class="font-mono" style="font-size:12px;color:var(--text-muted)">No alignment selected</div>
-          <div id="scenes-json-preview" style="display:none;margin-top:10px;max-height:150px;overflow-y:auto;background:var(--bg-darkest);border-radius:8px;padding:12px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);white-space:pre-wrap"></div>
+          <div id="scenes-source-info" class="font-mono" style="font-size:12px;color:var(--text-muted)">No segmentation selected</div>
+          <div id="scenes-json-preview" style="display:none;margin-top:10px;max-height:250px;overflow-y:auto;background:var(--bg-darkest);border-radius:8px;padding:12px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);white-space:pre-wrap"></div>
         </section>
 
         <!-- Settings -->
@@ -298,20 +413,52 @@
               </select>
             </div>
           </div>
+
+          <!-- Webhook Toggle -->
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <label class="block text-xs" style="color:var(--text-secondary)">Send to Webhook</label>
+              <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer">
+                <input type="checkbox" id="scenes-webhook-toggle" checked onchange="scenesToggleWebhook()" style="opacity:0;width:0;height:0">
+                <span style="position:absolute;inset:0;background:var(--bg-darkest);border:1px solid var(--border);border-radius:10px;transition:all 0.2s"></span>
+                <span id="scenes-webhook-dot" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:var(--accent);border-radius:50%;transition:all 0.2s;transform:translateX(16px)"></span>
+              </label>
+            </div>
+            <div id="scenes-webhook-url-row" style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="scenes-webhook-url" class="input-field font-mono" style="flex:1;padding:8px 12px;font-size:11px" placeholder="Webhook URL..." oninput="localStorage.setItem('sts-scenes-webhook-url',this.value)">
+              <button onclick="scenesResetWebhookUrl()" class="action-btn hover-accent" style="padding:6px 10px;font-size:10px;white-space:nowrap">Reset</button>
+            </div>
+            <p id="scenes-webhook-off-msg" style="display:none;font-size:11px;color:var(--text-muted);font-style:italic">Webhook disabled — will only preview the payload without sending</p>
+          </div>
         </section>
 
-        <!-- Generate Button -->
+        <!-- Generate / Preview Button -->
         <button id="scenes-generate-btn" onclick="handleGenerateScenes()" class="gen-btn w-full"
           style="padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;letter-spacing:0.02em;color:white;cursor:pointer;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);border:none;position:relative;overflow:hidden">
           <span id="scenes-btn-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
           <span id="scenes-btn-label">Generate Scene Script</span>
         </button>
 
+        <!-- Payload Preview (shown when webhook is OFF) -->
+        <div id="scenes-payload-preview" style="display:none;margin-top:16px">
+          <div style="border:1px solid var(--border);border-radius:10px;background:var(--bg-darkest);overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
+              <span class="font-mono text-xs" style="color:var(--accent)">Webhook Payload Preview</span>
+              <div style="display:flex;gap:6px">
+                <button onclick="scenesPayloadCopy()" class="action-btn hover-accent" style="padding:4px 10px;font-size:10px">Copy</button>
+                <button onclick="$('#scenes-payload-preview').style.display='none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
+              </div>
+            </div>
+            <pre id="scenes-payload-preview-content" class="font-mono" style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.6;margin:0;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
+          </div>
+        </div>
+
         <!-- Results -->
         <div id="scenes-results" style="display:none;margin-top:20px">
           <div class="flex items-center justify-between mb-3">
             <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Generated Scenes</label>
             <div style="display:flex;gap:6px">
+              <button onclick="toggleScenesPreview()" id="scenes-preview-btn" class="action-btn hover-accent" style="border-color:#A78BFA;color:#A78BFA">Preview Script</button>
               <button onclick="copyScenesJSON()" class="action-btn hover-accent">Copy JSON</button>
               <button onclick="downloadScenesJSON()" class="action-btn hover-accent">Download</button>
               <button onclick="sendToAssets()" class="action-btn hover-accent" style="border-color:var(--accent);color:var(--accent)">Send to Assets</button>
@@ -319,6 +466,16 @@
             </div>
           </div>
           <div id="scenes-stats" class="font-mono" style="font-size:11px;color:var(--text-secondary);margin-bottom:10px"></div>
+
+          <!-- Script Preview Panel -->
+          <div id="scenes-script-preview" style="display:none;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;background:var(--bg-darkest);overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
+              <span class="font-mono text-xs" style="color:var(--text-muted)">Generated Scene Script</span>
+              <button onclick="toggleScenesPreview()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
+            </div>
+            <pre id="scenes-script-preview-content" class="font-mono" style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.7;margin:0;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
+          </div>
+
           <div id="scenes-list" style="display:flex;flex-direction:column;gap:8px"></div>
         </div>
 
@@ -410,6 +567,7 @@
   <!-- ===== JavaScript Modules ===== -->
   <script src="js/app.js"></script>
   <script src="js/timing.js"></script>
+  <script src="js/segmenter.js"></script>
   <script src="js/scenes.js"></script>
   <script src="js/assets.js"></script>
   <script src="js/editor.js"></script>

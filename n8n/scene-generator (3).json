@@ -1,0 +1,227 @@
+{
+  "name": "scene-generator",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json.payload) }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a visual scene prompt writer for short-form viral video.\n\n## INPUT\nYou receive JSON with:\n- script: the full spoken transcript\n- style: visual style keyword (e.g., \"cinematic\", \"abstract\", \"photorealistic\")\n- segments: array of pre-timed speech segments, each with index + words\n\n## STEP 1: ANALYZE\nRead the full script FIRST. Determine:\n- mood: emotional arc (e.g., \"whimsical tension\", \"melancholic beauty\", \"raw defiance\")\n- environment: the physical setting implied by the text\n- color_palette: 3-5 dominant colors that match the mood\n- tone: comedic, dramatic, mysterious, nostalgic, unsettling, etc.\n- visual_style: combine the input style with your analysis (e.g., \"cinematic photorealistic with cool industrial tones\")\n\nReturn this as the \"analysis\" object. ALL scene prompts must stay visually consistent with this analysis.\n\n## STEP 2: WRITE SCENES\nFor EACH segment, write a scene that illustrates its meaning within the visual world from your analysis.\n\nEach scene object keys:\n- index: integer (match the input index exactly)\n- title: string (2-6 words)\n- narrative_role: \"hook\" | \"buildup\" | \"peak\" | \"transition\" | \"text_accent\" | \"cta\"\n- type_of_scene: \"image\" | \"video\" | \"text\"\n- image_prompt: string (scene description — for video scenes include motion and animation cues, for text scenes this is the background)\n- text_content: string or null (only for text scenes, 3-8 words, uppercase)\n\n## OUTPUT\nReturn ONLY valid JSON. No markdown. No code fences. No commentary. ENGLISH ONLY.\n\n{\n  \"analysis\": { \"mood\", \"environment\", \"color_palette\", \"tone\", \"visual_style\" },\n  \"scenes\": [ ... ]\n}\n\n## NARRATIVE ROLES\n- hook: FIRST segment. Most arresting scroll-stopping visual. NOT a generic establishing shot.\n- buildup: Rising tension, context, world-building.\n- peak: Most visually intense or emotionally charged moment.\n- transition: Breather. Environmental, atmospheric.\n- text_accent: Text overlay for punchlines, reveals, key phrases.\n- cta: LAST segment. Cliffhanger, question, or emotional resolution.\n\n## TYPE MIX\n- 60-75% video, 20-30% image, 5-10% text\n- Minimum 1 text scene, maximum 2 text scenes\n- The most emotionally impactful line should be a text scene\n- First and last segments should NOT be text scenes\n- Default to VIDEO unless there is a strong reason for image or text\n\n## IMAGE_PROMPT RULES\n\n### For VIDEO scenes — ANIMATED SCENE\nDescribe a living, breathing moment with built-in motion and energy.\n\nFORMAT: [shot type], [subject doing action], [setting + time], [lighting], [mood], [motion cues], [style]\n\nMOTION CUES to include:\n- Subject motion: hands trembling, tears rolling, fingers tracing, hair blowing, chest rising\n- Element motion: dust floating, smoke curling, light flickering, leaves drifting, paper fluttering, rain falling, steam rising, sparks drifting, fabric billowing\n- Camera feel: slow push, drifting, handheld sway (describe as feel, not technical terms)\n- Atmospheric: heat haze, fog rolling, light rays shifting, shadows creeping\n\nBe specific and cinematic: \"dust motes swirl slowly through a golden shaft of light as a weathered hand reaches for the violin\" — NOT \"things move around.\"\n\n### For IMAGE scenes — FROZEN STILL\nOne photograph. One instant. No motion verbs. Must pass: \"Can I take one photograph of exactly this?\"\n\nFORMAT: [shot type], [subject + details], [setting + time], [lighting], [mood], [style]\n\n### For TEXT scenes — BACKGROUND ONLY\nSimple, blurred, abstract background from the scene's environment. Do NOT include text in the prompt.\n\n### SHARED RULES (all types)\nSHOT TYPES: extreme-close-up | close-up | medium | wide | POV | bird's-eye | low-angle | high-angle | over-shoulder | centered-symmetrical\n\nSTYLE KEYWORDS (pick 2-4, must align with analysis.visual_style): cinematic | photorealistic | shallow-depth-of-field | film-grain | 8K | tilt-shift | bokeh | high-contrast | desaturated | painterly-texture\n\n- NEVER mention aspect ratio or resolution dimensions\n- No two consecutive scenes may use the same shot type\n- All prompts must share the same environment and color palette from your analysis\n\n## TEXT SCENES\n- image_prompt: blurred/abstract background from the scene's environment\n- text_content: exact on-screen text (3-8 words, impactful, uppercase)\n- Pick the line that hits hardest emotionally or creates the biggest twist\n\n## VISUAL CONSISTENCY\nEvery scene must feel like it belongs in the SAME video:\n- Same environment (don't jump between locations unless the script does)\n- Same lighting temperature (don't mix warm golden and cool blue randomly)\n- Same style keywords across all prompts\n- Characters/objects introduced early should be recognizable later\n- Color palette from analysis must be reflected in every prompt\n\n## EXAMPLE OUTPUT\n{\n  \"analysis\": {\n    \"mood\": \"whimsical, quietly unsettling, dry humor\",\n    \"environment\": \"sterile industrial mail sorting facility with conveyor belts and metal shelving\",\n    \"color_palette\": \"cool steel gray, fluorescent white, warm envelope cream, muted teal accents\",\n    \"tone\": \"comedic tension building to unease\",\n    \"visual_style\": \"cinematic photorealistic with cold industrial lighting and warm paper textures\"\n  },\n  \"scenes\": [\n    {\n      \"index\": 0,\n      \"title\": \"Designed To Sort Mail\",\n      \"narrative_role\": \"hook\",\n      \"type_of_scene\": \"video\",\n      \"image_prompt\": \"medium shot, robotic sorting arm twitching above a conveyor belt overflowing with scattered envelopes, a single envelope slowly sliding along the belt edge, fluorescent lights flickering overhead casting shifting shadows on steel surfaces, sterile industrial mail facility with metal shelving, mechanical tension and cold efficiency, cinematic photorealistic shallow-depth-of-field film-grain\",\n      \"text_content\": null\n    },\n    {\n      \"index\": 2,\n      \"title\": \"Firmware Crossroads\",\n      \"narrative_role\": \"buildup\",\n      \"type_of_scene\": \"image\",\n      \"image_prompt\": \"low-angle, stack of firmware update discs labeled V7 and V8 resting on cold steel workstation, faint monitor glow in blurred background, sterile industrial mail facility, cool fluorescent lighting, quiet anticipation, cinematic photorealistic 8K high-contrast\",\n      \"text_content\": null\n    },\n    {\n      \"index\": 3,\n      \"title\": \"Fondness For Poetry\",\n      \"narrative_role\": \"text_accent\",\n      \"type_of_scene\": \"text\",\n      \"image_prompt\": \"soft blurred background of scattered cream envelopes on steel surface under cool fluorescent light, warm paper tones against cold metal, high-contrast, cinematic photorealistic bokeh\",\n      \"text_content\": \"A FONDNESS FOR POETRY\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1440,
+        432
+      ],
+      "id": "7317b008-7bf8-4779-9e81-b695b1fb4ecc",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1512,
+        656
+      ],
+      "id": "38f04ec9-bdf7-4e52-a602-7960a4fa4e3f",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "mbWrJSQdMKz6Ve5M",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "scene-generator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        768,
+        556
+      ],
+      "id": "d34015e2-f527-4da9-ab60-ab12351b7a91",
+      "name": "Webhook",
+      "webhookId": "6ea28ba0-5b8c-43ee-8843-59542f0ac4b5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d20fea18-1a23-49da-a623-2189b4ea7d4b",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1216,
+        556
+      ],
+      "id": "620e6814-7397-4317-8074-d75a5d5629ae",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code Node: Validate Scene Generator Input\n// Place right after the Webhook node\n\nconst input = $input.first().json.body;\nconst errors = [];\nconst warnings = [];\n\n// ──────────────────────────────────────\n// 1. REQUIRED KEYS\n// ──────────────────────────────────────\nif (!input.script || typeof input.script !== 'string') {\n  errors.push('Missing or invalid \"script\": must be a non-empty string');\n}\n\nif (!input.segments || !Array.isArray(input.segments)) {\n  errors.push('Missing or invalid \"segments\": must be an array');\n}\n\nif (!input.style || typeof input.style !== 'string') {\n  warnings.push('Missing \"style\": will default to \"cinematic photorealistic\"');\n}\n\n// ──────────────────────────────────────\n// 2. SCRIPT VALIDATION\n// ──────────────────────────────────────\nif (input.script) {\n  const wordCount = input.script.split(/\\s+/).length;\n\n  if (wordCount < 10) {\n    errors.push(`Script too short: ${wordCount} words (min 10)`);\n  }\n\n  if (wordCount > 500) {\n    warnings.push(`Script is long: ${wordCount} words — LLM output may be truncated`);\n  }\n}\n\n// ──────────────────────────────────────\n// 3. SEGMENTS VALIDATION\n// ──────────────────────────────────────\nif (Array.isArray(input.segments)) {\n  if (input.segments.length === 0) {\n    errors.push('Segments array is empty');\n  }\n\n  if (input.segments.length < 3) {\n    warnings.push(`Only ${input.segments.length} segments — may produce thin scene plan`);\n  }\n\n  if (input.segments.length > 25) {\n    warnings.push(`${input.segments.length} segments — LLM may struggle with this many`);\n  }\n\n  const seenIndexes = new Set();\n\n  input.segments.forEach((seg, i) => {\n    // Index exists and is integer\n    if (seg.index === undefined || typeof seg.index !== 'number') {\n      errors.push(`Segment ${i}: missing or invalid \"index\"`);\n    }\n\n    // Duplicate index check\n    if (seenIndexes.has(seg.index)) {\n      errors.push(`Segment ${i}: duplicate index ${seg.index}`);\n    }\n    seenIndexes.add(seg.index);\n\n    // Words exists and is string\n    if (!seg.words || typeof seg.words !== 'string') {\n      errors.push(`Segment ${i} (index ${seg.index}): missing or invalid \"words\"`);\n    }\n\n    // Words not empty\n    if (seg.words && seg.words.trim().length === 0) {\n      errors.push(`Segment ${i} (index ${seg.index}): \"words\" is empty`);\n    }\n  });\n\n  // Check chronological index order\n  for (let i = 1; i < input.segments.length; i++) {\n    if (input.segments[i].index <= input.segments[i - 1].index) {\n      errors.push(`Segments not in order: index ${input.segments[i].index} after ${input.segments[i - 1].index}`);\n    }\n  }\n}\n\n// ──────────────────────────────────────\n// 4. OPTIONAL FIELDS CHECK\n// ──────────────────────────────────────\nconst VALID_STYLES = [\n  'cinematic', 'cinematic photorealistic', 'abstract',\n  'painterly', 'anime', 'watercolor', 'noir',\n  'retro', 'minimalist', 'surreal'\n];\n\nif (input.style && !VALID_STYLES.some(s => input.style.toLowerCase().includes(s))) {\n  warnings.push(`Style \"${input.style}\" not in known presets — LLM will interpret freely`);\n}\n\nif (input.aspect_ratio) {\n  const validRatios = ['9:16', '16:9', '1:1', '4:5'];\n  if (!validRatios.includes(input.aspect_ratio)) {\n    warnings.push(`Aspect ratio \"${input.aspect_ratio}\" not standard`);\n  }\n}\n\n// ──────────────────────────────────────\n// 5. BUILD CLEAN PAYLOAD\n// ──────────────────────────────────────\nconst valid = errors.length === 0;\n\nif (!valid) {\n  return {\n    json: {\n      valid: false,\n      errors,\n      warnings\n    }\n  };\n}\n\n// Clean payload — only what the LLM needs\nconst cleanPayload = {\n  script: input.script.trim(),\n  style: (input.style || 'cinematic photorealistic').trim(),\n  segments: input.segments.map(s => ({\n    index: s.index,\n    words: s.words.trim()\n  }))\n};\n\n// Pass-through metadata for later merge\nconst metadata = {\n  source_folder: input.source_folder || '',\n  aspect_ratio: input.aspect_ratio || '9:16',\n  segment_count: input.segments.length\n};\n\nreturn {\n  json: {\n    valid: true,\n    errors: [],\n    warnings,\n    payload: cleanPayload,\n    metadata\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        556
+      ],
+      "id": "d1c9c4e3-5b27-48a2-8edd-d68ddf672357",
+      "name": "input_validator"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1808,
+        1184
+      ],
+      "id": "46220b80-0d05-405d-b7a4-d98431bf94a7",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code Node: Validate LLM Scene Output v10\n// Place after the LLM Chain node\n\nconst raw = $input.first().json.text;\nconst errors = [];\nconst warnings = [];\n\n// ──────────────────────────────────────\n// 1. PARSE JSON\n// ──────────────────────────────────────\nlet data;\ntry {\n  data = JSON.parse(raw);\n} catch (e) {\n  const match = raw.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  if (match) {\n    try {\n      data = JSON.parse(match[1].trim());\n    } catch (e2) {\n      return { json: { valid: false, errors: ['Failed to parse JSON: ' + e2.message], warnings: [] } };\n    }\n  } else {\n    return { json: { valid: false, errors: ['Failed to parse JSON: ' + e.message], warnings: [] } };\n  }\n}\n\n// ──────────────────────────────────────\n// 2. VALIDATE ANALYSIS\n// ──────────────────────────────────────\nif (!data.analysis || typeof data.analysis !== 'object') {\n  errors.push('Missing \"analysis\" object');\n} else {\n  const requiredAnalysis = ['mood', 'environment', 'color_palette', 'tone', 'visual_style'];\n  requiredAnalysis.forEach(key => {\n    if (!data.analysis[key] || typeof data.analysis[key] !== 'string') {\n      warnings.push(`analysis.${key} missing or empty`);\n    }\n  });\n}\n\n// ──────────────────────────────────────\n// 3. VALIDATE SCENES ARRAY\n// ──────────────────────────────────────\nif (!data.scenes || !Array.isArray(data.scenes)) {\n  return { json: { valid: false, errors: ['Missing \"scenes\" array'], warnings } };\n}\n\nif (data.scenes.length === 0) {\n  return { json: { valid: false, errors: ['Scenes array is empty'], warnings } };\n}\n\n// ──────────────────────────────────────\n// 4. VALIDATE EACH SCENE\n// ──────────────────────────────────────\nconst VALID_ROLES = ['hook', 'buildup', 'peak', 'transition', 'text_accent', 'cta'];\nconst VALID_TYPES = ['image', 'video', 'text'];\nconst NON_ASCII = /[^\\x00-\\x7F]/;\n\nconst seenIndexes = new Set();\n\ndata.scenes.forEach((scene, i) => {\n  const label = `Scene ${i} (index ${scene.index})`;\n\n  // index\n  if (scene.index === undefined || typeof scene.index !== 'number') {\n    errors.push(`${label}: missing or invalid index`);\n  }\n  if (seenIndexes.has(scene.index)) {\n    errors.push(`${label}: duplicate index ${scene.index}`);\n  }\n  seenIndexes.add(scene.index);\n\n  // title\n  if (!scene.title || typeof scene.title !== 'string') {\n    errors.push(`${label}: missing title`);\n  } else if (scene.title.split(/\\s+/).length > 8) {\n    warnings.push(`${label}: title \"${scene.title}\" is long`);\n  }\n\n  // narrative_role\n  if (!VALID_ROLES.includes(scene.narrative_role)) {\n    errors.push(`${label}: invalid narrative_role \"${scene.narrative_role}\"`);\n  }\n\n  // type_of_scene\n  if (!VALID_TYPES.includes(scene.type_of_scene)) {\n    errors.push(`${label}: invalid type_of_scene \"${scene.type_of_scene}\"`);\n  }\n\n  // image_prompt\n  if (!scene.image_prompt || typeof scene.image_prompt !== 'string') {\n    errors.push(`${label}: missing image_prompt`);\n  } else {\n    // Check for non-ASCII\n    if (NON_ASCII.test(scene.image_prompt)) {\n      warnings.push(`${label}: image_prompt contains non-ASCII — auto-cleaned`);\n      scene.image_prompt = scene.image_prompt.replace(/[^\\x00-\\x7F]/g, '');\n    }\n\n    // Check prompt length\n    if (scene.image_prompt.length < 30) {\n      warnings.push(`${label}: image_prompt very short (${scene.image_prompt.length} chars)`);\n    }\n\n    // Video scenes should have motion cues\n    if (scene.type_of_scene === 'video') {\n      const motionWords = /\\b(slowly|gently|drifting|floating|flickering|swirling|trembling|rolling|curling|sliding|rising|falling|blowing|shifting|creeping|twitching|pulsing|breathing|swaying|dripping)\\b/i;\n      if (!motionWords.test(scene.image_prompt)) {\n        warnings.push(`${label}: video scene may lack motion cues in prompt`);\n      }\n    }\n  }\n\n  // text_content\n  if (scene.type_of_scene === 'text') {\n    if (!scene.text_content || typeof scene.text_content !== 'string') {\n      errors.push(`${label}: text scene missing text_content`);\n    }\n  } else {\n    if (scene.text_content !== null && scene.text_content !== undefined) {\n      scene.text_content = null; // auto-fix\n    }\n  }\n\n  // Remove legacy keys if present\n  delete scene.motion_in_image;\n  delete scene.fx;\n  delete scene.segment_index;\n});\n\n// ──────────────────────────────────────\n// 5. STRUCTURE CHECKS\n// ──────────────────────────────────────\n\n// First scene should be hook\nif (data.scenes[0] && data.scenes[0].narrative_role !== 'hook') {\n  warnings.push(`First scene role is \"${data.scenes[0].narrative_role}\" — expected \"hook\"`);\n}\n\n// Last scene should be cta\nconst lastScene = data.scenes[data.scenes.length - 1];\nif (lastScene && lastScene.narrative_role !== 'cta') {\n  warnings.push(`Last scene role is \"${lastScene.narrative_role}\" — expected \"cta\"`);\n}\n\n// Type mix check\nconst typeCounts = { video: 0, image: 0, text: 0 };\ndata.scenes.forEach(s => { if (typeCounts[s.type_of_scene] !== undefined) typeCounts[s.type_of_scene]++; });\nconst total = data.scenes.length;\n\nconst videoPct = Math.round(typeCounts.video / total * 100);\nconst imagePct = Math.round(typeCounts.image / total * 100);\nconst textPct = Math.round(typeCounts.text / total * 100);\n\nif (videoPct < 55) {\n  warnings.push(`Video at ${videoPct}% — target 60-75%`);\n}\n\nif (typeCounts.text === 0 && total >= 6) {\n  warnings.push('No text scenes — recommend at least 1');\n}\n\nif (typeCounts.text > 2) {\n  warnings.push(`${typeCounts.text} text scenes — recommend max 2`);\n}\n\n// ──────────────────────────────────────\n// 6. ADD DURATION\n// ──────────────────────────────────────\nconst randomDuration = () => +(2 + Math.random() * 1.5).toFixed(1);\n\ndata.scenes.forEach(scene => {\n  scene.duration = randomDuration();\n});\n\n// ──────────────────────────────────────\n// 7. OUTPUT\n// ──────────────────────────────────────\nconst valid = errors.length === 0;\n\nreturn {\n  json: {\n    valid,\n    errors,\n    warnings,\n    type_mix: {\n      video: `${typeCounts.video} (${videoPct}%)`,\n      image: `${typeCounts.image} (${imagePct}%)`,\n      text: `${typeCounts.text} (${textPct}%)`\n    },\n    analysis: data.analysis || {},\n    scenes: data.scenes,\n    scene_count: data.scenes.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        432
+      ],
+      "id": "45f35b52-ed20-4a88-9025-788e1b03e39e",
+      "name": "output_validator"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "input_validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "output_validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "input_validator": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "output_validator": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "fea24474-7e2f-4238-b084-dcdafa7ed1ac",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b08ffe7189a3bf891067c24699a40fefd7fab74ba662332f16c66f310d400ff0"
+  },
+  "id": "1ga5ercqD130rcAH",
+  "tags": []
+}

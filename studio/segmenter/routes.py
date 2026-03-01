@@ -30,6 +30,7 @@ def segment_alignment():
         return jsonify({"error": "No alignment data provided"}), 400
 
     metadata = {
+        "project_id": data.get("project_id", ""),
         "source_folder": data.get("source_folder", ""),
         "style": data.get("style", ""),
         "aspect_ratio": data.get("aspect_ratio", ""),
@@ -74,6 +75,7 @@ def segment_history():
             stats = data.get("stats", {})
             items.append({
                 "folder": entry,
+                "project_id": meta.get("project_id", ""),
                 "source_folder": meta.get("source_folder", ""),
                 "total_duration": meta.get("total_duration", 0),
                 "segmented_at": meta.get("segmented_at", ""),

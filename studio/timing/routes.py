@@ -2,8 +2,10 @@
 
 import json
 import os
+import random
 import re
 import shutil
+import string
 import subprocess
 import time
 import threading
@@ -16,6 +18,35 @@ from flask import Blueprint, jsonify, request, send_from_directory
 from loguru import logger
 
 from config import ALIGN_DIR, ALIGN_TRASH_DIR, BIN_DIR
+
+
+def _generate_project_id():
+    """Generate a unique project ID like proj_A3F82K.
+
+    Scans all existing alignment.json files to ensure no collision.
+    """
+    existing = set()
+    if os.path.exists(ALIGN_DIR):
+        for entry in os.listdir(ALIGN_DIR):
+            json_path = os.path.join(ALIGN_DIR, entry, "alignment.json")
+            if os.path.isfile(json_path):
+                try:
+                    with open(json_path, "r") as f:
+                        data = json.load(f)
+                    pid = data.get("project_id")
+                    if pid:
+                        existing.add(pid)
+                except (json.JSONDecodeError, OSError):
+                    pass
+
+    charset = string.ascii_uppercase + string.digits
+    for _ in range(100):
+        candidate = "proj_" + "".join(random.choices(charset, k=6))
+        if candidate not in existing:
+            return candidate
+
+    # Fallback: add timestamp to guarantee uniqueness
+    return "proj_" + datetime.now().strftime("%H%M%S") + "".join(random.choices(charset, k=3))
 
 timing_bp = Blueprint("timing", __name__)
 
@@ -115,6 +146,7 @@ def list_force_alignments():
             duration = round(words[-1]["end"], 2) if words else 0
             items.append({
                 "type": "force-alignment",
+                "project_id": meta.get("project_id", ""),
                 "folder": meta.get("folder", entry),
                 "source_file": meta.get("source_file", ""),
                 "transcript": meta.get("transcript", ""),
@@ -179,7 +211,10 @@ def force_align():
         if not alignment:
             return jsonify({"error": "Alignment produced no results"}), 500
 
+        project_id = _generate_project_id()
+
         result_data = {
+            "project_id": project_id,
             "source_file": original_name,
             "folder": folder_name,
             "transcript": text,

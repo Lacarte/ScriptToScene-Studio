@@ -62,9 +62,10 @@ function renderAlignResults(data) {
   $('#align-results').style.display = '';
   const words = data.alignment || [];
   const duration = words.length ? words[words.length - 1].end : 0;
-  let stats = `${words.length} words · ${duration.toFixed(1)}s duration`;
+  let stats = '';
+  if (data.project_id) stats += `${data.project_id} · `;
+  stats += `${words.length} words · ${duration.toFixed(1)}s duration`;
   if (data.inference_time) stats += ` · ${data.inference_time.toFixed(2)}s processing`;
-  if (data.folder) stats += ` · ${data.folder}/`;
   $('#align-results-stats').textContent = stats;
   $('#align-results-words').innerHTML = words.map(w =>
     `<span class="font-mono hover-word-chip" style="font-size:12px;padding:2px 6px;border-radius:4px;background:var(--bg-darkest);color:var(--text);cursor:default" title="${w.begin.toFixed(2)}s - ${w.end.toFixed(2)}s">${w.word}</span>`
@@ -129,7 +130,7 @@ function renderAlignHistory() {
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px">
         <div style="flex:1;min-width:0">
           <p style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">${esc(truncated)}</p>
-          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.word_count} words · ${h.duration_seconds}s · ${timeAgo(h.timestamp)}</p>
+          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.project_id ? h.project_id + ' · ' : ''}${h.word_count} words · ${h.duration_seconds}s · ${timeAgo(h.timestamp)}</p>
         </div>
         <span class="font-mono" style="font-size:9px;color:var(--text-muted);flex-shrink:0;background:var(--bg-darkest);padding:2px 6px;border-radius:4px">${esc(h.source_file || '')}</span>
         <button onclick="loadAlignResult(${i})" title="View" class="hover-purple-icon" style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);background:transparent;border:none;cursor:pointer;flex-shrink:0">
@@ -146,7 +147,7 @@ function renderAlignHistory() {
 function loadAlignResult(idx) {
   const h = STATE.alignHistory[idx];
   if (!h) return;
-  STATE.alignResult = { folder: h.folder, alignment: h.word_alignment, inference_time: h.inference_time, transcript: h.transcript };
+  STATE.alignResult = { project_id: h.project_id, folder: h.folder, alignment: h.word_alignment, inference_time: h.inference_time, transcript: h.transcript };
   renderAlignResults(STATE.alignResult);
   $('#main-content').scrollTo({ top: 0, behavior: 'smooth' });
 }

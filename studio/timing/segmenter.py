@@ -319,6 +319,7 @@ def run_segmenter(alignment, config=None, metadata=None):
 
     output = {
         "metadata": {
+            "project_id": meta.get("project_id", ""),
             "source_folder": meta.get("source_folder", ""),
             "style": meta.get("style", ""),
             "aspect_ratio": meta.get("aspect_ratio", ""),

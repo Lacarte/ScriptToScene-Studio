@@ -21,6 +21,12 @@ asset_jobs = {}
 # Routes
 # ---------------------------------------------------------------------------
 
+@assets_bp.route("/api/assets/webhook-url")
+def get_asset_webhook_url():
+    """Return the current asset webhook URL."""
+    return jsonify({"url": N8N_ASSET_WEBHOOK_URL})
+
+
 @assets_bp.route("/api/assets/generate", methods=["POST"])
 def generate_asset():
     """Queue an image generation request via n8n webhook."""
@@ -30,6 +36,7 @@ def generate_asset():
 
     scene_id = data.get("scene_id", 0)
     project_id = data.get("project_id", "default")
+    webhook_url = data.get("webhook_url") or N8N_ASSET_WEBHOOK_URL
     job_id = f"asset_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{scene_id}"
 
     asset_jobs[job_id] = {
@@ -43,7 +50,7 @@ def generate_asset():
 
     def _generate_async():
         try:
-            resp = http_requests.post(N8N_ASSET_WEBHOOK_URL, json={
+            resp = http_requests.post(webhook_url, json={
                 "job_id": job_id,
                 "prompt": data["prompt"],
                 "provider": data.get("provider", "midjourney"),

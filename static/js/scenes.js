@@ -44,7 +44,7 @@ async function scenesPickSegHistory() {
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px">
         <div style="flex:1;min-width:0">
           <p style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">${esc(truncated)}</p>
-          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.segment_count} segments · ${h.total_duration.toFixed(1)}s · avg ${h.avg_duration.toFixed(2)}s</p>
+          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.project_id ? h.project_id + ' · ' : ''}${h.segment_count} segments · ${h.total_duration.toFixed(1)}s · avg ${h.avg_duration.toFixed(2)}s</p>
         </div>
         <span class="font-mono" style="font-size:9px;color:var(--text-muted);flex-shrink:0;background:var(--bg-darkest);padding:2px 6px;border-radius:4px">${timeAgo(h.segmented_at)}</span>
       </div>
@@ -104,7 +104,8 @@ function _updateScenesSource() {
   const segCount = stats.segment_count || d.segments.filter(s => !s.is_filler).length;
   const dur = meta.total_duration || 0;
   const src = meta.source_folder || d.output_folder || 'uploaded';
-  $('#scenes-source-info').textContent = `${segCount} segments · ${dur.toFixed(1)}s from ${src}`;
+  const pid = meta.project_id ? `${meta.project_id} · ` : '';
+  $('#scenes-source-info').textContent = `${pid}${segCount} segments · ${dur.toFixed(1)}s from ${src}`;
   $('#scenes-source-info').style.color = 'var(--accent)';
 
   // Preview the full webhook payload that will be sent
@@ -249,6 +250,7 @@ async function scenesSendPreviewToWebhook() {
     const meta = STATE.scenesSegData.metadata || {};
     const payload = {
       ..._buildWebhookPayload(STATE.scenesSegData),
+      project_id: meta.project_id || '',
       source_folder: meta.source_folder || '',
       aspect_ratio: $('#scenes-aspect').value,
       webhook_url: webhookUrl,
@@ -282,25 +284,30 @@ async function scenesSendPreviewToWebhook() {
 function renderSceneResults(data) {
   $('#scenes-results').style.display = '';
   const scenes = data.scenes || [];
-  const totalDuration = scenes.length ? scenes[scenes.length - 1].end : 0;
-  $('#scenes-stats').textContent = `${scenes.length} scenes · ${totalDuration.toFixed(1)}s total`;
+  const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
+  const pid = data.project_id ? `${data.project_id} · ` : '';
+  $('#scenes-stats').textContent = `${pid}${scenes.length} scenes · ${totalDuration.toFixed(1)}s total`;
 
-  $('#scenes-list').innerHTML = scenes.map(s => `
-    <div class="scene-card">
+  const typeColors = { video: '#4ECDC4', image: '#A78BFA', text: '#FFB347' };
+  const typeBg = { video: 'rgba(78,205,196,0.1)', image: 'rgba(167,139,250,0.1)', text: 'rgba(255,179,71,0.1)' };
+
+  $('#scenes-list').innerHTML = scenes.map(s => {
+    const tc = typeColors[s.type_of_scene] || '#6b7f93';
+    const tb = typeBg[s.type_of_scene] || 'rgba(107,127,147,0.1)';
+    return `
+    <div class="scene-card" style="border-left-color:${tc}">
       <div class="flex items-center justify-between mb-2">
-        <span class="font-mono text-xs" style="color:var(--accent)">Scene ${s.scene_id} &middot; ${(s.start || 0).toFixed(2)}s - ${(s.end || 0).toFixed(2)}s</span>
+        <span class="font-mono text-xs" style="color:${tc}">#${s.index} &middot; ${esc(s.title || '')}</span>
         <div style="display:flex;gap:6px;align-items:center">
-          ${s.emotion ? `<span class="font-mono text-xs" style="padding:2px 8px;border-radius:4px;background:rgba(167,139,250,0.1);color:#A78BFA">${esc(s.emotion)}</span>` : ''}
-          ${s.intensity_level !== undefined ? `<span class="font-mono text-xs" style="padding:2px 6px;border-radius:4px;background:rgba(78,205,196,0.1);color:var(--accent)">L${s.intensity_level}</span>` : ''}
+          <span class="font-mono" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background:${tb};color:${tc};text-transform:uppercase;letter-spacing:0.05em">${s.type_of_scene || 'video'}</span>
+          ${s.narrative_role ? `<span class="font-mono" style="font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(78,205,196,0.08);color:var(--accent)">${esc(s.narrative_role)}</span>` : ''}
+          <span class="font-mono" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg-darkest);color:var(--text-muted)">${(s.duration || 0).toFixed(1)}s</span>
         </div>
       </div>
-      <p style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">${esc(s.text_fragment)}</p>
-      <p style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;font-style:italic;line-height:1.5">${esc(s.visual_prompt)}</p>
-      <div class="flex gap-3" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
-        ${s.camera_motion ? `<span>Camera: ${esc(s.camera_motion)}</span>` : ''}
-      </div>
-    </div>
-  `).join('');
+      ${s.text_content ? `<p style="font-size:14px;color:${tc};margin-bottom:8px;font-weight:600">"${esc(s.text_content)}"</p>` : ''}
+      <p style="font-size:11px;color:var(--text-secondary);font-style:italic;line-height:1.5">${esc(s.image_prompt || '')}</p>
+    </div>`;
+  }).join('');
 }
 
 // ---- Preview ----
@@ -320,14 +327,12 @@ function toggleScenesPreview() {
   // Build readable script preview
   const scenes = STATE.scenesResult.scenes;
   const lines = scenes.map(s => {
-    let header = `[Scene ${s.scene_id}] ${(s.start || 0).toFixed(2)}s - ${(s.end || 0).toFixed(2)}s`;
-    if (s.emotion) header += `  |  ${s.emotion}`;
-    if (s.intensity_level !== undefined) header += `  |  L${s.intensity_level}`;
+    let header = `[#${s.index}] ${esc(s.title || '')}  |  ${s.type_of_scene || 'video'}  |  ${(s.duration || 0).toFixed(1)}s`;
+    if (s.narrative_role) header += `  |  ${s.narrative_role}`;
 
     let body = '';
-    if (s.text_fragment) body += `  "${s.text_fragment}"\n`;
-    if (s.visual_prompt) body += `  Visual: ${s.visual_prompt}\n`;
-    if (s.camera_motion) body += `  Camera: ${s.camera_motion}\n`;
+    if (s.text_content) body += `  Text: "${s.text_content}"\n`;
+    if (s.image_prompt) body += `  Visual: ${s.image_prompt}\n`;
 
     return header + '\n' + body;
   });

@@ -20,7 +20,7 @@ function segUseCurrentResult() {
     toast('No alignment result available. Run alignment first.', 'error');
     return;
   }
-  STATE.segmenterAlignment = STATE.alignResult;
+  STATE.segmenterAlignment = { ...STATE.alignResult, project_id: STATE.alignResult.project_id };
   _updateSegSource();
 }
 
@@ -41,7 +41,7 @@ function segPickHistory() {
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px">
         <div style="flex:1;min-width:0">
           <p style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">${esc(truncated)}</p>
-          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.word_count} words · ${h.duration_seconds}s · ${timeAgo(h.timestamp)}</p>
+          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${h.project_id ? h.project_id + ' · ' : ''}${h.word_count} words · ${h.duration_seconds}s · ${timeAgo(h.timestamp)}</p>
         </div>
         <span class="font-mono" style="font-size:9px;color:var(--text-muted);flex-shrink:0;background:var(--bg-darkest);padding:2px 6px;border-radius:4px">${esc(h.source_file || '')}</span>
       </div>
@@ -52,7 +52,7 @@ function segPickHistory() {
 function segSelectHistory(idx) {
   const h = STATE.alignHistory[idx];
   if (!h) return;
-  STATE.segmenterAlignment = { folder: h.folder, alignment: h.word_alignment, transcript: h.transcript };
+  STATE.segmenterAlignment = { folder: h.folder, alignment: h.word_alignment, transcript: h.transcript, project_id: h.project_id };
   segClosePickerModal();
   _updateSegSource();
   toast('Alignment loaded from history');
@@ -77,6 +77,7 @@ function segHandleUpload(input) {
         alignment,
         transcript: data.transcript || '',
         folder: data.source_folder || data.folder || file.name.replace(/\.json$/, ''),
+        project_id: data.project_id || '',
       };
       _updateSegSource();
       toast('Alignment loaded from file');
@@ -98,7 +99,8 @@ function _updateSegSource() {
   const wc = a.alignment.length;
   const dur = wc ? a.alignment[wc - 1].end : 0;
   const label = a.folder || 'uploaded';
-  $('#seg-source-info').textContent = `${wc} words · ${dur.toFixed(1)}s from ${label}`;
+  const pid = a.project_id ? `${a.project_id} · ` : '';
+  $('#seg-source-info').textContent = `${pid}${wc} words · ${dur.toFixed(1)}s from ${label}`;
   $('#seg-source-info').style.color = 'var(--accent)';
 }
 
@@ -131,6 +133,7 @@ async function handleRunSegmenter() {
       alignment: STATE.segmenterAlignment.alignment,
       transcript: STATE.segmenterAlignment.transcript || '',
       source_folder: STATE.segmenterAlignment.folder || '',
+      project_id: STATE.segmenterAlignment.project_id || '',
       config: STATE.segmenterConfig,
     };
     const res = await fetch('/api/segmenter/run', {
@@ -161,7 +164,9 @@ function renderSegResults(data) {
   const stats = data.stats || {};
 
   // Stats bar
-  $('#seg-stats').textContent = `${stats.segment_count} segments · ${stats.filler_count} fillers · avg ${stats.avg_duration.toFixed(2)}s · range ${stats.min_duration.toFixed(2)}s - ${stats.max_duration.toFixed(2)}s`;
+  const meta = data.metadata || {};
+  const pidLabel = meta.project_id ? `${meta.project_id} · ` : '';
+  $('#seg-stats').textContent = `${pidLabel}${stats.segment_count} segments · ${stats.filler_count} fillers · avg ${stats.avg_duration.toFixed(2)}s · range ${stats.min_duration.toFixed(2)}s - ${stats.max_duration.toFixed(2)}s`;
 
   // Timeline visualization
   renderSegTimeline(segments, data.metadata);

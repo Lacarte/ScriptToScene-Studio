@@ -8,3 +8,6 @@ bin/
 exports/
 working-assets/
 .env
+.claude/
+.mcp.json
+_dev/alignments/

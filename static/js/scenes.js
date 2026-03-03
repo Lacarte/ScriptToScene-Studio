@@ -7,6 +7,12 @@
 // STATE.scenesSegData  — full segmenter result (metadata + segments)
 // STATE.scenesResult   — generated scenes from webhook
 
+// Audio playback state
+let _scnAudio = null;
+let _scnAnimFrame = null;
+let _scnActiveIdx = -1;
+let _scnSegTimings = []; // [{start, end, sceneIdx}] derived from segmenter segments
+
 // ---- Source Selection ----
 
 function scenesUseCurrentSegment() {
@@ -282,11 +288,18 @@ async function scenesSendPreviewToWebhook() {
 // ---- Render Results ----
 
 function renderSceneResults(data) {
+  scnStopAudio();
   $('#scenes-results').style.display = '';
   const scenes = data.scenes || [];
   const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
   const pid = data.project_id ? `${data.project_id} · ` : '';
   $('#scenes-stats').textContent = `${pid}${scenes.length} scenes · ${totalDuration.toFixed(1)}s total`;
+
+  // Compute scene timings from segmenter data
+  _scnBuildTimings(scenes);
+
+  // Timeline visualization + audio player
+  _scnRenderTimeline(scenes);
 
   const typeColors = { video: '#4ECDC4', image: '#A78BFA', text: '#FFB347' };
   const typeBg = { video: 'rgba(78,205,196,0.1)', image: 'rgba(167,139,250,0.1)', text: 'rgba(255,179,71,0.1)' };
@@ -294,10 +307,12 @@ function renderSceneResults(data) {
   $('#scenes-list').innerHTML = scenes.map((s, i) => {
     const tc = typeColors[s.type_of_scene] || '#6b7f93';
     const tb = typeBg[s.type_of_scene] || 'rgba(107,127,147,0.1)';
+    const timing = _scnSegTimings[i];
+    const timeStr = timing ? `${timing.start.toFixed(2)}s - ${timing.end.toFixed(2)}s` : '';
     return `
-    <div class="scene-card" style="border-left-color:${tc}">
+    <div class="scene-card" data-scene-idx="${i}" data-start="${timing?.start || 0}" data-end="${timing?.end || 0}" onclick="scnPlayBlock(${i})" style="border-left-color:${tc};cursor:pointer">
       <div class="flex items-center justify-between mb-2">
-        <span class="font-mono text-xs" style="color:${tc}">#${i + 1} &middot; ${esc(s.title || '')}</span>
+        <span class="font-mono text-xs" style="color:${tc}">#${i + 1} &middot; ${esc(s.title || '')}${timeStr ? ` · <span style="color:var(--text-muted)">${timeStr}</span>` : ''}</span>
         <div style="display:flex;gap:6px;align-items:center">
           <span class="font-mono" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background:${tb};color:${tc};text-transform:uppercase;letter-spacing:0.05em">${s.type_of_scene || 'video'}</span>
           ${s.narrative_role ? `<span class="font-mono" style="font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(78,205,196,0.08);color:var(--accent)">${esc(s.narrative_role)}</span>` : ''}
@@ -308,6 +323,268 @@ function renderSceneResults(data) {
       <p style="font-size:11px;color:var(--text-secondary);font-style:italic;line-height:1.5">${esc(s.image_prompt || '')}</p>
     </div>`;
   }).join('');
+
+  // Load audio for playback
+  _scnLoadAudio();
+}
+
+// ---- Scene Timing from Segmenter Data ----
+
+function _scnBuildTimings(scenes) {
+  _scnSegTimings = [];
+  const segData = STATE.scenesSegData;
+  if (!segData || !segData.segments) {
+    // Fallback: compute cumulative from scene durations
+    let t = 0;
+    for (let i = 0; i < scenes.length; i++) {
+      const dur = scenes[i].duration || 0;
+      _scnSegTimings.push({ start: t, end: t + dur, sceneIdx: i });
+      t += dur;
+    }
+    return;
+  }
+
+  // Non-filler segments map 1:1 to scenes
+  const allSegs = segData.segments;
+  const speechSegs = allSegs.filter(s => !s.is_filler);
+  const totalEnd = segData.metadata?.total_duration || allSegs[allSegs.length - 1]?.end || 0;
+
+  for (let i = 0; i < scenes.length; i++) {
+    const seg = speechSegs[i];
+    if (seg) {
+      // First scene absorbs leading silence (start from 0)
+      const start = i === 0 ? 0 : seg.start;
+      // Last scene extends to total audio duration
+      const nextSeg = speechSegs[i + 1];
+      const end = nextSeg ? nextSeg.start : totalEnd;
+      _scnSegTimings.push({ start, end, sceneIdx: i });
+    } else {
+      // More scenes than segments — fallback to cumulative
+      const prev = _scnSegTimings[i - 1];
+      const start = prev ? prev.end : 0;
+      const dur = scenes[i].duration || 0;
+      _scnSegTimings.push({ start, end: start + dur, sceneIdx: i });
+    }
+  }
+}
+
+// ---- Timeline Visualization ----
+
+function _scnRenderTimeline(scenes) {
+  const container = $('#scenes-timeline');
+  if (!scenes.length || !_scnSegTimings.length) { container.innerHTML = ''; return; }
+
+  const totalDuration = _scnSegTimings[_scnSegTimings.length - 1]?.end || 1;
+  const barHeight = 32;
+
+  const typeColors = { video: '174,58%,55%', image: '263,68%,65%', text: '30,100%,64%' };
+
+  container.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <button id="scn-play-btn" onclick="scnTogglePlay()" style="width:28px;height:28px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.15s,background 0.15s" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform=''">
+        <svg id="scn-play-icon" width="12" height="12" fill="white" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+      </button>
+      <div id="scn-timeline-bar" style="position:relative;flex:1;height:${barHeight}px;background:var(--bg-darkest);border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:pointer" onclick="scnSeekFromClick(event)">
+        ${scenes.map((s, i) => {
+          const t = _scnSegTimings[i];
+          if (!t) return '';
+          const left = (t.start / totalDuration * 100).toFixed(2);
+          const width = Math.max((t.end - t.start) / totalDuration * 100, 0.3).toFixed(2);
+          const hue = typeColors[s.type_of_scene] || '210,20%,45%';
+          const label = (s.title || '').split(' ').slice(0, 3).join(' ');
+          return `<div class="scn-timeline-block" data-scene-idx="${i}" title="${esc(s.title || '')} (${(s.duration || 0).toFixed(1)}s)" onclick="event.stopPropagation();scnPlayBlock(${i})" style="position:absolute;left:${left}%;width:${width}%;height:100%;background:hsla(${hue},0.7);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity 0.15s;border-right:1px solid var(--bg-darkest);cursor:pointer">
+            <span style="font-size:8px;color:rgba(255,255,255,0.8);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px">${esc(label)}</span>
+          </div>`;
+        }).join('')}
+        <div id="scn-playhead" style="position:absolute;top:0;left:0;width:2px;height:100%;background:white;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.15s"></div>
+      </div>
+      <span id="scn-time-display" class="font-mono" style="font-size:10px;color:var(--text-muted);min-width:48px;text-align:right;flex-shrink:0">0.00s</span>
+    </div>
+    <div class="flex justify-between" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-left:38px">
+      <span>0.00s</span>
+      <span>${totalDuration.toFixed(2)}s</span>
+    </div>`;
+}
+
+// ---- Audio Playback ----
+
+function _scnGetAudioUrl() {
+  // Collect candidate folders: from segData metadata, scene result, or alignment state
+  const folders = new Set();
+  const segData = STATE.scenesSegData;
+  if (segData?.metadata?.source_folder) folders.add(segData.metadata.source_folder);
+  if (STATE.scenesResult?.source_folder) folders.add(STATE.scenesResult.source_folder);
+
+  // Try each folder against alignment sources
+  for (const folder of folders) {
+    if (!folder) continue;
+    const align = STATE.segmenterAlignment;
+    if (align?.folder === folder && align?.source_file) {
+      return `/output/alignments/${folder}/${align.source_file}`;
+    }
+    const result = STATE.alignResult;
+    if (result?.folder === folder && result?.source_file) {
+      return `/output/alignments/${folder}/${result.source_file}`;
+    }
+    if (STATE.alignHistory) {
+      const match = STATE.alignHistory.find(h => h.folder === folder);
+      if (match) return `/output/alignments/${match.folder}/${match.source_file}`;
+    }
+  }
+  // Fallback: current alignment state
+  const align = STATE.segmenterAlignment;
+  if (align?.folder && align?.source_file) {
+    return `/output/alignments/${align.folder}/${align.source_file}`;
+  }
+  const result = STATE.alignResult;
+  if (result?.folder && result?.source_file) {
+    return `/output/alignments/${result.folder}/${result.source_file}`;
+  }
+  return null;
+}
+
+function _scnLoadAudio() {
+  scnStopAudio();
+  const url = _scnGetAudioUrl();
+  if (!url) {
+    const btn = $('#scn-play-btn');
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  _scnAudio = new Audio(url);
+  _scnAudio.addEventListener('ended', () => _scnResetPlayback());
+  _scnAudio.addEventListener('error', () => {
+    const btn = $('#scn-play-btn');
+    if (btn) btn.style.display = 'none';
+  });
+}
+
+function scnTogglePlay() {
+  if (!_scnAudio) return;
+  if (_scnAudio.paused) {
+    _scnAudio.play().then(() => {
+      _scnSetPlayIcon(false);
+      $('#scn-playhead').style.opacity = '1';
+      _scnAnimFrame = requestAnimationFrame(_scnTick);
+    }).catch(e => console.warn('Audio play failed:', e));
+  } else {
+    _scnAudio.pause();
+    _scnSetPlayIcon(true);
+    if (_scnAnimFrame) { cancelAnimationFrame(_scnAnimFrame); _scnAnimFrame = null; }
+  }
+}
+
+function _scnResetPlayback() {
+  if (_scnAudio) {
+    _scnAudio.pause();
+    _scnAudio.currentTime = 0;
+  }
+  if (_scnAnimFrame) { cancelAnimationFrame(_scnAnimFrame); _scnAnimFrame = null; }
+  _scnSetPlayIcon(true);
+  _scnClearHighlights();
+  const playhead = $('#scn-playhead');
+  if (playhead) { playhead.style.left = '0%'; playhead.style.opacity = '0'; }
+  const display = $('#scn-time-display');
+  if (display) display.textContent = '0.00s';
+  _scnActiveIdx = -1;
+}
+
+function scnStopAudio() {
+  if (_scnAudio) {
+    _scnAudio.pause();
+    _scnAudio.currentTime = 0;
+    _scnAudio = null;
+  }
+  if (_scnAnimFrame) { cancelAnimationFrame(_scnAnimFrame); _scnAnimFrame = null; }
+  _scnSetPlayIcon(true);
+  _scnClearHighlights();
+  const playhead = $('#scn-playhead');
+  if (playhead) playhead.style.opacity = '0';
+  _scnActiveIdx = -1;
+}
+
+function scnPlayBlock(idx) {
+  if (!_scnAudio) return;
+  const timing = _scnSegTimings[idx];
+  if (!timing) return;
+  _scnAudio.currentTime = timing.start;
+  _scnUpdatePlayhead();
+  if (_scnAudio.paused) {
+    _scnAudio.play().then(() => {
+      _scnSetPlayIcon(false);
+      $('#scn-playhead').style.opacity = '1';
+      _scnAnimFrame = requestAnimationFrame(_scnTick);
+    }).catch(e => console.warn('Audio play failed:', e));
+  }
+}
+
+function scnSeekFromClick(e) {
+  if (!_scnAudio) return;
+  const bar = $('#scn-timeline-bar');
+  if (!bar) return;
+  const rect = bar.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const totalDuration = _scnSegTimings.length ? _scnSegTimings[_scnSegTimings.length - 1].end : _scnAudio.duration || 1;
+  _scnAudio.currentTime = pct * totalDuration;
+  _scnUpdatePlayhead();
+  if (_scnAudio.paused) scnTogglePlay();
+}
+
+function _scnTick() {
+  if (!_scnAudio || _scnAudio.paused) return;
+  _scnUpdatePlayhead();
+  _scnAnimFrame = requestAnimationFrame(_scnTick);
+}
+
+function _scnUpdatePlayhead() {
+  if (!_scnAudio) return;
+  const t = _scnAudio.currentTime;
+  const totalDuration = _scnSegTimings.length ? _scnSegTimings[_scnSegTimings.length - 1].end : _scnAudio.duration || 1;
+  const pct = (t / totalDuration * 100).toFixed(2);
+
+  const playhead = $('#scn-playhead');
+  if (playhead) { playhead.style.left = pct + '%'; playhead.style.opacity = '1'; }
+
+  const display = $('#scn-time-display');
+  if (display) display.textContent = t.toFixed(2) + 's';
+
+  // Find active scene
+  let activeIdx = -1;
+  for (const timing of _scnSegTimings) {
+    if (t >= timing.start && t < timing.end) { activeIdx = timing.sceneIdx; break; }
+  }
+
+  if (activeIdx !== _scnActiveIdx) {
+    _scnClearHighlights();
+    _scnActiveIdx = activeIdx;
+    if (activeIdx >= 0) {
+      const block = $(`.scn-timeline-block[data-scene-idx="${activeIdx}"]`);
+      if (block) block.style.outline = '2px solid white';
+
+      const card = $(`.scene-card[data-scene-idx="${activeIdx}"]`);
+      if (card) {
+        card.style.borderColor = 'var(--accent)';
+        card.style.boxShadow = '0 0 12px rgba(78,205,196,0.3)';
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }
+}
+
+function _scnClearHighlights() {
+  document.querySelectorAll('.scn-timeline-block').forEach(el => el.style.outline = '');
+  document.querySelectorAll('.scene-card').forEach(el => {
+    el.style.borderColor = '';
+    el.style.boxShadow = '';
+  });
+}
+
+function _scnSetPlayIcon(isPlay) {
+  const icon = $('#scn-play-icon');
+  if (!icon) return;
+  icon.innerHTML = isPlay
+    ? '<polygon points="5,3 19,12 5,21"/>'
+    : '<rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/>';
 }
 
 // ---- Preview ----

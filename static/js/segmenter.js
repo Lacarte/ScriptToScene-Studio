@@ -13,6 +13,11 @@ window.STATE.segmenterConfig = {
   gap_filler: 0.3,
 };
 
+// Audio playback state
+let _segAudio = null;
+let _segAnimFrame = null;
+let _segActiveIdx = -1;
+
 // ---- Source Selection ----
 
 function segUseCurrentResult() {
@@ -52,7 +57,7 @@ function segPickHistory() {
 function segSelectHistory(idx) {
   const h = STATE.alignHistory[idx];
   if (!h) return;
-  STATE.segmenterAlignment = { folder: h.folder, alignment: h.word_alignment, transcript: h.transcript, project_id: h.project_id };
+  STATE.segmenterAlignment = { folder: h.folder, alignment: h.word_alignment, transcript: h.transcript, project_id: h.project_id, source_file: h.source_file };
   segClosePickerModal();
   _updateSegSource();
   toast('Alignment loaded from history');
@@ -160,6 +165,7 @@ async function handleRunSegmenter() {
 // ---- Render Results ----
 
 function renderSegResults(data) {
+  segStopAudio();
   $('#seg-results').style.display = '';
   const segments = data.segments || [];
   const stats = data.stats || {};
@@ -169,14 +175,14 @@ function renderSegResults(data) {
   const pidLabel = meta.project_id ? `${meta.project_id} · ` : '';
   $('#seg-stats').textContent = `${pidLabel}${stats.segment_count} segments · ${stats.filler_count} fillers · avg ${stats.avg_duration.toFixed(2)}s · range ${stats.min_duration.toFixed(2)}s - ${stats.max_duration.toFixed(2)}s`;
 
-  // Timeline visualization
+  // Timeline visualization + audio player
   renderSegTimeline(segments, data.metadata);
 
   // Segment list
   $('#seg-list').innerHTML = segments.map(s => {
     if (s.is_filler) {
       return `
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:var(--bg-darkest);border:1px dashed var(--border);opacity:0.6">
+      <div class="seg-filler" data-seg-idx="${s.index}" data-start="${s.start}" data-end="${s.end}" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px;background:var(--bg-darkest);border:1px dashed var(--border);opacity:0.6;transition:all 0.15s">
         <span class="font-mono" style="font-size:10px;color:var(--text-muted);min-width:40px">silence</span>
         <div style="flex:1;height:2px;background:var(--border);border-radius:1px"></div>
         <span class="font-mono" style="font-size:10px;color:var(--text-muted)">${s.duration.toFixed(2)}s</span>
@@ -190,7 +196,7 @@ function renderSegResults(data) {
     };
     const rc = reasonColor[s.break_reason] || 'var(--text-muted)';
     return `
-    <div class="seg-card" data-seg-idx="${s.index}" style="background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid ${rc};border-radius:10px;padding:12px 14px;transition:all 0.2s;cursor:default">
+    <div class="seg-card" data-seg-idx="${s.index}" data-start="${s.start}" data-end="${s.end}" onclick="segPlayBlock(${s.index})" style="background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid ${rc};border-radius:10px;padding:12px 14px;transition:all 0.2s;cursor:pointer">
       <div class="flex items-center justify-between mb-1.5">
         <span class="font-mono text-xs" style="color:${rc}">Segment ${s.index} · ${s.start.toFixed(2)}s - ${s.end.toFixed(2)}s</span>
         <div style="display:flex;gap:6px;align-items:center">
@@ -202,6 +208,9 @@ function renderSegResults(data) {
       <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin-top:4px">${s.word_count} words</p>
     </div>`;
   }).join('');
+
+  // Load audio for playback
+  _segLoadAudio();
 }
 
 function renderSegTimeline(segments, metadata) {
@@ -212,43 +221,234 @@ function renderSegTimeline(segments, metadata) {
   const barHeight = 32;
 
   container.innerHTML = `
-    <div style="position:relative;height:${barHeight}px;background:var(--bg-darkest);border-radius:8px;overflow:hidden;border:1px solid var(--border)">
-      ${segments.map(s => {
-        const left = (s.start / totalDuration * 100).toFixed(2);
-        const width = Math.max(s.duration / totalDuration * 100, 0.3).toFixed(2);
-        let bg;
-        if (s.is_filler) {
-          bg = 'rgba(255,255,255,0.04)';
-        } else {
-          const hue = s.break_reason === 'hard_max' ? '0,70%,60%'
-            : s.break_reason === 'strong_break' ? '174,58%,55%'
-            : s.break_reason === 'natural_break' ? '263,68%,65%'
-            : '210,20%,45%';
-          bg = `hsla(${hue},0.7)`;
-        }
-        const label = s.is_filler ? '' : s.words.split(' ').slice(0, 3).join(' ');
-        return `<div class="seg-timeline-block" data-seg-idx="${s.index}" title="${esc(s.words)} (${s.duration.toFixed(2)}s)" style="position:absolute;left:${left}%;width:${width}%;height:100%;background:${bg};display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;transition:opacity 0.15s;border-right:1px solid var(--bg-darkest)" onmouseenter="segHighlight(${s.index})" onmouseleave="segUnhighlight(${s.index})">
-          <span style="font-size:8px;color:rgba(255,255,255,0.8);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px">${esc(label)}</span>
-        </div>`;
-      }).join('')}
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <button id="seg-play-btn" onclick="segTogglePlay()" style="width:28px;height:28px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.15s,background 0.15s" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform=''">
+        <svg id="seg-play-icon" width="12" height="12" fill="white" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+      </button>
+      <div id="seg-timeline-bar" style="position:relative;flex:1;height:${barHeight}px;background:var(--bg-darkest);border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:pointer" onclick="segSeekFromClick(event)">
+        ${segments.map(s => {
+          const left = (s.start / totalDuration * 100).toFixed(2);
+          const width = Math.max(s.duration / totalDuration * 100, 0.3).toFixed(2);
+          let bg;
+          if (s.is_filler) {
+            bg = 'rgba(255,255,255,0.04)';
+          } else {
+            const hue = s.break_reason === 'hard_max' ? '0,70%,60%'
+              : s.break_reason === 'strong_break' ? '174,58%,55%'
+              : s.break_reason === 'natural_break' ? '263,68%,65%'
+              : '210,20%,45%';
+            bg = `hsla(${hue},0.7)`;
+          }
+          const label = s.is_filler ? '' : s.words.split(' ').slice(0, 3).join(' ');
+          return `<div class="seg-timeline-block" data-seg-idx="${s.index}" title="${esc(s.words)} (${s.duration.toFixed(2)}s)" onclick="event.stopPropagation();segPlayBlock(${s.index})" style="position:absolute;left:${left}%;width:${width}%;height:100%;background:${bg};display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity 0.15s;border-right:1px solid var(--bg-darkest);cursor:pointer" onmouseenter="segHighlight(${s.index})" onmouseleave="segUnhighlight(${s.index})">
+            <span style="font-size:8px;color:rgba(255,255,255,0.8);font-family:'JetBrains Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px">${esc(label)}</span>
+          </div>`;
+        }).join('')}
+        <div id="seg-playhead" style="position:absolute;top:0;left:0;width:2px;height:100%;background:white;z-index:10;pointer-events:none;opacity:0;transition:opacity 0.15s"></div>
+      </div>
+      <span id="seg-time-display" class="font-mono" style="font-size:10px;color:var(--text-muted);min-width:48px;text-align:right;flex-shrink:0">0.00s</span>
     </div>
-    <div class="flex justify-between mt-1" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
+    <div class="flex justify-between" style="font-size:9px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;margin-left:38px">
       <span>0.00s</span>
       <span>${totalDuration.toFixed(2)}s</span>
     </div>`;
 }
 
 function segHighlight(idx) {
+  if (_segAudio && !_segAudio.paused) return; // don't override playback highlight
   const card = $(`.seg-card[data-seg-idx="${idx}"]`);
   if (card) card.style.borderColor = 'var(--accent)';
 }
 
 function segUnhighlight(idx) {
+  if (_segAudio && !_segAudio.paused) return;
   const card = $(`.seg-card[data-seg-idx="${idx}"]`);
   if (card) {
     card.style.borderColor = 'var(--border)';
     card.style.borderLeftColor = '';
   }
+}
+
+// ---- Audio Playback ----
+
+function _segGetAudioUrl() {
+  // Try from alignment state (has folder + source_file)
+  const align = STATE.segmenterAlignment;
+  if (align?.folder && align?.source_file) {
+    return `/output/alignments/${align.folder}/${align.source_file}`;
+  }
+  // Try from alignment result
+  const result = STATE.alignResult;
+  if (result?.folder && result?.source_file) {
+    return `/output/alignments/${result.folder}/${result.source_file}`;
+  }
+  // Try matching segmenter source_folder against alignment history
+  const srcFolder = STATE.segmenterResult?.metadata?.source_folder;
+  if (srcFolder && STATE.alignHistory) {
+    const match = STATE.alignHistory.find(h => h.folder === srcFolder);
+    if (match) return `/output/alignments/${match.folder}/${match.source_file}`;
+  }
+  return null;
+}
+
+function _segLoadAudio() {
+  segStopAudio();
+  const url = _segGetAudioUrl();
+  if (!url) {
+    // Hide play button if no audio
+    const btn = $('#seg-play-btn');
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  _segAudio = new Audio(url);
+  _segAudio.addEventListener('ended', () => {
+    _segResetPlayback();
+  });
+  _segAudio.addEventListener('error', () => {
+    const btn = $('#seg-play-btn');
+    if (btn) btn.style.display = 'none';
+  });
+}
+
+function segTogglePlay() {
+  if (!_segAudio) return;
+  if (_segAudio.paused) {
+    _segAudio.play().then(() => {
+      _segSetPlayIcon(false);
+      $('#seg-playhead').style.opacity = '1';
+      _segAnimFrame = requestAnimationFrame(_segTick);
+    }).catch(e => console.warn('Audio play failed:', e));
+  } else {
+    _segAudio.pause();
+    _segSetPlayIcon(true);
+    if (_segAnimFrame) { cancelAnimationFrame(_segAnimFrame); _segAnimFrame = null; }
+  }
+}
+
+function _segResetPlayback() {
+  if (_segAudio) {
+    _segAudio.pause();
+    _segAudio.currentTime = 0;
+  }
+  if (_segAnimFrame) { cancelAnimationFrame(_segAnimFrame); _segAnimFrame = null; }
+  _segSetPlayIcon(true);
+  _segClearHighlights();
+  const playhead = $('#seg-playhead');
+  if (playhead) { playhead.style.left = '0%'; playhead.style.opacity = '0'; }
+  const display = $('#seg-time-display');
+  if (display) display.textContent = '0.00s';
+  _segActiveIdx = -1;
+}
+
+function segStopAudio() {
+  if (_segAudio) {
+    _segAudio.pause();
+    _segAudio.currentTime = 0;
+    _segAudio = null;
+  }
+  if (_segAnimFrame) { cancelAnimationFrame(_segAnimFrame); _segAnimFrame = null; }
+  _segSetPlayIcon(true);
+  _segClearHighlights();
+  const playhead = $('#seg-playhead');
+  if (playhead) playhead.style.opacity = '0';
+  _segActiveIdx = -1;
+}
+
+function segPlayBlock(idx) {
+  if (!_segAudio || !STATE.segmenterResult) return;
+  const segments = STATE.segmenterResult.segments || [];
+  const seg = segments.find(s => s.index === idx);
+  if (!seg) return;
+  _segAudio.currentTime = seg.start;
+  _segUpdatePlayhead();
+  if (_segAudio.paused) {
+    _segAudio.play().then(() => {
+      _segSetPlayIcon(false);
+      $('#seg-playhead').style.opacity = '1';
+      _segAnimFrame = requestAnimationFrame(_segTick);
+    }).catch(e => console.warn('Audio play failed:', e));
+  }
+}
+
+function segSeekFromClick(e) {
+  if (!_segAudio) return;
+  const bar = $('#seg-timeline-bar');
+  if (!bar) return;
+  const rect = bar.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const totalDuration = STATE.segmenterResult?.metadata?.total_duration || _segAudio.duration || 1;
+  _segAudio.currentTime = pct * totalDuration;
+  _segUpdatePlayhead();
+  // Start playing if paused
+  if (_segAudio.paused) segTogglePlay();
+}
+
+function _segTick() {
+  if (!_segAudio || _segAudio.paused) return;
+  _segUpdatePlayhead();
+  _segAnimFrame = requestAnimationFrame(_segTick);
+}
+
+function _segUpdatePlayhead() {
+  if (!_segAudio || !STATE.segmenterResult) return;
+  const t = _segAudio.currentTime;
+  const totalDuration = STATE.segmenterResult.metadata?.total_duration || _segAudio.duration || 1;
+  const pct = (t / totalDuration * 100).toFixed(2);
+
+  // Move playhead
+  const playhead = $('#seg-playhead');
+  if (playhead) {
+    playhead.style.left = pct + '%';
+    playhead.style.opacity = '1';
+  }
+
+  // Time display
+  const display = $('#seg-time-display');
+  if (display) display.textContent = t.toFixed(2) + 's';
+
+  // Find active segment
+  const segments = STATE.segmenterResult.segments || [];
+  let activeIdx = -1;
+  for (const s of segments) {
+    if (t >= s.start && t < s.end) { activeIdx = s.index; break; }
+  }
+
+  if (activeIdx !== _segActiveIdx) {
+    _segClearHighlights();
+    _segActiveIdx = activeIdx;
+    if (activeIdx >= 0) {
+      // Highlight timeline block
+      const block = $(`.seg-timeline-block[data-seg-idx="${activeIdx}"]`);
+      if (block) block.style.outline = '2px solid white';
+
+      // Highlight segment card
+      const card = $(`.seg-card[data-seg-idx="${activeIdx}"]`);
+      if (card) {
+        card.style.borderColor = 'var(--accent)';
+        card.style.boxShadow = '0 0 12px rgba(78,205,196,0.3)';
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }
+}
+
+function _segClearHighlights() {
+  // Clear timeline block outlines
+  document.querySelectorAll('.seg-timeline-block').forEach(el => el.style.outline = '');
+  // Clear card highlights
+  document.querySelectorAll('.seg-card').forEach(el => {
+    el.style.borderColor = 'var(--border)';
+    el.style.borderLeftColor = '';
+    el.style.boxShadow = '';
+  });
+}
+
+function _segSetPlayIcon(isPlay) {
+  const icon = $('#seg-play-icon');
+  if (!icon) return;
+  icon.innerHTML = isPlay
+    ? '<polygon points="5,3 19,12 5,21"/>'
+    : '<rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/>';
 }
 
 // ---- Actions ----

@@ -291,13 +291,13 @@ function renderSceneResults(data) {
   const typeColors = { video: '#4ECDC4', image: '#A78BFA', text: '#FFB347' };
   const typeBg = { video: 'rgba(78,205,196,0.1)', image: 'rgba(167,139,250,0.1)', text: 'rgba(255,179,71,0.1)' };
 
-  $('#scenes-list').innerHTML = scenes.map(s => {
+  $('#scenes-list').innerHTML = scenes.map((s, i) => {
     const tc = typeColors[s.type_of_scene] || '#6b7f93';
     const tb = typeBg[s.type_of_scene] || 'rgba(107,127,147,0.1)';
     return `
     <div class="scene-card" style="border-left-color:${tc}">
       <div class="flex items-center justify-between mb-2">
-        <span class="font-mono text-xs" style="color:${tc}">#${s.index} &middot; ${esc(s.title || '')}</span>
+        <span class="font-mono text-xs" style="color:${tc}">#${i + 1} &middot; ${esc(s.title || '')}</span>
         <div style="display:flex;gap:6px;align-items:center">
           <span class="font-mono" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background:${tb};color:${tc};text-transform:uppercase;letter-spacing:0.05em">${s.type_of_scene || 'video'}</span>
           ${s.narrative_role ? `<span class="font-mono" style="font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(78,205,196,0.08);color:var(--accent)">${esc(s.narrative_role)}</span>` : ''}
@@ -326,8 +326,8 @@ function toggleScenesPreview() {
 
   // Build readable script preview
   const scenes = STATE.scenesResult.scenes;
-  const lines = scenes.map(s => {
-    let header = `[#${s.index}] ${esc(s.title || '')}  |  ${s.type_of_scene || 'video'}  |  ${(s.duration || 0).toFixed(1)}s`;
+  const lines = scenes.map((s, i) => {
+    let header = `[#${i + 1}] ${esc(s.title || '')}  |  ${s.type_of_scene || 'video'}  |  ${(s.duration || 0).toFixed(1)}s`;
     if (s.narrative_role) header += `  |  ${s.narrative_role}`;
 
     let body = '';

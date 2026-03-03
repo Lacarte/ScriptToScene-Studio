@@ -9,188 +9,207 @@
 </head>
 
 <body>
-    <!-- App loading overlay - shown immediately, hidden when everything is ready -->
+    <!-- App loading overlay -->
     <div id="app-loading-overlay" class="app-loading-overlay">
         <div class="app-loading-content">
             <div class="app-loading-spinner"></div>
-            <div class="app-loading-text">Loading Script-to-Scene...</div>
+            <div class="app-loading-text">Loading Timeline...</div>
         </div>
     </div>
 
     <header class="app-header">
         <div class="header-left">
-            <button id="sidebar-toggle" class="sidebar-toggle" title="Toggle Projects">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="18" rx="1" />
-                    <path d="M14 3h7v18h-7" />
+            <div class="header-brand">
+                <svg class="brand-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="2" y="3" width="20" height="18" rx="2"/>
+                    <path d="M2 7h20"/>
+                    <path d="M6 3v4"/><path d="M10 3v4"/><path d="M14 3v4"/><path d="M18 3v4"/>
+                    <path d="M10 14l4-2.5v5z"/>
                 </svg>
-            </button>
-            <h1>Script-to-Scene Timeline</h1>
+                <h1>Timeline</h1>
+            </div>
+        </div>
+        <div class="header-center">
+            <div class="source-controls">
+                <button id="use-current-btn" class="btn btn-source" title="Load scenes from studio's latest result">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                    Use Current
+                </button>
+                <button id="pick-history-btn" class="btn btn-source btn-source-accent" title="Browse asset projects">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
+                    Pick from Assets
+                </button>
+            </div>
+            <span id="studio-source-info" class="source-info">No scenes loaded</span>
         </div>
         <div class="header-right">
             <div class="sync-status">
                 <span class="status-dot"></span>
                 <span class="status-text">Ready</span>
             </div>
-            <button id="details-toggle" class="sidebar-toggle" title="Toggle Details Panel">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M10 3h7v18h-7" />
-                    <rect x="17" y="3" width="4" height="18" rx="1" />
-                </svg>
-            </button>
         </div>
     </header>
 
-    <div class="app-layout" data-sidebar="collapsed">
-        <aside class="sidebar">
-            <h2>Projects</h2>
-            <div id="projects-loading" class="loading-container">
-                <div class="loading-spinner"></div>
-                <span>Loading projects...</span>
-            </div>
-            <ul id="project-list">
-                <!-- Project items will be injected here -->
-            </ul>
-        </aside>
+    <main class="main-content">
+        <div id="timeline-loading" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <span>Loading scenes...</span>
+        </div>
 
-        <main class="timeline-area">
-            <div id="timeline-loading" class="loading-overlay hidden">
-                <div class="loading-spinner"></div>
-                <span>Loading scenes...</span>
+        <!-- Timeline controls bar -->
+        <div class="timeline-header">
+            <div class="timeline-info-group">
+                <span class="timeline-info" id="stats-scenes"><strong>0</strong> scenes</span>
+                <span class="timeline-info" id="stats-duration"><strong>0:00</strong> total</span>
             </div>
-            <div class="timeline-header">
-                <div class="timeline-info-group">
-                    <span class="timeline-info" id="stats-scenes"><strong>0</strong> scenes</span>
-                    <span class="timeline-info" id="stats-duration"><strong>0:00</strong> total</span>
-                </div>
-                <div class="timeline-actions">
-                    <div class="history-controls">
-                        <button id="undo-btn" class="btn btn-icon" title="Undo (Ctrl+Z)" disabled>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="1 4 1 10 7 10"></polyline>
-                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                            </svg>
-                        </button>
-                        <button id="redo-btn" class="btn btn-icon" title="Redo (Ctrl+Y)" disabled>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"></path>
-                            </svg>
-                        </button>
-                        <div class="history-dropdown-container">
-                            <button id="history-btn" class="btn btn-icon history-toggle" title="View History">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                </svg>
-                                <span id="history-badge" class="history-badge">0</span>
-                            </button>
-                            <div id="history-dropdown" class="history-dropdown">
-                                <div class="history-dropdown-header">
-                                    <span>Edit History</span>
-                                    <button id="clear-history-btn" class="btn-clear-history" title="Clear all history">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M3 6h18"></path>
-                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-                                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                        </svg>
-                                    </button>
-                                </div>
-                                <ul id="history-list" class="history-list">
-                                    <li class="history-empty">No history yet</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="status-badges">
-                        <span class="status-badge badge-done" id="badge-done" title="Completed scenes">
-                            <span class="badge-dot"></span><span class="badge-count">0</span>
-                        </span>
-                        <span class="status-badge badge-pending" id="badge-pending" title="Pending scenes">
-                            <span class="badge-dot"></span><span class="badge-count">0</span>
-                        </span>
-                        <span class="status-badge badge-error" id="badge-error" title="Scenes with errors">
-                            <span class="badge-dot"></span><span class="badge-count">0</span>
-                        </span>
-                    </div>
-                    <button id="export-timeline" class="btn btn-export" title="Export Timeline JSON">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
+            <div class="timeline-actions">
+                <div class="history-controls">
+                    <button id="undo-btn" class="btn btn-icon" title="Undo (Ctrl+Z)" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                         </svg>
-                        Export
                     </button>
-                    <button id="stage-timeline" class="btn btn-stage" title="Send to Video Editor">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M5 12h14"/>
-                            <path d="M12 5l7 7-7 7"/>
+                    <button id="redo-btn" class="btn btn-icon" title="Redo (Ctrl+Y)" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"></path>
                         </svg>
-                        Stage
                     </button>
-                </div>
-            </div>
-            <div class="timeline-viewport">
-                <div id="timeline-container">
-                    <!-- Timeline blocks will be injected here -->
-                </div>
-                <!-- Welcome message shown when no project is selected -->
-                <div id="welcome-message" class="welcome-message">
-                    <div class="welcome-content">
-                        <div class="welcome-icon">
-                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <rect x="2" y="2" width="20" height="20" rx="2"/>
-                                <path d="M7 2v20"/>
-                                <path d="M2 7h5"/>
-                                <path d="M2 12h5"/>
-                                <path d="M2 17h5"/>
-                                <circle cx="14.5" cy="12" r="3"/>
-                                <path d="M17.5 12l2 2"/>
+                    <div class="history-dropdown-container">
+                        <button id="history-btn" class="btn btn-icon history-toggle" title="View History">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
                             </svg>
-                        </div>
-                        <h2>Welcome to Script-to-Scene</h2>
-                        <p>Select a project from the sidebar to start editing your timeline.</p>
-                        <div class="welcome-tips">
-                            <div class="tip">
-                                <span class="tip-icon">1</span>
-                                <span>Choose a project from the left panel</span>
+                            <span id="history-badge" class="history-badge">0</span>
+                        </button>
+                        <div id="history-dropdown" class="history-dropdown">
+                            <div class="history-dropdown-header">
+                                <span>Edit History</span>
+                                <button id="clear-history-btn" class="btn-clear-history" title="Clear all history">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 6h18"></path>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                    </svg>
+                                </button>
                             </div>
-                            <div class="tip">
-                                <span class="tip-icon">2</span>
-                                <span>Review and fix scene errors</span>
-                            </div>
-                            <div class="tip">
-                                <span class="tip-icon">3</span>
-                                <span>Click "Stage" to send to Video Editor</span>
-                            </div>
+                            <ul id="history-list" class="history-list">
+                                <li class="history-empty">No history yet</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
+                <div class="status-badges">
+                    <span class="status-badge badge-done" id="badge-done" title="Completed scenes">
+                        <span class="badge-dot"></span><span class="badge-count">0</span>
+                    </span>
+                </div>
+                <button id="export-timeline" class="btn btn-export" title="Export Timeline JSON">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Export
+                </button>
+                <button id="stage-timeline" class="btn btn-stage" title="Send to Video Editor">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14"/>
+                        <path d="M12 5l7 7-7 7"/>
+                    </svg>
+                    Stage
+                </button>
             </div>
-            <div class="timeline-scroll-indicator-left">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M15 18l-6-6 6-6" />
-                </svg>
-            </div>
-            <div class="timeline-scroll-indicator">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 18l6-6-6-6" />
-                </svg>
-            </div>
-        </main>
+        </div>
 
-        <aside class="details-panel">
-            <div id="scene-editor">
-                <h3>Scene Details</h3>
-                <div class="placeholder-text">Select a scene to edit</div>
+        <!-- Timeline viewport -->
+        <div class="timeline-viewport">
+            <div id="timeline-container">
+                <!-- Timeline blocks injected here -->
             </div>
-            <div id="validation-panel">
-                <h3>Validation</h3>
-                <ul id="error-list">
-                    <li class="no-errors">Select a project to validate</li>
+            <!-- Welcome state -->
+            <div id="welcome-message" class="welcome-message">
+                <div class="welcome-content">
+                    <div class="welcome-icon">
+                        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                            <rect x="2" y="3" width="20" height="18" rx="2"/>
+                            <path d="M2 7h20"/>
+                            <path d="M6 3v4"/><path d="M10 3v4"/><path d="M14 3v4"/><path d="M18 3v4"/>
+                            <path d="M10 14l4-2.5v5z"/>
+                        </svg>
+                    </div>
+                    <h2>Load an asset project to begin</h2>
+                    <p>Use <strong>Pick from Assets</strong> above to load a project with images and timing data.</p>
+                </div>
+            </div>
+        </div>
+        <div class="timeline-scroll-indicator-left">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6" />
+            </svg>
+        </div>
+        <div class="timeline-scroll-indicator">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6" />
+            </svg>
+        </div>
+
+        <!-- Project info bar (shown when project loaded) -->
+        <div id="project-info-bar" class="project-info-bar" style="display:none">
+            <div class="project-info-inner">
+                <div class="project-info-meta">
+                    <span class="project-info-label">PROJECT</span>
+                    <span id="project-info-id" class="project-info-id"></span>
+                </div>
+                <div class="project-info-chips">
+                    <span id="project-info-scenes" class="info-chip"></span>
+                    <span id="project-info-images" class="info-chip chip-accent"></span>
+                    <span id="project-info-duration" class="info-chip"></span>
+                    <span id="project-info-segmenter" class="info-chip chip-violet" style="display:none"></span>
+                    <span id="project-info-alignment" class="info-chip chip-violet" style="display:none"></span>
+                </div>
+                <span id="project-info-time" class="project-info-time"></span>
+            </div>
+        </div>
+
+        <!-- Recent projects section -->
+        <div id="recent-projects" class="recent-projects-section">
+            <div class="recent-projects-header">
+                <div class="recent-projects-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>Recent Projects</span>
+                </div>
+                <button id="refresh-history-btn" class="btn btn-icon btn-icon-sm" title="Refresh">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+                </button>
+            </div>
+            <div id="recent-projects-list" class="recent-projects-list">
+                <div class="recent-projects-empty">
+                    <span>No asset projects yet</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Asset Project Picker Modal -->
+    <div id="scene-picker-modal" class="modal">
+        <div class="modal-content modal-md">
+            <div class="modal-header">
+                <h3>Pick Asset Project</h3>
+                <button class="modal-close" title="Close">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div id="scene-picker-loading" class="loading-container" style="padding: 24px;">
+                    <div class="loading-spinner"></div>
+                    <span>Loading history...</span>
+                </div>
+                <ul id="scene-picker-list" class="picker-list">
+                    <!-- Items injected dynamically -->
                 </ul>
             </div>
-        </aside>
+        </div>
     </div>
 
     <!-- Script Modal -->
@@ -229,10 +248,6 @@
                     <div class="shortcut-item">
                         <span class="shortcut-keys"><kbd>Del</kbd></span>
                         <span class="shortcut-desc">Delete selected scene</span>
-                    </div>
-                    <div class="shortcut-item">
-                        <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>S</kbd></span>
-                        <span class="shortcut-desc">Save all scenes</span>
                     </div>
                     <div class="shortcut-item">
                         <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></span>

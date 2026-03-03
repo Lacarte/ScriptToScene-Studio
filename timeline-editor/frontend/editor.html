@@ -95,78 +95,288 @@
     </header>
 
     <div class="editor-layout">
+        <!-- Media Panel (CapCut-style tabbed sidebar) -->
+        <aside class="media-panel">
+            <nav class="media-tabs">
+                <button class="media-tab active" data-tab="media">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="2" y="2" width="20" height="20" rx="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <path d="M21 15l-5-5L5 21"/>
+                    </svg>
+                    <span>Media</span>
+                </button>
+                <button class="media-tab" data-tab="effects">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>Effects</span>
+                </button>
+                <button class="media-tab" data-tab="transitions">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="2" y="7" width="8" height="10" rx="1"/>
+                        <rect x="14" y="7" width="8" height="10" rx="1"/>
+                        <path d="M10 12h4" stroke-dasharray="2 2"/>
+                    </svg>
+                    <span>Transitions</span>
+                </button>
+                <button class="media-tab" data-tab="text">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M4 7V4h16v3"/>
+                        <path d="M12 4v16"/>
+                        <path d="M8 20h8"/>
+                    </svg>
+                    <span>Text</span>
+                </button>
+                <button class="media-tab" data-tab="caption">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="2" y="4" width="20" height="16" rx="2"/>
+                        <path d="M6 14h4"/>
+                        <path d="M14 14h4"/>
+                        <path d="M6 18h12"/>
+                    </svg>
+                    <span>Caption</span>
+                </button>
+                <button class="media-tab" data-tab="adjustment">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                    </svg>
+                    <span>Adjustment</span>
+                </button>
+            </nav>
+            <div class="media-tab-content">
+                <div class="tab-pane active" data-pane="media">
+                    <div class="tab-pane-body">
+                        <div class="media-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="2" width="20" height="20" rx="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <path d="M21 15l-5-5L5 21"/>
+                            </svg>
+                            <p>Project media will appear here</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" data-pane="effects">
+                    <div class="tab-pane-body">
+                        <div class="media-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                <path d="M2 17l10 5 10-5"/>
+                                <path d="M2 12l10 5 10-5"/>
+                            </svg>
+                            <p>Effects & filters</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" data-pane="transitions">
+                    <div class="tab-pane-body">
+                        <div class="media-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="7" width="8" height="10" rx="1"/>
+                                <rect x="14" y="7" width="8" height="10" rx="1"/>
+                                <path d="M10 12h4" stroke-dasharray="2 2"/>
+                            </svg>
+                            <p>Scene transitions</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" data-pane="text">
+                    <div class="tab-pane-body">
+                        <div class="media-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M4 7V4h16v3"/>
+                                <path d="M12 4v16"/>
+                                <path d="M8 20h8"/>
+                            </svg>
+                            <p>Text overlays & titles</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" data-pane="caption">
+                    <div class="tab-pane-body">
+                        <div class="media-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                                <path d="M6 14h4"/>
+                                <path d="M14 14h4"/>
+                                <path d="M6 18h12"/>
+                            </svg>
+                            <p>Auto captions & subtitles</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane" data-pane="adjustment">
+                    <div class="tab-pane-body">
+                        <div class="media-empty">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                            </svg>
+                            <p>Color & brightness adjustments</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Resize handle: media ↔ preview -->
+        <div class="panel-resize-handle" id="resize-media" data-panel="media"></div>
+
         <!-- Preview Panel -->
         <section class="preview-panel">
-            <div class="preview-container">
-                <canvas id="preview-canvas" width="1080" height="1920"></canvas>
-                <div class="preview-placeholder" id="preview-placeholder">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="1.5">
-                        <rect x="2" y="2" width="20" height="20" rx="2" />
-                        <circle cx="8" cy="8" r="2" />
-                        <path d="M21 15l-5-5L5 21" />
-                    </svg>
-                    <span>Select media folder to preview</span>
+            <div class="player-card">
+                <!-- Player card header -->
+                <div class="player-card-header">
+                    <span class="player-card-title">Player</span>
+                    <button id="player-menu-btn" class="pc-btn" title="Player Options">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+                        </svg>
+                    </button>
                 </div>
-            </div>
-            <div class="preview-controls">
-                <button id="play-btn" class="control-btn-minimal" title="Play/Pause">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="6 4 18 12 6 20 6 4" />
-                    </svg>
-                </button>
-                <button id="loop-btn" class="control-btn-minimal" title="Toggle Loop">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M17 4l3 3-3 3"/><path d="M4 10V9a3 3 0 013-3h13"/>
-                        <path d="M7 20l-3-3 3-3"/><path d="M20 14v1a3 3 0 01-3 3H4"/>
-                    </svg>
-                </button>
-                <div class="time-display">
-                    <span id="current-time">0:00</span>
-                    <span>/</span>
-                    <span id="total-time">0:00</span>
+
+                <!-- Video stage — height-driven, keeps 9:16 ratio -->
+                <div class="preview-stage">
+                    <div class="preview-container">
+                        <canvas id="preview-canvas" width="1080" height="1920"></canvas>
+                        <div class="preview-placeholder hidden" id="preview-placeholder"></div>
+                    </div>
                 </div>
-                <input type="range" id="time-scrubber" class="time-scrubber" min="0" max="100" value="0">
-                <button id="volume-btn" class="control-btn-minimal" title="Volume">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    </svg>
-                </button>
+
+                <!-- Player controls bar -->
+                <div class="preview-controls">
+                    <input type="range" id="time-scrubber" class="time-scrubber" min="0" max="100" value="0">
+                    <div class="preview-controls-row">
+                        <!-- Left group: timecode + storyboard -->
+                        <div class="pc-group-left">
+                            <div class="time-display">
+                                <span id="current-time" class="tc-current">00:00:00:00</span>
+                                <span class="tc-sep">/</span>
+                                <span id="total-time">00:00:00:00</span>
+                            </div>
+                            <button id="storyboard-btn" class="pc-btn" title="Storyboard View">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                                    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Center: play -->
+                        <div class="pc-group-center">
+                            <button id="play-btn" class="pc-play" title="Play/Pause">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <polygon points="6 4 20 12 6 20 6 4" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Right group: audio, full, zoom, ratio, expand -->
+                        <div class="pc-group-right">
+                            <button id="volume-btn" class="pc-btn" title="Toggle Audio">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                                </svg>
+                            </button>
+                            <button id="fit-btn" class="pc-btn pc-btn-label" title="Fit to Preview">Full</button>
+                            <button id="zoom-preview-btn" class="pc-btn" title="Zoom Preview">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
+                                </svg>
+                            </button>
+                            <button id="ratio-btn" class="pc-btn pc-btn-label" title="Aspect Ratio">9:16</button>
+                            <button id="loop-btn" class="pc-btn" title="Toggle Loop">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
+
+        <!-- Resize handle: preview ↔ details -->
+        <div class="panel-resize-handle" id="resize-details" data-panel="details"></div>
+
+        <!-- Detail Panel — single unified card like CapCut -->
+        <aside class="properties-panel">
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <span class="detail-card-title">Details</span>
+                </div>
+                <div class="detail-card-body">
+                    <!-- Scene properties (dynamic) -->
+                    <div id="scene-properties" class="detail-section">
+                        <div class="detail-placeholder">Select a scene to edit</div>
+                    </div>
+
+                    <!-- Static project info rows -->
+                    <div id="project-info" class="detail-section">
+                        <div class="detail-row">
+                            <span class="detail-label">Scenes</span>
+                            <span class="detail-value" id="info-scenes">0</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Duration</span>
+                            <span class="detail-value" id="info-duration">0:00</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Aspect ratio</span>
+                            <span class="detail-value">9:16</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Resolution</span>
+                            <span class="detail-value">1080x1920</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Frame rate</span>
+                            <span class="detail-value">30.00fps</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
 
         <!-- Timeline Panel -->
         <section class="timeline-panel">
             <div class="timeline-resize-handle" id="timeline-resize-handle"></div>
+
+            <!-- Top toolbar: time ruler + zoom -->
             <div class="timeline-toolbar">
                 <div class="toolbar-left">
-                    <button id="select-folder" class="btn btn-secondary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                        </svg>
-                        Select Media Folder
-                    </button>
-                    <span class="media-status" id="media-status">No media loaded</span>
+                    <span class="media-status" id="media-status"></span>
                 </div>
                 <div class="toolbar-right">
+                    <button id="select-folder" class="tl-btn" title="Select Media Folder">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+                        </svg>
+                    </button>
+                    <button id="randomize-media" class="tl-btn" title="Randomize Scene Media">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="3"/>
+                            <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+                            <circle cx="16" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+                            <circle cx="8" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+                            <circle cx="16" cy="16" r="1.5" fill="currentColor" stroke="none"/>
+                            <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+                        </svg>
+                    </button>
                     <div class="zoom-controls">
-                        <button id="zoom-out" class="control-btn" title="Zoom Out">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="11" cy="11" r="8" />
-                                <path d="M21 21l-4.35-4.35" />
-                                <path d="M8 11h6" />
+                        <button id="zoom-out" class="tl-btn" title="Zoom Out">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/><path d="M8 11h6"/>
                             </svg>
                         </button>
                         <span class="zoom-level" id="zoom-level">100%</span>
-                        <button id="zoom-in" class="control-btn" title="Zoom In">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="11" cy="11" r="8" />
-                                <path d="M21 21l-4.35-4.35" />
-                                <path d="M11 8v6M8 11h6" />
+                        <button id="zoom-in" class="tl-btn" title="Zoom In">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/><path d="M11 8v6M8 11h6"/>
                             </svg>
                         </button>
                     </div>
@@ -177,6 +387,9 @@
                     <div class="header-marker-indicator"></div>
                 </div>
             </div>
+
+            <!-- Time Ruler (top, above tracks) -->
+            <div class="time-ruler" id="time-ruler"></div>
 
             <!-- Playhead -->
             <div class="timeline-playhead" id="timeline-playhead">
@@ -189,62 +402,33 @@
                 <!-- Video Track -->
                 <div class="track" data-track="video">
                     <div class="track-header">
-                        <span class="track-label">Video</span>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <rect x="2" y="3" width="20" height="18" rx="2"/><path d="M7 3v18"/><path d="M17 3v18"/>
+                            <path d="M2 7.5h5"/><path d="M2 12h5"/><path d="M2 16.5h5"/>
+                            <path d="M17 7.5h5"/><path d="M17 12h5"/><path d="M17 16.5h5"/>
+                        </svg>
                     </div>
-                    <div class="track-content" id="video-track">
-                        <!-- Scenes will be rendered here -->
-                    </div>
+                    <div class="track-content" id="video-track"></div>
                 </div>
 
                 <!-- Audio Track -->
                 <div class="track" data-track="audio">
                     <div class="track-header">
-                        <span class="track-label">Audio</span>
-                        <button id="add-audio" class="track-btn" title="Add Audio">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M12 5v14M5 12h14" />
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                        </svg>
+                        <button id="add-audio" class="tl-btn tl-btn-xs" title="Add Audio">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M12 5v14M5 12h14"/>
                             </svg>
                         </button>
                     </div>
                     <div class="track-content" id="audio-track">
-                        <div class="audio-placeholder">Click + to add background audio</div>
+                        <div class="audio-placeholder"></div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Time Ruler -->
-            <div class="time-ruler" id="time-ruler">
-                <!-- Time markers will be generated -->
             </div>
         </section>
-
-        <!-- Properties Panel -->
-        <aside class="properties-panel">
-            <div class="panel-section">
-                <h3>Scene Properties</h3>
-                <div id="scene-properties" class="properties-content">
-                    <div class="placeholder-text">Select a scene to edit</div>
-                </div>
-            </div>
-            <div class="panel-section">
-                <h3>Project Info</h3>
-                <div id="project-info" class="properties-content">
-                    <div class="info-row">
-                        <span class="info-label">Scenes</span>
-                        <span class="info-value" id="info-scenes">0</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Duration</span>
-                        <span class="info-value" id="info-duration">0:00</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">Resolution</span>
-                        <span class="info-value">1080x1920</span>
-                    </div>
-                </div>
-            </div>
-        </aside>
     </div>
 
     <!-- Export JSON Modal -->
@@ -304,6 +488,158 @@
     </div>
 
     <script type="module" src="js/video-editor.js"></script>
+    <script>
+        // Media panel tab switching
+        document.querySelectorAll('.media-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.tab;
+                document.querySelectorAll('.media-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                const pane = document.querySelector(`.tab-pane[data-pane="${target}"]`);
+                if (pane) pane.classList.add('active');
+            });
+        });
+
+        // ---- Panel resize handles ----
+        (function() {
+            const layout = document.querySelector('.editor-layout');
+            const resizeMedia = document.getElementById('resize-media');
+            const resizeDetails = document.getElementById('resize-details');
+            const MIN_PANEL = 200;
+            const MAX_PANEL = 500;
+
+            function initResize(handle, cssVar, side) {
+                let startX, startWidth;
+
+                handle.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    handle.classList.add('dragging');
+                    document.body.style.cursor = 'col-resize';
+                    document.body.style.userSelect = 'none';
+                    startX = e.clientX;
+                    startWidth = parseInt(getComputedStyle(layout).getPropertyValue(cssVar)) || (side === 'left' ? 320 : 260);
+
+                    const onMove = (ev) => {
+                        const delta = side === 'left' ? ev.clientX - startX : startX - ev.clientX;
+                        const newW = Math.max(MIN_PANEL, Math.min(MAX_PANEL, startWidth + delta));
+                        layout.style.setProperty(cssVar, newW + 'px');
+                    };
+
+                    const onUp = () => {
+                        handle.classList.remove('dragging');
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    };
+
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+            }
+
+            initResize(resizeMedia, '--media-panel-width', 'left');
+            initResize(resizeDetails, '--details-panel-width', 'right');
+
+            // ---- Drag-by-header panel swap ----
+            // Each slot maps to a grid column (1, 3, 5).
+            // Panels can swap between slots by dragging headers.
+            const slots = [
+                { col: 1, el: document.querySelector('.media-panel'),      handle: document.querySelector('.media-tabs') },
+                { col: 3, el: document.querySelector('.preview-panel'),    handle: document.querySelector('.player-card-header') },
+                { col: 5, el: document.querySelector('.properties-panel'), handle: document.querySelector('.detail-card-header') },
+            ];
+
+            function getSlotForX(x) {
+                for (const slot of slots) {
+                    const r = slot.el.getBoundingClientRect();
+                    if (x >= r.left && x <= r.right) return slot;
+                }
+                return null;
+            }
+
+            function swapSlots(a, b) {
+                // Swap grid-column assignments
+                const colA = a.col, colB = b.col;
+                a.el.style.gridColumn = colB;
+                b.el.style.gridColumn = colA;
+                a.col = colB;
+                b.col = colA;
+
+                // Play swap animation
+                a.el.classList.add('panel-swapping');
+                b.el.classList.add('panel-swapping');
+                setTimeout(() => {
+                    a.el.classList.remove('panel-swapping');
+                    b.el.classList.remove('panel-swapping');
+                }, 260);
+            }
+
+            slots.forEach((slot) => {
+                const { el, handle } = slot;
+                if (!handle) return;
+
+                handle.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('button, a, input, select')) return;
+                    e.preventDefault();
+
+                    // Ghost — compact preview that follows the cursor
+                    const ghost = el.cloneNode(true);
+                    ghost.classList.add('panel-drag-ghost');
+                    ghost.style.width = '220px';
+                    ghost.style.height = '140px';
+                    ghost.style.left = (e.clientX - 110) + 'px';
+                    ghost.style.top = (e.clientY - 20) + 'px';
+                    document.body.appendChild(ghost);
+
+                    el.classList.add('panel-dragging');
+                    document.body.style.cursor = 'grabbing';
+                    document.body.style.userSelect = 'none';
+
+                    let dropTarget = null;
+
+                    const onMove = (ev) => {
+                        ghost.style.left = (ev.clientX - 110) + 'px';
+                        ghost.style.top = (ev.clientY - 20) + 'px';
+
+                        // Detect drop target by cursor X within the top panels row
+                        const target = getSlotForX(ev.clientX);
+                        if (target && target !== slot) {
+                            if (dropTarget !== target) {
+                                if (dropTarget) dropTarget.el.classList.remove('panel-drop-target');
+                                target.el.classList.add('panel-drop-target');
+                                dropTarget = target;
+                            }
+                        } else {
+                            if (dropTarget) {
+                                dropTarget.el.classList.remove('panel-drop-target');
+                                dropTarget = null;
+                            }
+                        }
+                    };
+
+                    const onUp = () => {
+                        ghost.remove();
+                        el.classList.remove('panel-dragging');
+                        document.body.style.cursor = '';
+                        document.body.style.userSelect = '';
+
+                        if (dropTarget) {
+                            dropTarget.el.classList.remove('panel-drop-target');
+                            swapSlots(slot, dropTarget);
+                        }
+
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    };
+
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+            });
+        })();
+    </script>
 </body>
 
 </html>

@@ -10,6 +10,18 @@ import { ExportAPI, prepareExportData, validateExportData } from './export-api.j
 // Export API instance
 const exportAPI = new ExportAPI();
 
+/**
+ * Format seconds to HH:MM:SS:MS timecode (e.g. 00:01:19:04)
+ */
+function formatTimecode(seconds) {
+    if (isNaN(seconds) || seconds == null || seconds < 0) seconds = 0;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 100);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}:${String(ms).padStart(2, '0')}`;
+}
+
 // Scene type icons - flat outline style SVG icons
 const SCENE_ICONS = {
     hook: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -847,7 +859,7 @@ function getScenePixelWidth(scene) {
 /**
  * Track base offset (header + padding)
  */
-const TRACK_BASE_OFFSET = 96; // 80px header + 16px padding
+const TRACK_BASE_OFFSET = 40; // 36px header + 4px padding
 
 // DOM Elements
 const elements = {
@@ -865,6 +877,7 @@ const elements = {
     loopBtn: document.getElementById('loop-btn'),  // Loop toggle button
     volumeBtn: document.getElementById('volume-btn'),  // Volume/mute button
     selectFolderBtn: document.getElementById('select-folder'),
+    randomizeMediaBtn: document.getElementById('randomize-media'),
     mediaStatus: document.getElementById('media-status'),
     zoomIn: document.getElementById('zoom-in'),
     zoomOut: document.getElementById('zoom-out'),
@@ -959,8 +972,8 @@ function loadProjectData(data) {
 
     EditorState.scenes = data.scenes.map(scene => ({
         ...scene,
-        mediaLoaded: false,
-        mediaUrl: null
+        mediaLoaded: !!scene.image_url,
+        mediaUrl: scene.image_url || null
     }));
 
     // Store original scenes for reset functionality
@@ -1048,12 +1061,13 @@ function loadProjectData(data) {
     updateTimeScrubber();
     updatePlayhead();
 
-    // Load default audio
-    loadDefaultAudio();
+    // Load audio — use staged alignment URL when available
+    loadDefaultAudio(data);
 }
 
 /**
- * Load project media with progress tracking
+ * Load project media with progress tracking.
+ * Uses image_url from staged data when available, falls back to working-assets/ probing.
  */
 async function loadProjectMediaWithProgress() {
     const projectId = EditorState.project?.id;
@@ -1062,45 +1076,49 @@ async function loadProjectMediaWithProgress() {
         return;
     }
 
-    const basePath = `working-assets/${projectId}/`;
-    const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    const visualScenes = EditorState.scenes.filter(s => s.type !== 'text');
+    const totalScenes = visualScenes.length;
     let loadedCount = 0;
-    const totalScenes = EditorState.scenes.filter(s => s.type !== 'text').length;
 
-    // Update loading overlay
     updateLoadingOverlay(`Loading assets (0/${totalScenes})...`);
 
-    // Process each scene
     for (let i = 0; i < EditorState.scenes.length; i++) {
         const scene = EditorState.scenes[i];
         const sceneNumber = i + 1;
 
-        if (scene.type === 'text') {
-            console.log(`Skipping scene ${sceneNumber}: text type`);
-            continue;
+        if (scene.type === 'text') continue;
+
+        // If image_url was set from staged data, verify it loads
+        if (scene.mediaUrl) {
+            updateLoadingOverlay(`Loading scene ${sceneNumber} (${loadedCount}/${totalScenes})...`);
+            const exists = await checkImageExists(scene.mediaUrl);
+            if (exists) {
+                loadedCount++;
+                console.log(`Scene ${sceneNumber}: loaded from image_url: ${scene.mediaUrl}`);
+                updateSceneClipThumb(scene.id, scene.mediaUrl);
+                await sleep(30);
+                continue;
+            }
+            // image_url didn't load, clear and fall through to probing
+            console.warn(`Scene ${sceneNumber}: image_url failed (${scene.mediaUrl}), trying fallback`);
+            scene.mediaUrl = null;
+            scene.mediaLoaded = false;
         }
 
+        // Fallback: probe working-assets/{project_id}/
         updateLoadingOverlay(`Loading scene ${sceneNumber} (${loadedCount}/${totalScenes})...`);
+        const basePath = `working-assets/${projectId}/`;
+        const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
         const pathsToTry = [];
         for (const ext of imageExtensions) {
-            pathsToTry.push({
-                path: `${basePath}${sceneNumber}.${ext}`,
-                filename: `${sceneNumber}.${ext}`
-            });
+            pathsToTry.push({ path: `${basePath}${sceneNumber}.${ext}`, filename: `${sceneNumber}.${ext}` });
         }
-
         if (scene.image) {
-            pathsToTry.push({
-                path: `${basePath}${scene.image}`,
-                filename: scene.image
-            });
+            pathsToTry.push({ path: `${basePath}${scene.image}`, filename: scene.image });
             const bareFilename = scene.image.split('/').pop();
             if (bareFilename !== scene.image) {
-                pathsToTry.push({
-                    path: `${basePath}${bareFilename}`,
-                    filename: bareFilename
-                });
+                pathsToTry.push({ path: `${basePath}${bareFilename}`, filename: bareFilename });
             }
         }
 
@@ -1114,7 +1132,7 @@ async function loadProjectMediaWithProgress() {
                     scene.image = filename;
                     loadedCount++;
                     found = true;
-                    console.log(`Loaded scene ${sceneNumber}: ${imagePath}`);
+                    console.log(`Scene ${sceneNumber}: fallback loaded ${imagePath}`);
                     updateSceneClipThumb(scene.id, imagePath);
                     break;
                 }
@@ -1127,14 +1145,11 @@ async function loadProjectMediaWithProgress() {
             console.warn(`Scene ${sceneNumber} (id: ${scene.id}): No image found`);
         }
 
-        // Small delay between each scene for visual feedback
         await sleep(50);
     }
 
-    // Update loading status
     updateLoadingOverlay(`Loaded ${loadedCount}/${totalScenes} assets. Finalizing...`);
 
-    // Update preview with loaded scenes
     const scenesWithMedia = EditorState.scenes.filter(s => s.mediaUrl);
     console.log(`Auto-load complete: ${scenesWithMedia.length} scenes have mediaUrl`);
 
@@ -1151,7 +1166,7 @@ async function loadProjectMediaWithProgress() {
         }
         showToast(`Loaded ${scenesWithMedia.length} scene images`, 'success');
     } else {
-        showToast(`No images found in working-assets/${projectId}/`, 'info');
+        showToast('No images found for this project', 'info');
     }
 }
 
@@ -1275,13 +1290,22 @@ function checkImageExists(imagePath) {
 }
 
 /**
- * Load audio from working-assets/{project_id}/main-audio.mp3
+ * Load audio — uses staged alignment URL when available, falls back to working-assets/
  */
-function loadDefaultAudio() {
-    // Use project_id as folder name, main-audio.mp3 as filename
+function loadDefaultAudio(stagedData) {
     const projectId = EditorState.project?.id || 'default';
-    const audioFileName = 'main-audio.mp3';
-    const audioPath = `working-assets/${projectId}/${audioFileName}`;
+
+    // Determine audio source: staged alignment URL first, then working-assets fallback
+    let audioPath, audioFileName;
+    if (stagedData?.audio?.url) {
+        audioPath = stagedData.audio.url;
+        audioFileName = stagedData.audio.source_file || audioPath.split('/').pop();
+        console.log('Using staged audio URL:', audioPath);
+    } else {
+        audioFileName = 'main-audio.mp3';
+        audioPath = `working-assets/${projectId}/${audioFileName}`;
+        console.log('No staged audio — falling back to:', audioPath);
+    }
 
     // Create audio element
     const audio = new Audio(audioPath);
@@ -1291,7 +1315,7 @@ function loadDefaultAudio() {
     EditorState.audio = {
         file: audioFileName,
         path: audioPath,
-        duration: 0,
+        duration: stagedData?.audio?.duration || 0,
         loaded: false
     };
 
@@ -1306,8 +1330,19 @@ function loadDefaultAudio() {
             console.log('Restored audio trim duration:', EditorState.audio.trimmedDuration);
         }
 
-        recalculateDuration(); // Recalc total duration including audio
-        renderAudioTrack(); // Re-render to show correct trimmed width
+        // Extend last scene to fill any trailing gap between segments and actual audio end.
+        // Segmenter segments may end before the audio file's true duration (trailing silence).
+        const audioDur = EditorState.audio.trimmedDuration || audio.duration;
+        const scenesDur = getScenesDuration();
+        if (EditorState.scenes.length > 0 && audioDur > scenesDur + 0.05) {
+            const lastScene = EditorState.scenes[EditorState.scenes.length - 1];
+            const gap = parseFloat((audioDur - scenesDur).toFixed(3));
+            lastScene.duration = parseFloat((lastScene.duration + gap).toFixed(3));
+            console.log(`Extended last scene by ${gap}s to match audio duration`);
+        }
+
+        recalculateDuration();
+        renderAudioTrack();
         showToast('Audio loaded: ' + formatTimestamp(EditorState.audio.trimmedDuration || audio.duration), 'success');
     });
 
@@ -1316,7 +1351,7 @@ function loadDefaultAudio() {
         EditorState.audio.loaded = false;
         EditorState.audio.error = true;
         renderAudioTrack();
-        showToast(`Audio not found: Place ${audioFileName} in working-assets/${projectId}/`, 'warning');
+        showToast(`Audio not found: ${audioFileName}`, 'warning');
     });
 
     // Handle audio ended event for looping
@@ -1476,7 +1511,7 @@ function updateProjectInfo() {
         elements.infoDuration.textContent = formatTimestamp(EditorState.project.totalDuration);
     }
     if (elements.totalTime) {
-        elements.totalTime.textContent = formatTimestamp(EditorState.project.totalDuration);
+        elements.totalTime.textContent = formatTimecode(EditorState.project.totalDuration);
     }
 }
 
@@ -1681,7 +1716,7 @@ function renderSceneProperties() {
 
     const scene = EditorState.selectedScene;
     if (!scene) {
-        elements.sceneProperties.innerHTML = '<div class="placeholder-text">Select a scene to edit</div>';
+        elements.sceneProperties.innerHTML = '<div class="detail-placeholder">Select a scene to edit</div>';
         return;
     }
 
@@ -1960,7 +1995,7 @@ function updateTimeScrubber() {
         elements.timeScrubber.value = EditorState.playbackPosition;
     }
     if (elements.currentTime) {
-        elements.currentTime.textContent = formatTimestamp(EditorState.playbackPosition);
+        elements.currentTime.textContent = formatTimecode(EditorState.playbackPosition);
     }
 }
 
@@ -2224,6 +2259,9 @@ function setupEventListeners() {
 
     // Select folder (File System Access API)
     elements.selectFolderBtn?.addEventListener('click', selectMediaFolder);
+
+    // Randomize scene media (dice button)
+    elements.randomizeMediaBtn?.addEventListener('click', randomizeSceneMedia);
 
     // Sync playhead with manual scroll
     if (elements.timelineTracks) {
@@ -2588,15 +2626,15 @@ function updatePlayButton() {
 
     if (EditorState.isPlaying) {
         elements.playBtn.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <svg viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="4" width="4" height="16"/>
                 <rect x="14" y="4" width="4" height="16"/>
             </svg>
         `;
     } else {
         elements.playBtn.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"/>
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6 4 20 12 6 20 6 4"/>
             </svg>
         `;
     }
@@ -2779,6 +2817,66 @@ async function matchMediaToScenes() {
         EditorState.preview.setScenes(EditorState.scenes);
         EditorState.preview.render();
     }
+}
+
+/**
+ * Randomize scene media — fetches all asset files per scene from the API,
+ * then picks a random file from each scene's own subfolder.
+ */
+async function randomizeSceneMedia() {
+    const projectId = EditorState.project?.id;
+    if (!projectId) {
+        showToast('No project loaded', 'warning');
+        return;
+    }
+
+    // Fetch asset data (cached after first call)
+    if (!EditorState._assetFilesCache) {
+        try {
+            const resp = await fetch(`/api/assets/project/${encodeURIComponent(projectId)}`);
+            if (!resp.ok) throw new Error(resp.status);
+            EditorState._assetFilesCache = await resp.json();
+        } catch (e) {
+            showToast('Failed to load asset files', 'error');
+            console.error('Asset fetch error:', e);
+            return;
+        }
+    }
+
+    const assetScenes = EditorState._assetFilesCache.scenes || {};
+    let assignedCount = 0;
+
+    for (const scene of EditorState.scenes) {
+        if (scene.type === 'text' || scene.type === 'cta') continue;
+
+        // Try multiple index strategies to find this scene's asset folder
+        const sceneIdx = String((scene.id || 1) - 1);
+        const sceneAsset = assetScenes[sceneIdx] || assetScenes[String(scene.id)];
+        const files = sceneAsset?.files_on_disk;
+        if (!files || !files.length) continue;
+
+        // Pick a random file from this scene's asset folder
+        const pick = files[Math.floor(Math.random() * files.length)];
+        scene.mediaUrl = pick.url;
+        scene.image = pick.filename;
+        scene.mediaLoaded = true;
+        updateSceneClipThumb(scene.id, pick.url);
+        assignedCount++;
+    }
+
+    if (assignedCount === 0) {
+        showToast('No scenes with multiple assets to randomize', 'warning');
+        return;
+    }
+
+    // Clear preview image cache so new URLs are loaded, then re-sync
+    if (EditorState.preview) {
+        EditorState.preview.imageCache.clear();
+        EditorState.preview.setScenes(EditorState.scenes);
+    }
+
+    renderTimeline();
+    showToast(`Randomized ${assignedCount} scenes`, 'success');
 }
 
 /**

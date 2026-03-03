@@ -45,6 +45,7 @@ export const STATUS_OPTIONS = ["pending", "done", "error"];
 
 // Format seconds to m:ss
 export function formatTimestamp(seconds) {
+    if (isNaN(seconds) || seconds == null) return '0:00';
     const totalSeconds = Math.floor(seconds);
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;

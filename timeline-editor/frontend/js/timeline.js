@@ -105,6 +105,12 @@ class TimelineRenderer {
         }
     }
 
+    _esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
     render() {
         const scenes = State.get('scenes');
         const selectedScene = State.get('selectedScene');
@@ -147,7 +153,7 @@ class TimelineRenderer {
                         </svg>
                     </div>
                     <p>No scenes to display</p>
-                    <p class="text-muted">Select a project from the sidebar</p>
+                    <p class="text-muted">Pick an asset project from the sidebar</p>
                 </div>
             `;
             return;
@@ -163,14 +169,31 @@ class TimelineRenderer {
             const sceneErrors = getSceneErrors(errors, scene.scene_id);
             const hasError = sceneErrors.some(e => e.type === ErrorType.ERROR);
             const hasWarning = sceneErrors.some(e => e.type === ErrorType.WARNING);
+            const hasImage = !!scene.image_url;
 
             const color = SCENE_COLORS[scene.scene_type] || '#666666';
             const vfxIcon = VFX_ICONS[scene.visual_fx] || '';
             const sceneIcon = SCENE_TYPE_ICONS[scene.scene_type] || '';
             const displayType = formatSceneType(scene.scene_type);
 
+            // Thumbnail area
+            let thumbnailHtml = '';
+            if (hasImage) {
+                thumbnailHtml = `
+                    <div class="block-thumbnail">
+                        <img src="${this._esc(scene.image_url)}" alt="Scene ${scene.scene_id}" onerror="this.parentElement.innerHTML='<div class=\\'block-thumbnail-placeholder\\'>err</div>'">
+                    </div>
+                `;
+            }
+
+            // Segment timing display
+            let segmentHtml = '';
+            if (scene.segment_start != null) {
+                segmentHtml = `<div class="block-segment-timing">${scene.segment_start.toFixed(1)}s–${scene.segment_end.toFixed(1)}s</div>`;
+            }
+
             html += `
-                <div class="timeline-block ${isSelected ? 'selected' : ''} ${hasError ? 'has-error' : ''} ${hasWarning && !hasError ? 'has-warning' : ''}"
+                <div class="timeline-block ${isSelected ? 'selected' : ''} ${hasError ? 'has-error' : ''} ${hasWarning && !hasError ? 'has-warning' : ''} ${hasImage ? 'has-image' : ''}"
                      data-scene-id="${scene.scene_id}"
                      style="--scene-color: ${color};">
                     <div class="block-content">
@@ -178,6 +201,7 @@ class TimelineRenderer {
                             <span class="block-id">${scene.scene_id}</span>
                             <span class="block-type">${displayType}</span>
                         </div>
+                        ${thumbnailHtml}
                         <div class="block-icons">
                             ${sceneIcon ? `<span class="block-scene-icon" title="${scene.scene_type}">${sceneIcon}</span>` : ''}
                             ${vfxIcon ? `<span class="block-vfx" title="${scene.visual_fx}">${vfxIcon}</span>` : ''}
@@ -187,6 +211,7 @@ class TimelineRenderer {
                         <div class="block-duration">${scene.duration}s</div>
                         <div class="block-status status-${scene.status}" title="${scene.status}"></div>
                     </div>
+                    ${segmentHtml}
                 </div>
             `;
         });
@@ -198,8 +223,9 @@ class TimelineRenderer {
         html += '<div class="timeline-timestamps">';
         let cumulative = 0;
         scenes.forEach(scene => {
+            const hasImage = !!scene.image_url;
             html += `
-                <div class="timestamp-marker">
+                <div class="timestamp-marker ${hasImage ? 'has-image' : ''}">
                     ${formatTimestamp(cumulative)}
                 </div>
             `;

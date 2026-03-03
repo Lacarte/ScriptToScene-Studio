@@ -1,64 +1,49 @@
 import { State } from './state.js';
-import { API } from './api.js';
+import { StudioAPI } from './studio-api.js';
 import { Timeline } from './timeline.js';
-import { Editor } from './editor.js';
 import { validateProject, hasBlockingErrors } from './validation.js';
 import { formatRelativeTime, showToast, Storage, getTotalDuration } from './utils.js';
 
 class App {
     constructor() {
         this.timeline = null;
-        this.editor = null;
     }
 
     async init() {
         console.log('App initializing...');
 
-        // Remove any leftover staging overlay (e.g., when navigating back from editor)
+        // Remove any leftover staging overlay
         const stagingOverlay = document.getElementById('staging-overlay');
-        if (stagingOverlay) {
-            stagingOverlay.remove();
-        }
+        if (stagingOverlay) stagingOverlay.remove();
 
-        // Initialize components
+        // Initialize timeline
         this.timeline = new Timeline('timeline-container');
-        this.editor = new Editor('scene-editor', 'validation-panel');
 
-        // Set up timeline click handler
         this.timeline.onSceneClick = (scene) => {
             State.selectScene(scene);
             this.timeline.scrollToScene(scene.scene_id);
-            this.expandDetailsPanel();
         };
 
-        // Subscribe to state changes for UI updates
+        // Subscriptions
         State.subscribe(['syncStatus', 'lastSyncedAt'], () => this.updateSyncStatus());
         State.subscribe(['scenes'], () => this.runValidation());
         State.subscribe(['scenes', 'history', 'historyIndex'], () => this.updateUndoRedoButtons());
-        State.subscribe(['projects'], () => this.renderProjectList());
 
-        // Set up sidebar toggle
-        this.setupSidebarToggle();
-
-        // Set up details panel toggle
-        this.setupDetailsToggle();
-
-        // Set up keyboard shortcuts
+        // Set up controls
         this.setupKeyboardShortcuts();
-
-        // Set up export button
         this.setupExportButton();
-
-        // Set up stage button
         this.setupStageButton();
-
-        // Set up undo/redo buttons
         this.setupUndoRedoButtons();
+        this.setupStudioSource();
+        this.setupPostMessageListener();
 
-        // Load projects
-        await this.loadProjects();
+        // Check for scenes from studio's "Send to Editor"
+        this.checkStudioBridge();
 
-        // Hide the app loading overlay with fade effect
+        // Load recent projects history
+        this.loadRecentProjects();
+
+        // Hide the app loading overlay
         this.hideAppLoadingOverlay();
 
         console.log('App initialized');
@@ -68,237 +53,86 @@ class App {
         const overlay = document.getElementById('app-loading-overlay');
         if (overlay) {
             overlay.classList.add('fade-out');
-            setTimeout(() => {
-                overlay.classList.add('hidden');
-            }, 300);
+            setTimeout(() => overlay.classList.add('hidden'), 300);
         }
     }
 
     setupExportButton() {
-        const exportBtn = document.getElementById('export-timeline');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => this.exportTimeline());
-        }
+        document.getElementById('export-timeline')?.addEventListener('click', () => this.exportTimeline());
     }
 
     setupStageButton() {
-        const stageBtn = document.getElementById('stage-timeline');
-        if (stageBtn) {
-            stageBtn.addEventListener('click', () => this.stageTimeline());
-        }
+        document.getElementById('stage-timeline')?.addEventListener('click', () => this.stageTimeline());
     }
 
-    setupSidebarToggle() {
-        const toggle = document.getElementById('sidebar-toggle');
-        const layout = document.querySelector('.app-layout');
+    // ---- Studio Source Integration ----
 
-        if (!toggle || !layout) return;
+    setupStudioSource() {
+        document.getElementById('use-current-btn')?.addEventListener('click', () => this.useCurrentResult());
+        document.getElementById('pick-history-btn')?.addEventListener('click', () => this.pickFromHistory());
+        document.getElementById('refresh-history-btn')?.addEventListener('click', () => this.loadRecentProjects());
+    }
 
-        // Load saved state (default to collapsed)
-        const savedState = Storage.load('timeline_sidebar_collapsed');
-        if (savedState !== false) {
-            layout.dataset.sidebar = 'collapsed';
-        } else {
-            layout.dataset.sidebar = 'expanded';
-        }
-
-        toggle.addEventListener('click', () => {
-            const isCollapsed = layout.dataset.sidebar === 'collapsed';
-            layout.dataset.sidebar = isCollapsed ? 'expanded' : 'collapsed';
-            Storage.save('timeline_sidebar_collapsed', !isCollapsed);
+    setupPostMessageListener() {
+        window.addEventListener('message', (e) => {
+            if (e.data && e.data.type === 'load-scenes' && e.data.data) {
+                this.loadStudioData(e.data.data);
+                showToast('Scenes received from Studio', 'success');
+            }
         });
     }
 
-    setupDetailsToggle() {
-        const toggle = document.getElementById('details-toggle');
-        const layout = document.querySelector('.app-layout');
-
-        if (!toggle || !layout) return;
-
-        // Load saved state (default to expanded)
-        const savedState = Storage.load('timeline_details_collapsed');
-        if (savedState === true) {
-            layout.dataset.details = 'collapsed';
-        } else {
-            layout.dataset.details = 'expanded';
-        }
-
-        toggle.addEventListener('click', () => {
-            const isCollapsed = layout.dataset.details === 'collapsed';
-            layout.dataset.details = isCollapsed ? 'expanded' : 'collapsed';
-            Storage.save('timeline_details_collapsed', !isCollapsed);
-        });
-    }
-
-    expandDetailsPanel() {
-        const layout = document.querySelector('.app-layout');
-        if (layout && layout.dataset.details === 'collapsed') {
-            layout.dataset.details = 'expanded';
-            Storage.save('timeline_details_collapsed', false);
-        }
-    }
-
-    async loadProjects() {
-        const projectsLoading = document.getElementById('projects-loading');
+    checkStudioBridge() {
+        const stored = localStorage.getItem('sts-editor-scenes');
+        if (!stored) return;
 
         try {
-            // Show loading state
-            if (projectsLoading) projectsLoading.classList.remove('hidden');
-
-            const projects = await API.fetchProjects();
-
-            // Sort by date descending
-            projects.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-            State.setProjects(projects);
-
-            // Check for last opened project
-            const lastProjectId = Storage.load('timeline_last_project');
-            if (lastProjectId) {
-                const lastProject = projects.find(p => p.project_id === lastProjectId);
-                if (lastProject) {
-                    await this.selectProject(lastProject);
-                }
+            const data = JSON.parse(stored);
+            if (data && data.scenes && data.scenes.length) {
+                this.updateSourceInfo(`${data.scenes.length} scenes available`, false);
             }
-        } catch (error) {
-            console.error('Failed to load projects:', error);
-            showToast('Failed to load projects', 'error');
-        } finally {
-            // Hide loading state
-            if (projectsLoading) projectsLoading.classList.add('hidden');
-        }
+        } catch { /* ignore */ }
     }
 
-    async selectProject(project) {
-        State.selectProject(project);
-
-        // Hide welcome message when a project is selected
-        const welcomeMessage = document.getElementById('welcome-message');
-        if (welcomeMessage) welcomeMessage.classList.add('hidden');
-
-        // Update visual selection in project list
-        document.querySelectorAll('.project-item').forEach(item => {
-            item.classList.toggle('selected', item.dataset.projectId === project.project_id);
-        });
-
-        const timelineLoading = document.getElementById('timeline-loading');
-
-        try {
-            // Show loading overlay
-            if (timelineLoading) timelineLoading.classList.remove('hidden');
-
-            const scenes = await API.fetchScenes(project.project_id, project.chat_id);
-
-            if (scenes.length === 0 && project.scenes_json) {
-                // Fallback to scenes_json
-                try {
-                    const parsed = JSON.parse(project.scenes_json);
-                    State.setScenes(parsed);
-                    showToast('Loaded scenes from backup', 'info');
-                } catch {
-                    State.setScenes([]);
-                }
-            } else {
-                State.setScenes(scenes);
-            }
-
-            this.runValidation();
-        } catch (error) {
-            console.error('Failed to load scenes:', error);
-            showToast('Failed to load scenes', 'error');
-        } finally {
-            // Hide loading overlay
-            if (timelineLoading) timelineLoading.classList.add('hidden');
-        }
-    }
-
-    renderProjectList() {
-        const projects = State.get('projects');
-        const currentProject = State.get('currentProject');
-        const projectList = document.getElementById('project-list');
-
-        if (!projectList) return;
-
-        if (projects.length === 0) {
-            projectList.innerHTML = '<li class="no-projects">No projects found</li>';
+    useCurrentResult() {
+        const stored = localStorage.getItem('sts-editor-scenes');
+        if (!stored) {
+            showToast('No scenes available. Generate scenes in Studio first.', 'error');
             return;
         }
 
-        projectList.innerHTML = projects.map(project => {
-            const isSelected = currentProject?.project_id === project.project_id;
-            const date = new Date(project.created_at);
-            const scriptExcerpt = project.script ? project.script.slice(0, 24) + '...' : '';
-
-            return `
-                <li class="project-item ${isSelected ? 'selected' : ''}" data-project-id="${project.project_id}">
-                    <div class="project-header">
-                        <div class="project-name">${project.project_id.slice(0, 20)}...</div>
-                        <button class="btn-script" title="View script"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></button>
-                    </div>
-                    ${scriptExcerpt ? `<div class="project-excerpt">${scriptExcerpt}</div>` : ''}
-                    <div class="project-meta">
-                        <span>${project.duration}s</span>
-                        <span>${formatRelativeTime(date)}</span>
-                    </div>
-                </li>
-            `;
-        }).join('');
-
-        // Attach click handlers
-        projectList.querySelectorAll('.project-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                // Don't select project if clicking script button
-                if (e.target.classList.contains('btn-script')) return;
-
-                const projectId = item.dataset.projectId;
-                const project = projects.find(p => p.project_id === projectId);
-                if (project) {
-                    this.selectProject(project);
-                }
-            });
-        });
-
-        // Script button handlers
-        projectList.querySelectorAll('.btn-script').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const projectId = btn.closest('.project-item').dataset.projectId;
-                const project = projects.find(p => p.project_id === projectId);
-                if (project) {
-                    this.showScriptModal(project.script);
-                }
-            });
-        });
+        try {
+            const data = JSON.parse(stored);
+            if (!data || !data.scenes || !data.scenes.length) {
+                showToast('No scenes in current result', 'error');
+                return;
+            }
+            this.loadStudioData(data);
+            showToast(`Loaded ${data.scenes.length} scenes from current result`);
+        } catch (e) {
+            showToast('Failed to parse scenes data', 'error');
+        }
     }
 
-    showScriptModal(script) {
-        const modal = document.getElementById('script-modal');
-        const content = document.getElementById('script-content');
-        const closeBtn = modal.querySelector('.modal-close');
-        const copyBtn = document.getElementById('copy-script');
+    /**
+     * Pick from ASSETS history — shows modal with asset projects.
+     */
+    async pickFromHistory() {
+        const modal = document.getElementById('scene-picker-modal');
+        const list = document.getElementById('scene-picker-list');
+        const loading = document.getElementById('scene-picker-loading');
+        const closeBtn = modal?.querySelector('.modal-close');
 
-        if (!modal || !content) return;
+        if (!modal || !list) return;
 
-        content.textContent = script || 'No script available';
         modal.classList.add('show');
+        if (loading) loading.classList.remove('hidden');
+        list.innerHTML = '';
 
-        // Close handlers
         const closeModal = () => modal.classList.remove('show');
-
         closeBtn.onclick = closeModal;
-        modal.onclick = (e) => {
-            if (e.target === modal) closeModal();
-        };
+        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
 
-        // Copy handler
-        copyBtn.onclick = async () => {
-            if (script) {
-                await navigator.clipboard.writeText(script);
-                showToast('Script copied to clipboard', 'success');
-            }
-        };
-
-        // Escape key
         const handleEscape = (e) => {
             if (e.key === 'Escape') {
                 closeModal();
@@ -306,7 +140,382 @@ class App {
             }
         };
         document.addEventListener('keydown', handleEscape);
+
+        try {
+            const items = await StudioAPI.fetchAssetsHistory();
+            if (loading) loading.classList.add('hidden');
+
+            if (!items || !items.length) {
+                list.innerHTML = '<li class="picker-empty">No asset projects found. Generate assets in Studio first.</li>';
+                return;
+            }
+
+            const currentSourceId = State.get('studioSourceId');
+
+            list.innerHTML = items.map(item => {
+                const isActive = currentSourceId && item.project_id === currentSourceId;
+                const name = item.project_id || 'Untitled';
+                const truncated = name.length > 35 ? name.slice(0, 35) + '...' : name;
+                const timeStr = item.created_at ? formatRelativeTime(new Date(item.created_at))
+                    : item.timestamp ? formatRelativeTime(new Date(item.timestamp)) : '';
+                const statusColors = { done: '#4ECDC4', downloading: '#FFB347', error: '#FF6B6B', waiting: '#8B8B8B' };
+                const statusColor = statusColors[item.status] || '#8B8B8B';
+
+                // Preview image
+                const previewHtml = item.preview
+                    ? `<div class="recent-project-preview"><img src="${this._escHtml(item.preview)}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'recent-project-preview-fallback\\'>IMG</div>'"></div>`
+                    : `<div class="recent-project-preview"><div class="recent-project-preview-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div></div>`;
+
+                return `
+                    <li class="picker-item ${isActive ? 'active' : ''}" data-project-id="${this._escHtml(item.project_id)}">
+                        ${previewHtml}
+                        <div class="picker-item-info">
+                            <div class="picker-item-name">${this._escHtml(truncated)}</div>
+                            <div class="picker-item-meta">
+                                ${item.scene_count || 0} scenes ·
+                                ${item.disk_files || 0} files
+                                ${timeStr ? ' · ' + timeStr : ''}
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:5px">
+                            <span style="width:5px;height:5px;border-radius:50%;background:${statusColor}"></span>
+                            <span style="font-family:var(--font-mono);font-size:0.5rem;color:${statusColor};text-transform:uppercase;letter-spacing:0.06em;font-weight:600">${item.status || 'unknown'}</span>
+                        </div>
+                        ${isActive ? '<span class="picker-item-badge">ACTIVE</span>' : ''}
+                    </li>
+                `;
+            }).join('');
+
+            // Click handlers
+            list.querySelectorAll('.picker-item').forEach(item => {
+                item.addEventListener('click', async () => {
+                    const projectId = item.dataset.projectId;
+                    closeModal();
+                    await this.loadAssetProject(projectId);
+                });
+            });
+        } catch (e) {
+            if (loading) loading.classList.add('hidden');
+            list.innerHTML = `<li class="picker-empty">Failed to load history: ${e.message}</li>`;
+        }
     }
+
+    /**
+     * Load an asset project — fetches assets, scenes, segmenter, and alignment data.
+     */
+    async loadAssetProject(projectId) {
+        const timelineLoading = document.getElementById('timeline-loading');
+        if (timelineLoading) timelineLoading.classList.remove('hidden');
+
+        try {
+            const [assetsData, sceneData, segmenterData, alignmentData] = await Promise.all([
+                StudioAPI.fetchAssetsProject(projectId),
+                StudioAPI.fetchSceneProject(projectId).catch(() => null),
+                StudioAPI.findSegmenterForProject({ project_id: projectId }),
+                StudioAPI.findAlignmentForProject(projectId),
+            ]);
+
+            if (!assetsData) {
+                showToast('No asset data found', 'error');
+                return;
+            }
+
+            // Build scene data from assets if scene data not available
+            let effectiveSceneData = sceneData;
+            if (!effectiveSceneData || !effectiveSceneData.scenes || !effectiveSceneData.scenes.length) {
+                const prompts = assetsData.prompts || {};
+                const scenes = [];
+                for (const [sceneNum, sceneInfo] of Object.entries(assetsData.scenes || {})) {
+                    scenes.push({
+                        index: parseInt(sceneNum),
+                        type_of_scene: 'image',
+                        image_prompt: prompts[sceneNum] || '',
+                        duration: 3,
+                        text_content: null,
+                    });
+                }
+                scenes.sort((a, b) => a.index - b.index);
+                effectiveSceneData = { project_id: projectId, scenes };
+            }
+
+            // Build timeline scenes
+            const timelineScenes = StudioAPI.buildTimelineFromAssets(
+                effectiveSceneData, assetsData, segmenterData
+            );
+
+            if (!timelineScenes.length) {
+                showToast('No scenes to load', 'error');
+                return;
+            }
+
+            // Create project object
+            const project = {
+                project_id: projectId,
+                script: effectiveSceneData.script || '',
+                duration: timelineScenes.reduce((sum, s) => sum + (s.duration || 0), 0),
+                created_at: assetsData.created_at || new Date().toISOString(),
+            };
+
+            State.selectProject(project);
+            State.setScenes(timelineScenes, true);
+            State.set({ studioSourceId: projectId }, true);
+
+            // Store segmenter and alignment data
+            if (segmenterData) {
+                State.set({ segmenterData }, true);
+            }
+            if (alignmentData) {
+                State.set({ alignmentData }, true);
+                this.renderAudioBar(alignmentData);
+            }
+
+            // Hide welcome message
+            const welcomeMessage = document.getElementById('welcome-message');
+            if (welcomeMessage) welcomeMessage.classList.add('hidden');
+
+            // Update source info + project info bar
+            this.updateSourceInfo(`${projectId.slice(0, 25)} · ${timelineScenes.length} scenes`, true);
+            this.updateProjectInfoBar(projectId, timelineScenes, segmenterData, alignmentData, project.created_at);
+
+            // Refresh recent projects list
+            this.loadRecentProjects();
+
+            this.runValidation();
+
+            const doneCount = timelineScenes.filter(s => s.status === 'done').length;
+            showToast(`Loaded ${timelineScenes.length} scenes (${doneCount} with images)${segmenterData ? ' + timing' : ''}${alignmentData ? ' + audio' : ''}`);
+        } catch (e) {
+            showToast(`Failed to load project: ${e.message}`, 'error');
+        } finally {
+            if (timelineLoading) timelineLoading.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Legacy: load studio scene data (from "Use Current Result" or postMessage).
+     */
+    async loadStudioData(studioData) {
+        const scenes = StudioAPI.transformScenes(studioData);
+        if (!scenes.length) {
+            showToast('No scenes to load', 'error');
+            return;
+        }
+
+        const projectId = studioData.project_id || `studio_${Date.now()}`;
+        const project = {
+            project_id: projectId,
+            script: studioData.script || '',
+            duration: scenes.reduce((sum, s) => sum + (s.duration || 0), 0),
+            created_at: studioData.timestamp || new Date().toISOString(),
+        };
+
+        State.selectProject(project);
+        State.setScenes(scenes, true);
+        State.set({ studioSourceId: projectId }, true);
+
+        const welcomeMessage = document.getElementById('welcome-message');
+        if (welcomeMessage) welcomeMessage.classList.add('hidden');
+
+        this.updateSourceInfo(`${projectId.slice(0, 25)} · ${scenes.length} scenes`, true);
+        this.updateProjectInfoBar(projectId, scenes, null, null, project.created_at);
+
+        // Try to load segmenter + alignment data
+        this.loadSegmenterForProject(studioData);
+        this.loadAlignmentForProject(projectId);
+
+        this.runValidation();
+    }
+
+    async loadSegmenterForProject(studioData) {
+        try {
+            const segData = await StudioAPI.findSegmenterForProject(studioData);
+            if (segData) {
+                State.set({ segmenterData: segData }, true);
+            }
+        } catch (e) {
+            console.warn('Could not load segmenter data:', e);
+        }
+    }
+
+    async loadAlignmentForProject(projectId) {
+        try {
+            const alignData = await StudioAPI.findAlignmentForProject(projectId);
+            if (alignData) {
+                State.set({ alignmentData: alignData }, true);
+                this.renderAudioBar(alignData);
+            }
+        } catch (e) {
+            console.warn('Could not load alignment data:', e);
+        }
+    }
+
+    // ---- Project Info Bar ----
+
+    updateProjectInfoBar(projectId, scenes, segmenterData, alignmentData, createdAt) {
+        const bar = document.getElementById('project-info-bar');
+        if (!bar) return;
+
+        bar.style.display = '';
+
+        const idEl = document.getElementById('project-info-id');
+        const scenesEl = document.getElementById('project-info-scenes');
+        const imagesEl = document.getElementById('project-info-images');
+        const durationEl = document.getElementById('project-info-duration');
+        const segEl = document.getElementById('project-info-segmenter');
+        const alignEl = document.getElementById('project-info-alignment');
+        const timeEl = document.getElementById('project-info-time');
+
+        const doneCount = scenes.filter(s => s.status === 'done').length;
+        const totalDur = getTotalDuration(scenes);
+
+        if (idEl) idEl.textContent = projectId.length > 30 ? projectId.slice(0, 30) + '...' : projectId;
+        if (scenesEl) scenesEl.textContent = `${scenes.length} scenes`;
+        if (imagesEl) imagesEl.textContent = `${doneCount} images`;
+        if (durationEl) {
+            const m = Math.floor(totalDur / 60);
+            const s = Math.floor(totalDur % 60);
+            durationEl.textContent = `${m}:${s.toString().padStart(2, '0')} duration`;
+        }
+
+        if (segEl) {
+            if (segmenterData) {
+                segEl.style.display = '';
+                segEl.textContent = `segmenter`;
+            } else {
+                segEl.style.display = 'none';
+            }
+        }
+
+        if (alignEl) {
+            if (alignmentData) {
+                alignEl.style.display = '';
+                alignEl.textContent = `audio`;
+            } else {
+                alignEl.style.display = 'none';
+            }
+        }
+
+        if (timeEl && createdAt) {
+            timeEl.textContent = formatRelativeTime(new Date(createdAt));
+        }
+    }
+
+    // ---- Recent Projects ----
+
+    async loadRecentProjects() {
+        const container = document.getElementById('recent-projects-list');
+        if (!container) return;
+
+        try {
+            const items = await StudioAPI.fetchAssetsHistory();
+            if (!items || !items.length) {
+                container.innerHTML = '<div class="recent-projects-empty"><span>No asset projects yet</span></div>';
+                return;
+            }
+
+            const currentSourceId = State.get('studioSourceId');
+
+            container.innerHTML = items.slice(0, 8).map(item => {
+                const isActive = currentSourceId && item.project_id === currentSourceId;
+                const name = item.project_id || 'Untitled';
+                const truncated = name.length > 30 ? name.slice(0, 30) + '...' : name;
+                const timeStr = item.created_at ? formatRelativeTime(new Date(item.created_at))
+                    : item.timestamp ? formatRelativeTime(new Date(item.timestamp)) : '';
+                const statusColors = { done: '#4ECDC4', downloading: '#FFB347', error: '#FF6B6B', waiting: '#8B8B8B' };
+                const statusColor = statusColors[item.status] || '#8B8B8B';
+                const statusLabel = item.status || 'unknown';
+                const readyCount = item.ready_count || 0;
+
+                // Preview
+                const previewHtml = item.preview
+                    ? `<div class="recent-project-preview"><img src="${this._escHtml(item.preview)}" alt="" onerror="this.parentElement.innerHTML='<div class=\\'recent-project-preview-fallback\\'>IMG</div>'"></div>`
+                    : `<div class="recent-project-preview"><div class="recent-project-preview-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div></div>`;
+
+                return `
+                    <div class="recent-project-item ${isActive ? 'active' : ''}" data-project-id="${this._escHtml(item.project_id)}">
+                        ${previewHtml}
+                        <div class="recent-project-info">
+                            <div class="recent-project-name-row">
+                                <span class="recent-project-name">${this._escHtml(truncated)}</span>
+                                ${isActive ? '<span class="recent-project-badge">ACTIVE</span>' : ''}
+                            </div>
+                            <div class="recent-project-meta">
+                                <span class="recent-project-chip">${item.scene_count || 0} scenes</span>
+                                ${readyCount > 0 ? `<span class="recent-project-chip recent-project-chip-accent">${readyCount} ready</span>` : ''}
+                                ${item.disk_files > 0 ? `<span class="recent-project-chip">${item.disk_files} files</span>` : ''}
+                                ${timeStr ? `<span class="recent-project-chip" style="opacity:0.6">${timeStr}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="recent-project-status">
+                            <span class="recent-project-status-dot" style="background:${statusColor}"></span>
+                            <span class="recent-project-status-label" style="color:${statusColor}">${statusLabel}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Click handlers
+            container.querySelectorAll('.recent-project-item').forEach(item => {
+                item.addEventListener('click', async () => {
+                    const projectId = item.dataset.projectId;
+                    await this.loadAssetProject(projectId);
+                });
+            });
+        } catch (e) {
+            container.innerHTML = '<div class="recent-projects-empty"><span>Could not load projects</span></div>';
+        }
+    }
+
+    // ---- Audio bar ----
+
+    renderAudioBar(alignmentData) {
+        const existing = document.getElementById('audio-bar');
+        if (existing) existing.remove();
+
+        if (!alignmentData || !alignmentData.folder) return;
+
+        const audioUrl = this._getAudioUrl(alignmentData);
+        const sourceFile = alignmentData.source_file || 'audio';
+        const duration = alignmentData.duration_seconds
+            ? `${alignmentData.duration_seconds.toFixed(1)}s`
+            : '';
+
+        const bar = document.createElement('div');
+        bar.id = 'audio-bar';
+        bar.className = 'audio-bar';
+        bar.innerHTML = `
+            <span class="audio-bar-label">Audio</span>
+            <audio controls preload="metadata" src="${this._escHtml(audioUrl)}"></audio>
+            <span class="audio-bar-file" title="${this._escHtml(sourceFile)}">${this._escHtml(sourceFile)}${duration ? ' · ' + duration : ''}</span>
+        `;
+
+        const timelineHeader = document.querySelector('.timeline-header');
+        if (timelineHeader) {
+            timelineHeader.after(bar);
+        }
+    }
+
+    _getAudioUrl(alignmentData) {
+        if (!alignmentData || !alignmentData.folder) return '';
+        const sourceFile = alignmentData.source_file || '';
+        return `/output/alignments/${encodeURIComponent(alignmentData.folder)}/${encodeURIComponent(sourceFile)}`;
+    }
+
+    updateSourceInfo(text, loaded) {
+        const el = document.getElementById('studio-source-info');
+        if (el) {
+            el.textContent = text;
+            el.classList.toggle('loaded', !!loaded);
+        }
+    }
+
+    _escHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    // ---- Validation ----
 
     runValidation() {
         const scenes = State.get('scenes');
@@ -317,6 +526,8 @@ class App {
         State.setValidationErrors(errors);
     }
 
+    // ---- Sync Status ----
+
     updateSyncStatus() {
         const status = State.get('syncStatus');
         const lastSynced = State.get('lastSyncedAt');
@@ -326,7 +537,6 @@ class App {
 
         if (!statusDot || !statusText) return;
 
-        // Remove existing status classes
         statusDot.classList.remove('status-synced', 'status-saving', 'status-error');
 
         switch (status) {
@@ -347,11 +557,11 @@ class App {
         }
     }
 
+    // ---- Keyboard shortcuts ----
+
     setupKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Ignore if typing in input/textarea
             if (e.target.matches('input, textarea, select')) {
-                // Only allow Escape in form fields
                 if (e.key !== 'Escape') return;
             }
 
@@ -360,46 +570,39 @@ class App {
                     e.preventDefault();
                     this.timeline.navigateScene(-1);
                     break;
-
                 case 'ArrowRight':
                     e.preventDefault();
                     this.timeline.navigateScene(1);
                     break;
-
                 case 'Escape':
                     e.preventDefault();
                     State.selectScene(null);
                     break;
-
                 case 'Delete':
                     if (State.get('selectedScene')) {
                         e.preventDefault();
-                        document.getElementById('delete-scene')?.click();
+                        const scene = State.get('selectedScene');
+                        if (confirm(`Delete scene ${scene.scene_id}?`)) {
+                            State.removeScene(scene.scene_id);
+                        }
                     }
                     break;
-
                 case 's':
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault();
                         this.saveAll();
                     }
                     break;
-
                 case 'z':
                     if (e.ctrlKey || e.metaKey) {
                         e.preventDefault();
                         if (e.shiftKey) {
-                            if (State.redo()) {
-                                showToast('Redo', 'info');
-                            }
+                            if (State.redo()) showToast('Redo', 'info');
                         } else {
-                            if (State.undo()) {
-                                showToast('Undo', 'info');
-                            }
+                            if (State.undo()) showToast('Undo', 'info');
                         }
                     }
                     break;
-
                 case '?':
                     e.preventDefault();
                     this.showShortcutsModal();
@@ -411,16 +614,42 @@ class App {
     showShortcutsModal() {
         const modal = document.getElementById('shortcuts-modal');
         const closeBtn = modal?.querySelector('.modal-close');
-
         if (!modal) return;
 
         modal.classList.add('show');
+        const closeModal = () => modal.classList.remove('show');
+        closeBtn.onclick = closeModal;
+        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+    }
+
+    showScriptModal(script) {
+        const modal = document.getElementById('script-modal');
+        const content = document.getElementById('script-content');
+        const closeBtn = modal.querySelector('.modal-close');
+        const copyBtn = document.getElementById('copy-script');
+
+        if (!modal || !content) return;
+
+        content.textContent = script || 'No script available';
+        modal.classList.add('show');
 
         const closeModal = () => modal.classList.remove('show');
-
         closeBtn.onclick = closeModal;
-        modal.onclick = (e) => {
-            if (e.target === modal) closeModal();
+        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+        copyBtn.onclick = async () => {
+            if (script) {
+                await navigator.clipboard.writeText(script);
+                showToast('Script copied to clipboard', 'success');
+            }
         };
 
         const handleEscape = (e) => {
@@ -432,77 +661,13 @@ class App {
         document.addEventListener('keydown', handleEscape);
     }
 
+    // ---- Save / Export / Stage ----
+
     async saveAll() {
         const scenes = State.get('scenes');
         if (!scenes.length) return;
-
-        try {
-            await API.saveAllScenes(scenes);
-            State.backupScenes();
-        } catch (error) {
-            console.error('Failed to save all scenes:', error);
-        }
-    }
-
-    // Quick actions
-    recalculateTimestamps() {
-        const scenes = State.get('scenes');
-        State.setScenes(scenes); // This triggers timestamp recalculation
-        showToast('Timestamps recalculated', 'success');
-    }
-
-    async copyAllPrompts() {
-        const scenes = State.get('scenes');
-        const prompts = scenes
-            .filter(s => s.prompt?.trim())
-            .map(s => `Scene ${s.scene_id}: ${s.prompt}`)
-            .join('\n\n');
-
-        if (prompts) {
-            await navigator.clipboard.writeText(prompts);
-            showToast('All prompts copied', 'success');
-        } else {
-            showToast('No prompts to copy', 'warning');
-        }
-    }
-
-    markAllPending() {
-        const scenes = State.get('scenes').map(s => ({ ...s, status: 'pending' }));
-        State.set({ scenes });
-        showToast('All scenes marked as pending', 'success');
-    }
-
-    clearAllImages() {
-        const scenes = State.get('scenes').map(s => ({ ...s, image_url: '' }));
-        State.set({ scenes });
-        showToast('All image URLs cleared', 'success');
-    }
-
-    exportProject() {
-        const project = State.get('currentProject');
-        const scenes = State.get('scenes');
-
-        if (!project) {
-            showToast('No project selected', 'warning');
-            return;
-        }
-
-        const data = {
-            project,
-            scenes,
-            exportedAt: new Date().toISOString(),
-            totalDuration: getTotalDuration(scenes)
-        };
-
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${project.project_id}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        showToast('Project exported', 'success');
+        State.backupScenes();
+        showToast('Scenes saved locally', 'success');
     }
 
     async exportTimeline() {
@@ -520,15 +685,10 @@ class App {
             return;
         }
 
-        // Show loading state
         const exportBtn = document.getElementById('export-timeline');
-        const timelineArea = document.querySelector('.timeline-area');
-
         exportBtn?.classList.add('btn-loading');
-        timelineArea?.classList.add('exporting');
 
-        // Simulate processing delay for visual feedback
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 600));
 
         let imageCounter = 1;
         const timeline = {
@@ -549,19 +709,32 @@ class App {
                     visual_fx: scene.visual_fx,
                     style: scene.style || '',
                     status: scene.status,
-                    // Visual scenes get image filename
                     ...(isVisualScene && {
                         image: imageFile,
+                        image_url: scene.image_url || '',
                         prompt: scene.prompt || ''
                     }),
-                    // Text/CTA scenes get text content
                     ...(!isVisualScene && {
                         text_content: scene.text_content || '',
                         text_bg: scene.text_bg || ''
+                    }),
+                    ...(scene.segment_start != null && {
+                        segment_start: scene.segment_start,
+                        segment_end: scene.segment_end,
+                        segment_words: scene.segment_words || ''
                     })
                 };
             })
         };
+
+        const alignmentData = State.get('alignmentData');
+        if (alignmentData) {
+            timeline.audio = {
+                source_file: alignmentData.source_file || '',
+                folder: alignmentData.folder || '',
+                duration: alignmentData.duration_seconds || 0,
+            };
+        }
 
         const blob = new Blob([JSON.stringify(timeline, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -571,10 +744,7 @@ class App {
         a.click();
         URL.revokeObjectURL(url);
 
-        // Remove loading state
         exportBtn?.classList.remove('btn-loading');
-        timelineArea?.classList.remove('exporting');
-
         showToast(`Timeline exported with ${imageCounter - 1} images`, 'success');
     }
 
@@ -593,17 +763,14 @@ class App {
             return;
         }
 
-        // Show loading state on button
         const stageBtn = document.getElementById('stage-timeline');
         if (stageBtn) {
             stageBtn.classList.add('btn-loading');
             stageBtn.disabled = true;
         }
 
-        // Show full-page loading overlay
         this.showStagingOverlay();
 
-        // Prepare staged data (with small delay for UI feedback)
         setTimeout(() => {
             let imageCounter = 1;
             const stagedData = {
@@ -627,6 +794,7 @@ class App {
                         status: scene.status,
                         ...(isVisualScene && {
                             image: imageFile,
+                            image_url: scene.image_url || '',
                             prompt: scene.prompt || ''
                         }),
                         ...(!isVisualScene && {
@@ -637,13 +805,20 @@ class App {
                 })
             };
 
-            // Store in sessionStorage for Stage 2 to read
+            const alignmentData = State.get('alignmentData');
+            if (alignmentData) {
+                stagedData.audio = {
+                    source_file: alignmentData.source_file || '',
+                    folder: alignmentData.folder || '',
+                    url: this._getAudioUrl(alignmentData),
+                    duration: alignmentData.duration_seconds || 0,
+                };
+            }
+
             sessionStorage.setItem('staged_timeline', JSON.stringify(stagedData));
 
-            // Update overlay message
             this.updateStagingOverlay('Opening Video Editor...');
 
-            // Navigate to Stage 2 editor
             setTimeout(() => {
                 window.location.href = 'editor.html';
             }, 300);
@@ -651,7 +826,6 @@ class App {
     }
 
     showStagingOverlay() {
-        // Create overlay if it doesn't exist
         let overlay = document.getElementById('staging-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
@@ -665,53 +839,26 @@ class App {
             `;
             document.body.appendChild(overlay);
         }
-
-        // Show with animation
-        requestAnimationFrame(() => {
-            overlay.classList.add('active');
-        });
+        requestAnimationFrame(() => overlay.classList.add('active'));
     }
 
     updateStagingOverlay(message) {
         const msgEl = document.querySelector('.staging-message');
-        if (msgEl) {
-            msgEl.textContent = message;
-        }
+        if (msgEl) msgEl.textContent = message;
     }
 
-    restoreFromBackup() {
-        if (State.restoreFromBackup()) {
-            showToast('Restored from backup', 'success');
-            this.runValidation();
-        } else {
-            showToast('No backup found', 'warning');
-        }
-    }
+    // ---- Undo / Redo ----
 
     setupUndoRedoButtons() {
-        const undoBtn = document.getElementById('undo-btn');
-        const redoBtn = document.getElementById('redo-btn');
+        document.getElementById('undo-btn')?.addEventListener('click', () => {
+            if (State.undo()) showToast('Undo', 'info');
+        });
 
-        if (undoBtn) {
-            undoBtn.addEventListener('click', () => {
-                if (State.undo()) {
-                    showToast('Undo', 'info');
-                }
-            });
-        }
+        document.getElementById('redo-btn')?.addEventListener('click', () => {
+            if (State.redo()) showToast('Redo', 'info');
+        });
 
-        if (redoBtn) {
-            redoBtn.addEventListener('click', () => {
-                if (State.redo()) {
-                    showToast('Redo', 'info');
-                }
-            });
-        }
-
-        // Setup history dropdown
         this.setupHistoryDropdown();
-
-        // Initial state update
         this.updateUndoRedoButtons();
     }
 
@@ -722,7 +869,6 @@ class App {
 
         if (!historyBtn || !historyDropdown) return;
 
-        // Toggle dropdown
         historyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isOpen = historyDropdown.classList.contains('show');
@@ -734,18 +880,16 @@ class App {
             }
         });
 
-        // Close on outside click
         document.addEventListener('click', (e) => {
             if (!historyDropdown.contains(e.target) && !historyBtn.contains(e.target)) {
                 historyDropdown.classList.remove('show');
             }
         });
 
-        // Clear all history
         if (clearHistoryBtn) {
             clearHistoryBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (confirm('Clear all edit history? This cannot be undone.')) {
+                if (confirm('Clear all edit history?')) {
                     State.clearHistory();
                     this.renderHistoryList();
                     showToast('History cleared', 'info');
@@ -766,7 +910,6 @@ class App {
             return;
         }
 
-        // Render history items (most recent first, skip index 0 which is initial state)
         historyList.innerHTML = history.map((scenes, index) => {
             if (index === 0) {
                 return `
@@ -780,7 +923,6 @@ class App {
                 `;
             }
 
-            // Try to describe what changed
             const prevScenes = history[index - 1];
             const changeDesc = this.describeHistoryChange(prevScenes, scenes);
 
@@ -801,7 +943,6 @@ class App {
             `;
         }).reverse().join('');
 
-        // Add click handlers for jumping to history state
         historyList.querySelectorAll('.history-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 if (e.target.closest('.history-item-delete')) return;
@@ -812,7 +953,6 @@ class App {
             });
         });
 
-        // Add click handlers for delete buttons
         historyList.querySelectorAll('.history-item-delete').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -827,40 +967,21 @@ class App {
     describeHistoryChange(prevScenes, currentScenes) {
         if (!prevScenes || !currentScenes) return 'Unknown change';
 
-        // Check for scene count change
         if (prevScenes.length !== currentScenes.length) {
-            if (currentScenes.length > prevScenes.length) {
-                return `Added scene`;
-            } else {
-                return `Removed scene`;
-            }
+            return currentScenes.length > prevScenes.length ? 'Added scene' : 'Removed scene';
         }
 
-        // Find what changed
         for (let i = 0; i < currentScenes.length; i++) {
             const prev = prevScenes[i];
             const curr = currentScenes[i];
-
             if (!prev || !curr) continue;
 
-            if (prev.duration !== curr.duration) {
-                return `Scene ${curr.scene_id}: duration → ${curr.duration}s`;
-            }
-            if (prev.scene_type !== curr.scene_type) {
-                return `Scene ${curr.scene_id}: type → ${curr.scene_type}`;
-            }
-            if (prev.visual_fx !== curr.visual_fx) {
-                return `Scene ${curr.scene_id}: effect → ${curr.visual_fx}`;
-            }
-            if (prev.text_content !== curr.text_content) {
-                return `Scene ${curr.scene_id}: text changed`;
-            }
-            if (prev.status !== curr.status) {
-                return `Scene ${curr.scene_id}: status → ${curr.status}`;
-            }
-            if (prev.prompt !== curr.prompt) {
-                return `Scene ${curr.scene_id}: prompt changed`;
-            }
+            if (prev.duration !== curr.duration) return `Scene ${curr.scene_id}: duration → ${curr.duration}s`;
+            if (prev.scene_type !== curr.scene_type) return `Scene ${curr.scene_id}: type → ${curr.scene_type}`;
+            if (prev.visual_fx !== curr.visual_fx) return `Scene ${curr.scene_id}: effect → ${curr.visual_fx}`;
+            if (prev.text_content !== curr.text_content) return `Scene ${curr.scene_id}: text changed`;
+            if (prev.status !== curr.status) return `Scene ${curr.scene_id}: status → ${curr.status}`;
+            if (prev.prompt !== curr.prompt) return `Scene ${curr.scene_id}: prompt changed`;
         }
 
         return 'Scene modified';
@@ -871,28 +992,29 @@ class App {
         const redoBtn = document.getElementById('redo-btn');
         const historyBadge = document.getElementById('history-badge');
 
-        if (undoBtn) {
-            undoBtn.disabled = !State.canUndo();
-        }
+        if (undoBtn) undoBtn.disabled = !State.canUndo();
+        if (redoBtn) redoBtn.disabled = !State.canRedo();
 
-        if (redoBtn) {
-            redoBtn.disabled = !State.canRedo();
-        }
-
-        // Update history badge
         if (historyBadge) {
             const historyIndex = State.get('historyIndex');
             historyBadge.textContent = historyIndex;
             historyBadge.classList.toggle('has-history', historyIndex > 0);
         }
     }
+
+    restoreFromBackup() {
+        if (State.restoreFromBackup()) {
+            showToast('Restored from backup', 'success');
+            this.runValidation();
+        } else {
+            showToast('No backup found', 'warning');
+        }
+    }
 }
 
-// Initialize app when DOM is ready
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
     const app = new App();
     app.init();
-
-    // Expose to window for console access and quick actions
     window.app = app;
 });

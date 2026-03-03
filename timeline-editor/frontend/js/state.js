@@ -13,7 +13,10 @@ class StateManager {
             lastSyncedAt: null,
             validationErrors: [],
             history: [],
-            historyIndex: -1
+            historyIndex: -1,
+            segmenterData: null,
+            alignmentData: null,
+            studioSourceId: null,
         };
         this.listeners = new Map();
     }

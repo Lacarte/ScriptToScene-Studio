@@ -16,6 +16,7 @@ class SceneEditor {
         // Subscribe to state changes
         State.subscribe(['selectedScene'], (state) => this.loadScene(state.selectedScene));
         State.subscribe(['validationErrors'], () => this.renderValidation());
+        State.subscribe(['segmenterData'], (state) => this.loadScene(state.selectedScene));
     }
 
     loadScene(scene) {
@@ -33,6 +34,7 @@ class SceneEditor {
                 </h3>
                 <div class="panel-content ${this.isEditorCollapsed ? 'collapsed' : ''}">
                     <div class="placeholder-text">Select a scene to edit</div>
+                    ${this.renderSegmenterStats()}
                 </div>
             `;
             this.attachToggleListener();
@@ -142,6 +144,8 @@ class SceneEditor {
                     </div>
                 `}
 
+                ${this.renderSegmentInfo(scene)}
+
                 <div class="form-actions">
                     <button type="button" id="duplicate-scene" class="btn btn-secondary">Duplicate</button>
                     <button type="button" id="delete-scene" class="btn btn-danger">Delete</button>
@@ -156,6 +160,83 @@ class SceneEditor {
 
     hasFieldError(errors, field) {
         return errors.some(e => e.field === field && e.type === ErrorType.ERROR);
+    }
+
+    /**
+     * Render segmenter info for a specific scene (matched by index).
+     */
+    renderSegmentInfo(scene) {
+        const segData = State.get('segmenterData');
+        if (!segData || !segData.segments) return '';
+
+        // Match by scene index (scene_id is 1-based, segment index is 0-based)
+        const segIndex = (scene.scene_id || 1) - 1;
+        const segment = segData.segments[segIndex];
+        if (!segment) return '';
+
+        const begin = typeof segment.begin === 'number' ? segment.begin.toFixed(2) : '?';
+        const end = typeof segment.end === 'number' ? segment.end.toFixed(2) : '?';
+        const dur = typeof segment.begin === 'number' && typeof segment.end === 'number'
+            ? (segment.end - segment.begin).toFixed(2)
+            : '?';
+
+        return `
+            <div class="segment-info">
+                <div class="segment-info-header">
+                    <span class="segment-info-label">Segment ${segment.index ?? segIndex}</span>
+                    ${segment.is_filler ? '<span style="font-size:0.6rem;color:var(--accent-warning);font-weight:600">FILLER</span>' : ''}
+                </div>
+                <div class="segment-info-words">"${this._esc(segment.words || '')}"</div>
+                <div class="segment-info-timing">
+                    <span>${begin}s — ${end}s</span>
+                    <span>dur: ${dur}s</span>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Render overall segmenter stats (shown when no scene selected).
+     */
+    renderSegmenterStats() {
+        const segData = State.get('segmenterData');
+        if (!segData || !segData.stats) return '';
+
+        const stats = segData.stats;
+        const meta = segData.metadata || {};
+
+        return `
+            <div class="segment-stats" style="margin-top: 16px;">
+                <div class="segment-info-header" style="margin-bottom: 10px;">
+                    <span class="segment-info-label">Segmenter Data</span>
+                </div>
+                <div class="segment-stats-grid">
+                    <div class="segment-stat">
+                        <span class="segment-stat-label">Segments</span>
+                        <span class="segment-stat-value">${stats.segment_count || 0}</span>
+                    </div>
+                    <div class="segment-stat">
+                        <span class="segment-stat-label">Fillers</span>
+                        <span class="segment-stat-value">${stats.filler_count || 0}</span>
+                    </div>
+                    <div class="segment-stat">
+                        <span class="segment-stat-label">Avg Duration</span>
+                        <span class="segment-stat-value">${(stats.avg_duration || 0).toFixed(2)}s</span>
+                    </div>
+                    <div class="segment-stat">
+                        <span class="segment-stat-label">Total Duration</span>
+                        <span class="segment-stat-value">${(meta.total_duration || 0).toFixed(1)}s</span>
+                    </div>
+                </div>
+                ${meta.source_folder ? `<div style="margin-top:8px;font-size:0.6rem;color:var(--text-muted);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(meta.source_folder)}</div>` : ''}
+            </div>
+        `;
+    }
+
+    _esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
     }
 
     attachToggleListener() {

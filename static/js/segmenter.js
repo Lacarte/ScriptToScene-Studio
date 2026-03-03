@@ -146,6 +146,7 @@ async function handleRunSegmenter() {
 
     STATE.segmenterResult = data;
     renderSegResults(data);
+    loadSegHistory();
     toast('Segmentation complete');
   } catch (e) {
     toast(e.message || 'Segmentation failed', 'error');
@@ -271,3 +272,64 @@ function downloadSegJSON() {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
+
+// ---- History ----
+
+async function loadSegHistory() {
+  try {
+    const items = await api('/api/segmenter/history');
+    renderSegHistory(items);
+  } catch (e) {
+    console.error('Segmenter history:', e);
+  }
+}
+
+function renderSegHistory(items) {
+  const list = $('#seg-history-list');
+  if (!list) return;
+
+  if (!items || !items.length) {
+    list.innerHTML = '<p style="text-align:center;padding:32px 0;font-size:13px;color:var(--text-muted)">No segmentations yet</p>';
+    $('#seg-history-count').textContent = '0 results';
+    return;
+  }
+
+  const currentFolder = STATE.segmenterResult?.output_folder || null;
+  $('#seg-history-count').textContent = items.length + ' result' + (items.length !== 1 ? 's' : '');
+
+  list.innerHTML = items.map(item => {
+    const isActive = currentFolder && item.folder === currentFolder;
+    const activeStyle = isActive
+      ? 'background:rgba(78,205,196,0.06);border-left:3px solid var(--accent)'
+      : 'border-left:3px solid transparent';
+
+    return `
+    <div class="hist-item" style="cursor:pointer;transition:background 0.15s;${activeStyle}" onclick="loadSegHistoryItem('${esc(item.folder)}')" onmouseover="this.style.background='var(--bg-darkest)'" onmouseout="this.style.background='${isActive ? 'rgba(78,205,196,0.06)' : ''}'">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+            <span style="font-size:13px;color:${isActive ? 'var(--accent)' : 'var(--text)'};font-weight:${isActive ? '600' : '400'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.project_id || item.source_folder || item.folder)}</span>
+            ${isActive ? '<span class="font-mono" style="font-size:8px;padding:1px 6px;border-radius:3px;background:rgba(78,205,196,0.15);color:var(--accent);letter-spacing:0.05em;flex-shrink:0">ACTIVE</span>' : ''}
+          </div>
+          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:0">${item.segment_count} segments · ${item.filler_count} fillers · avg ${item.avg_duration.toFixed(2)}s · ${item.total_duration.toFixed(1)}s total · ${timeAgo(item.segmented_at)}</p>
+        </div>
+        <svg width="14" height="14" fill="none" stroke="${isActive ? 'var(--accent)' : 'var(--text-muted)'}" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:${isActive ? '0.8' : '0.4'}"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadSegHistoryItem(folder) {
+  try {
+    const data = await api(`/api/segmenter/${encodeURIComponent(folder)}`);
+    STATE.segmenterResult = data;
+    renderSegResults(data);
+    loadSegHistory(); // refresh to highlight active
+    toast('Segmentation loaded');
+  } catch (e) {
+    toast(e.message || 'Failed to load segmentation', 'error');
+  }
+}
+
+// Load history on startup
+loadSegHistory();

@@ -12,6 +12,7 @@ window.__stsSyncActive = true;
 
 const S = {
   studioUrl: localStorage.getItem('sts-url') || 'http://localhost:5000',
+  scrollRows: parseInt(localStorage.getItem('sts-scroll-rows')) || 15,
   connected: false, autoSync: true, collapsed: true,
   showSettings: false, activeTab: 'typing',
   lastPoll: 0, projectId: null, arguments: '',
@@ -116,16 +117,24 @@ root.innerHTML = `
     background: rgba(0,0,0,0.15);
     display: none;
   }
-  .sts-settings.open { display: flex; gap: 6px; align-items: center; }
+  .sts-settings.open { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .sts-settings label { font-size: 10px; color: #71717a; font-weight: 500; white-space: nowrap; }
   .sts-url-input {
-    flex: 1; padding: 4px 8px; border-radius: 6px;
+    flex: 1; min-width: 120px; padding: 4px 8px; border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.08);
     background: rgba(255,255,255,0.04); color: #d4d4d8;
     font-family: 'DM Mono', monospace; font-size: 10px;
     outline: none; transition: border-color 0.2s;
   }
   .sts-url-input:focus { border-color: rgba(139,92,246,0.4); }
+  .sts-scroll-input {
+    width: 38px; padding: 4px 6px; border-radius: 6px; text-align: center;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.04); color: #d4d4d8;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .sts-scroll-input:focus { border-color: rgba(139,92,246,0.4); }
   .sts-url-save {
     padding: 4px 8px; border-radius: 4px; border: none;
     background: rgba(139,92,246,0.2); color: #8b5cf6;
@@ -295,6 +304,21 @@ root.innerHTML = `
     font-size: 10px; color: #3f3f46; text-align: center;
   }
 
+  /* Scroll status banner */
+  .sts-scroll-status {
+    display: none; padding: 8px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: rgba(59,130,246,0.08);
+    font-size: 10px; font-weight: 500; color: #60a5fa;
+    align-items: center; gap: 8px;
+  }
+  .sts-scroll-status.active { display: flex; }
+  .sts-scroll-icon { animation: sts-bounce 0.6s ease-in-out infinite alternate; }
+  @keyframes sts-bounce { from { transform: translateY(-1px); } to { transform: translateY(1px); } }
+  .sts-scroll-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .sts-scroll-fill { height: 100%; border-radius: 2px; background: #3b82f6; transition: width 0.3s ease; }
+  .sts-scroll-status.done { background: rgba(34,197,94,0.08); color: #22c55e; }
+
   /* Footer */
   .sts-foot {
     display: flex; align-items: center; justify-content: space-between;
@@ -358,12 +382,20 @@ root.innerHTML = `
   <div class="sts-settings" id="sts-settings">
     <label>URL</label>
     <input class="sts-url-input" id="sts-url" type="text" />
+    <label>Rows</label>
+    <input class="sts-scroll-input" id="sts-scroll-rows" type="number" min="1" max="50" />
     <button class="sts-url-save" id="sts-url-save">Save</button>
   </div>
 
   <div class="sts-timer">
     <span>Last poll</span>
     <span class="sts-timer-val" id="sts-timer-val">--</span>
+  </div>
+
+  <div class="sts-scroll-status" id="sts-scroll-status">
+    <span class="sts-scroll-icon" id="sts-scroll-icon">&#x25BC;</span>
+    <span id="sts-scroll-label">Scrolling...</span>
+    <div class="sts-scroll-bar"><div class="sts-scroll-fill" id="sts-scroll-fill" style="width:0%"></div></div>
   </div>
 
   <div class="sts-stats">
@@ -405,6 +437,7 @@ const $id = (id) => document.getElementById(id);
 
 // ─── Settings ───
 $id('sts-url').value = S.studioUrl;
+$id('sts-scroll-rows').value = S.scrollRows;
 
 // ─── Event Listeners ───
 $id('sts-pill').addEventListener('click', () => {
@@ -427,10 +460,14 @@ $id('sts-url-save').addEventListener('click', () => {
   if (!url) return;
   S.studioUrl = url;
   localStorage.setItem('sts-url', url);
+  const rows = Math.max(1, Math.min(50, parseInt($id('sts-scroll-rows').value) || 15));
+  S.scrollRows = rows;
+  $id('sts-scroll-rows').value = rows;
+  localStorage.setItem('sts-scroll-rows', rows);
   S.showSettings = false;
   $id('sts-settings').classList.remove('open');
   $id('sts-gear').classList.remove('active');
-  console.log('Studio URL saved:', url);
+  console.log('Settings saved — URL:', url, '| Scroll rows:', rows);
   poll();
 });
 $id('sts-toggle').addEventListener('click', () => {
@@ -468,6 +505,8 @@ async function syncNow() {
       sc.status = 'pending';
     }
   }
+  // Scroll to force all virtualized blocks into DOM (highlights during each step)
+  await scrollToLoadAll();
   scanPage();
   // Force-send any ready scenes
   for (const [num, sc] of Object.entries(S.scenes)) {
@@ -794,12 +833,16 @@ async function sendResults(num, urls) {
   console.log('Fetching', urls.length, 'images for scene', num, 'as blobs...');
 
   async function fetchBlob(url) {
-    // Try default fetch first, then with credentials (for cross-origin CDN video .mp4)
-    for (const opts of [{}, { credentials: 'include' }]) {
+    // MJ video elements use crossorigin="anonymous" — match that with credentials:'omit'
+    const isVideo = url.includes('.mp4');
+    const strategies = isVideo
+      ? [{ mode: 'cors', credentials: 'omit' }, {}, { credentials: 'include' }]
+      : [{}, { credentials: 'include' }];
+    for (const opts of strategies) {
       try {
         const r = await fetch(url, opts);
         if (r.ok) return await r.blob();
-      } catch (e) { /* CORS may block credentialed request, try next */ }
+      } catch (e) { /* CORS may block, try next strategy */ }
     }
     return null;
   }
@@ -877,16 +920,21 @@ function scanPage() {
     // (e.g., video generation + image generation). We want to merge URLs from all blocks.
     if (sc.status === 'uploading') return;
 
-    // Walk up to the generation container (the grid with images + prompt)
+    // Walk up to the generation container (the 2-col grid with mediaGrid + prompt)
+    // IMPORTANT: We target [class*="group/mediaGrid"] which only exists in the left column
+    // of the full block. Previous selector (img[src*="cdn.midjourney.com"]) would stop at the
+    // RIGHT column when it contained reference thumbnails, missing all videos in the left column.
     let block = span;
     for (let i = 0; i < 10; i++) {
       block = block.parentElement;
       if (!block || block.id === 'pageScroll') break;
-      // MJ grid block: has both img and the prompt panel
-      if (block.querySelector('a[href*="/jobs/"] img') || block.querySelector('img[src*="cdn.midjourney.com"]')) break;
+      if (block.querySelector('[class*="group/mediaGrid"]')) break;
     }
     if (!block || block.id === 'pageScroll') return;
     foundBlocks++;
+
+    // Highlight immediately — before MJ virtualizes the block away on next scroll
+    highlightBlock(block);
 
     // Check if still processing
     const blockText = block.textContent || '';
@@ -971,7 +1019,18 @@ function scrapeBlock(block) {
     });
   });
 
-  // 6. Fallback: extract job IDs and construct URLs
+  // 6. Derive .mp4 URLs from poster frames (when <video> elements aren't rendered due to lazy-load)
+  // Poster pattern: cdn.midjourney.com/video/{uuid}/{index}_640_N.webp?frame=last
+  // Video pattern:  cdn.midjourney.com/video/{uuid}/{index}.mp4
+  if (!urls.some(u => u.includes('.mp4'))) {
+    const posterUrls = urls.filter(u => u.includes('frame=last') && u.includes('/video/'));
+    for (const poster of posterUrls) {
+      const m = poster.match(/cdn\.midjourney\.com\/video\/([^/]+)\/(\d+)_640_N\.webp/);
+      if (m) addUrl('https://cdn.midjourney.com/video/' + m[1] + '/' + m[2] + '.mp4');
+    }
+  }
+
+  // 7. Fallback: extract job IDs and construct URLs
   if (urls.length === 0) {
     const jobIds = new Set();
     mediaGrid.querySelectorAll('a[href*="/jobs/"]').forEach(lk => {
@@ -983,8 +1042,103 @@ function scrapeBlock(block) {
     });
   }
 
-  console.log('scrapeBlock found', urls.length, 'URLs', hasVideo ? '(video)' : '');
+  const finalHasVideo = urls.some(u => u.includes('.mp4'));
+  console.log('scrapeBlock found', urls.length, 'URLs', finalHasVideo ? '(incl. video)' : '');
   return urls;
+}
+
+// ─── Scroll to load all blocks ───
+// MJ uses virtualized rendering — only blocks near the viewport are in the DOM.
+// Scroll through #pageScroll to force all blocks to render, then scan.
+async function scrollToLoadAll() {
+  const ps = document.getElementById('pageScroll');
+  if (!ps) return;
+  const viewH = ps.clientHeight;
+  const maxSteps = S.scrollRows;
+  const stepSize = Math.floor(viewH * 0.9);
+
+  const statusEl = $id('sts-scroll-status');
+  const labelEl = $id('sts-scroll-label');
+  const fillEl = $id('sts-scroll-fill');
+  const iconEl = $id('sts-scroll-icon');
+
+  // Show scroll status banner
+  statusEl.classList.add('active');
+  statusEl.classList.remove('done');
+
+  // Total steps = maxSteps down + 1 scroll-back
+  const totalPhases = maxSteps + 1;
+  let actualSteps = 0;
+
+  console.log('Scrolling down', maxSteps, 'rows...');
+  iconEl.innerHTML = '&#x25BC;'; // down arrow
+  for (let i = 0; i < maxSteps; i++) {
+    const target = (i + 1) * stepSize;
+    if (target >= ps.scrollHeight) break;
+    actualSteps = i + 1;
+    ps.scrollTop = target;
+    labelEl.textContent = 'Scrolling down ' + actualSteps + '/' + maxSteps;
+    fillEl.style.width = ((actualSteps / totalPhases) * 100) + '%';
+    await sleep(500);
+    highlightVisibleBlocks();
+  }
+
+  // Scroll back to top
+  iconEl.innerHTML = '&#x25B2;'; // up arrow
+  labelEl.textContent = 'Scrolling back to top...';
+  fillEl.style.width = ((actualSteps + 0.5) / totalPhases * 100) + '%';
+  ps.scrollTop = 0;
+  await sleep(400);
+  highlightVisibleBlocks();
+
+  // Done
+  fillEl.style.width = '100%';
+  statusEl.classList.add('done');
+  iconEl.innerHTML = '&#x2714;'; // checkmark
+  labelEl.textContent = 'Scroll complete — scanning';
+  console.log('Scroll complete — all visible project blocks highlighted');
+
+  // Auto-hide after 3s
+  setTimeout(() => { statusEl.classList.remove('active', 'done'); fillEl.style.width = '0%'; }, 3000);
+}
+
+// ─── CSS highlight styles (injected once at startup) ───
+function injectPickStyles() {
+  if (document.getElementById('__sts_pick_styles')) return;
+  const s = document.createElement('style');
+  s.id = '__sts_pick_styles';
+  s.textContent = '.sts-picked{border:3px dotted #00ff3b!important;border-radius:12px;box-shadow:0 0 0 2px rgba(16,185,129,.15);transition:all .2s ease;background:rgba(16,185,129,.05)!important}.sts-batch{border:2px solid #06f!important;box-shadow:0 0 8px rgba(0,102,255,.3)}';
+  document.head.appendChild(s);
+}
+
+// ─── Highlight a single block's media grid ───
+function highlightBlock(block) {
+  const mediaGrid = block.querySelector('[class*="group/mediaGrid"]');
+  if (mediaGrid && !mediaGrid.classList.contains('sts-picked')) {
+    mediaGrid.classList.add('sts-picked', 'sts-batch');
+    setTimeout(() => mediaGrid.classList.remove('sts-batch'), 2000);
+  }
+}
+
+// ─── Quick highlight pass for all currently visible project blocks ───
+// Used during scroll steps to mark blocks before MJ virtualizes them away
+function highlightVisibleBlocks() {
+  if (!S.projectId) return;
+  const ps = document.getElementById('pageScroll');
+  if (!ps) return;
+  const tagRe = new RegExp('\\[' + S.projectId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\|\\d+\\]');
+  ps.querySelectorAll('span.relative').forEach(span => {
+    const text = span.textContent || '';
+    if (!tagRe.test(text)) return;
+    let block = span;
+    for (let i = 0; i < 10; i++) {
+      block = block.parentElement;
+      if (!block || block.id === 'pageScroll') break;
+      if (block.querySelector('[class*="group/mediaGrid"]')) break;
+    }
+    if (!block || block.id === 'pageScroll') return;
+    highlightBlock(block);
+  });
 }
 
 // ─── Poll ───
@@ -998,10 +1152,14 @@ async function poll() {
 
 // ─── Start ───
 console.log('Synchronizer v2 injected');
+injectPickStyles();
 renderTabs();
-poll();
-setInterval(poll, 5000);
-setInterval(updateTimer, 1000);
+// Start polling (no auto-scroll — wait for user to press Sync Now)
+(async () => {
+  await poll();
+  setInterval(poll, 5000);
+  setInterval(updateTimer, 1000);
+})();
 
 automaNextBlock();"""
 

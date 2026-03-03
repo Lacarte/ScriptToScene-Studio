@@ -33,6 +33,7 @@ function loadScenesForAssets() {
   STATE.assetsSceneData = STATE.scenesResult;
   STATE.assetStatuses = {};  // Clear stale statuses from previous project
   renderAssetsFromScenes();
+  loadAssetsHistory(); // refresh to highlight active row
   toast(`Loaded ${STATE.scenesResult.scenes.length} scenes`);
 }
 
@@ -53,17 +54,29 @@ async function assetsPickSceneHistory() {
   modal.classList.remove('hidden');
   modal.style.display = 'flex';
 
-  $('#assets-scene-picker-list').innerHTML = items.map(item => `
-    <div class="hist-item" style="cursor:pointer" onclick="assetsSelectSceneProject('${esc(item.project_id)}')">
+  const currentPid = STATE.assetsSceneData?.project_id || null;
+
+  $('#assets-scene-picker-list').innerHTML = items.map(item => {
+    const isActive = currentPid && item.project_id === currentPid;
+    const activeStyle = isActive
+      ? 'background:rgba(78,205,196,0.06);border-left:3px solid var(--accent)'
+      : 'border-left:3px solid transparent';
+
+    return `
+    <div class="hist-item" style="cursor:pointer;transition:background 0.15s;${activeStyle}" onclick="assetsSelectSceneProject('${esc(item.project_id)}')" onmouseover="this.style.background='var(--bg-darkest)'" onmouseout="this.style.background='${isActive ? 'rgba(78,205,196,0.06)' : ''}'">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px">
         <div style="flex:1;min-width:0">
-          <p style="font-size:13px;color:var(--text);margin:0">${esc(item.project_id)}</p>
+          <div style="display:flex;align-items:center;gap:8px">
+            <p style="font-size:13px;color:${isActive ? 'var(--accent)' : 'var(--text)'};margin:0;font-weight:${isActive ? '600' : '400'}">${esc(item.project_id)}</p>
+            ${isActive ? '<span class="font-mono" style="font-size:8px;padding:1px 6px;border-radius:3px;background:rgba(78,205,196,0.15);color:var(--accent);letter-spacing:0.05em;flex-shrink:0">ACTIVE</span>' : ''}
+          </div>
           <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${item.scene_count} scenes · ${timeAgo(item.timestamp)}</p>
         </div>
         ${item.source_folder ? `<span class="font-mono" style="font-size:9px;color:var(--text-muted);flex-shrink:0;background:var(--bg-darkest);padding:2px 6px;border-radius:4px">${esc(item.source_folder.length > 30 ? item.source_folder.slice(0, 30) + '...' : item.source_folder)}</span>` : ''}
+        <svg width="14" height="14" fill="none" stroke="${isActive ? 'var(--accent)' : 'var(--text-muted)'}" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:${isActive ? '0.8' : '0.4'}"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 async function assetsSelectSceneProject(projectId) {
@@ -74,6 +87,7 @@ async function assetsSelectSceneProject(projectId) {
     STATE.assetsSceneData = data;
     STATE.assetStatuses = {};  // Clear stale statuses from previous project
     renderAssetsFromScenes();
+    loadAssetsHistory(); // refresh to highlight active row
     toast(`Loaded ${data.scenes.length} scenes from history`);
   } catch (e) {
     toast(e.message || 'Failed to load scene project', 'error');
@@ -104,6 +118,7 @@ function handleAssetsJSONImport(input) {
       STATE.assetsSceneData = data;
       STATE.assetStatuses = {};  // Clear stale statuses from previous project
       renderAssetsFromScenes();
+      loadAssetsHistory(); // refresh to highlight active row
       toast(`Loaded ${data.scenes.length} scenes from file`);
     } catch (err) {
       toast('Failed to parse JSON', 'error');
@@ -662,7 +677,10 @@ async function loadAssetsHistory() {
       return;
     }
 
+    const currentPid = STATE.assetsSceneData?.project_id || null;
+
     container.innerHTML = projects.map(p => {
+      const isActive = currentPid && p.project_id === currentPid;
       const statusColors = { done: '#4ECDC4', downloading: '#FFB347', error: '#FF6B6B', waiting: '#8B8B8B', grabbing: '#A78BFA' };
       const statusColor = statusColors[p.status] || '#8B8B8B';
       const statusLabel = p.status || 'unknown';
@@ -671,18 +689,23 @@ async function loadAssetsHistory() {
       const diskFiles = p.disk_files || 0;
       const time = p.created_at ? timeAgo(p.created_at) : timeAgo(p.timestamp);
 
+      const activeStyle = isActive
+        ? 'background:rgba(78,205,196,0.06);border-left:3px solid var(--accent)'
+        : 'border-left:3px solid transparent';
+
       return `
-      <div class="hist-item" style="cursor:pointer;transition:background 0.15s" onclick="assetsLoadFromHistory('${esc(p.project_id)}')" onmouseover="this.style.background='var(--bg-darkest)'" onmouseout="this.style.background=''">
+      <div class="hist-item" data-project-id="${esc(p.project_id)}" style="cursor:pointer;transition:background 0.15s;${activeStyle}" onclick="assetsLoadFromHistory('${esc(p.project_id)}')" onmouseover="this.style.background='var(--bg-darkest)'" onmouseout="this.style.background='${isActive ? 'rgba(78,205,196,0.06)' : ''}'">
         <div style="display:flex;align-items:center;gap:12px;padding:10px 14px">
           ${p.preview
-            ? `<div style="width:48px;height:48px;border-radius:6px;overflow:hidden;flex-shrink:0;border:1px solid var(--border)"><img src="${esc(p.preview)}" style="width:100%;height:100%;object-fit:cover" /></div>`
-            : `<div style="width:48px;height:48px;border-radius:6px;flex-shrink:0;background:var(--bg-darkest);display:flex;align-items:center;justify-content:center">
-                <svg width="20" height="20" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            ? `<div style="width:48px;height:48px;border-radius:6px;overflow:hidden;flex-shrink:0;border:1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}"><img src="${esc(p.preview)}" style="width:100%;height:100%;object-fit:cover" /></div>`
+            : `<div style="width:48px;height:48px;border-radius:6px;flex-shrink:0;background:var(--bg-darkest);display:flex;align-items:center;justify-content:center;border:1px solid ${isActive ? 'var(--accent)' : 'transparent'}">
+                <svg width="20" height="20" fill="none" stroke="${isActive ? 'var(--accent)' : 'var(--text-muted)'}" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:${isActive ? '0.8' : '0.4'}"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
               </div>`
           }
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-              <span style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.project_id)}</span>
+              <span style="font-size:12px;font-weight:600;color:${isActive ? 'var(--accent)' : 'var(--text)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.project_id)}</span>
+              ${isActive ? '<span class="font-mono" style="font-size:8px;padding:1px 6px;border-radius:3px;background:rgba(78,205,196,0.15);color:var(--accent);letter-spacing:0.05em;flex-shrink:0">ACTIVE</span>' : ''}
               <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};flex-shrink:0"></span>
               <span class="font-mono" style="font-size:9px;color:${statusColor};text-transform:uppercase;letter-spacing:0.05em">${esc(statusLabel)}</span>
             </div>
@@ -694,7 +717,7 @@ async function loadAssetsHistory() {
               ${p.provider ? `<span class="font-mono" style="font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,0.1);color:#A78BFA">${esc(p.provider)}</span>` : ''}
             </div>
           </div>
-          <svg width="16" height="16" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:0.4"><path d="M9 18l6-6-6-6"/></svg>
+          <svg width="16" height="16" fill="none" stroke="${isActive ? 'var(--accent)' : 'var(--text-muted)'}" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:${isActive ? '0.8' : '0.4'}"><path d="M9 18l6-6-6-6"/></svg>
         </div>
       </div>`;
     }).join('');
@@ -754,6 +777,7 @@ async function assetsLoadFromHistory(projectId) {
     }
 
     renderAssetsFromScenes();
+    loadAssetsHistory(); // refresh to highlight active row
     toast(`Loaded project ${projectId} (${Object.keys(data.scenes).length} scenes)`);
   } catch (e) {
     toast(e.message || 'Failed to load project', 'error');

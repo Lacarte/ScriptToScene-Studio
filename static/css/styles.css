@@ -236,3 +236,36 @@ body {
 }
 .tts-blend-preset-btn:hover { border-color: var(--accent); background: rgba(78,205,196,0.04); }
 .tts-blend-preset-btn.active { border-color: var(--accent); background: rgba(78,205,196,0.08); }
+
+/* ---- Fullscreen Karaoke ---- */
+.aln-fs-word {
+  display: inline-block; font-size: 22px; font-weight: 500;
+  color: var(--text-muted); padding: 2px 4px; border-radius: 4px;
+  cursor: pointer; user-select: none; white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+.aln-fs-word:hover { color: var(--text); background: rgba(78,205,196,0.06); }
+.aln-fs-word.active {
+  color: var(--accent); background: rgba(78,205,196,0.14);
+  font-weight: 600; border-bottom: 2px solid var(--accent); padding-bottom: 0;
+}
+.aln-fs-word.spoken { color: var(--text); }
+
+@media (max-width: 767px) {
+  .aln-fs-word { font-size: 16px; }
+}
+
+/* ---- Settings Toggle Switch ---- */
+.sts-toggle {
+  position: relative; display: inline-block; width: 38px; height: 20px; cursor: pointer;
+}
+.sts-toggle input { opacity: 0; width: 0; height: 0; }
+.sts-toggle-slider {
+  position: absolute; inset: 0; background: var(--border); border-radius: 10px; transition: all 0.2s;
+}
+.sts-toggle-slider::before {
+  content: ''; position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--text-muted); left: 3px; top: 3px; transition: all 0.2s;
+}
+.sts-toggle input:checked + .sts-toggle-slider { background: rgba(78,205,196,0.3); }
+.sts-toggle input:checked + .sts-toggle-slider::before { transform: translateX(18px); background: var(--accent); }

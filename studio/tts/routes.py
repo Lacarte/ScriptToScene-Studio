@@ -573,18 +573,21 @@ def generate():
     lang = _voice_to_lang(voice)
     logger.info("Generate  \033[1m{}\033[0m | {} | {} chars", model_id, voice_for_metadata, len(prompt))
 
+    skip_clean = data.get("skip_clean", False)
+
     pre_blocks = re.findall(r'\[([^\[\]]+)\]', prompt)
     if pre_blocks and len(pre_blocks) >= 2:
         blocks = []
         for b in pre_blocks:
-            cleaned = re.sub(r"[*_#`~]", "", b)
-            cleaned = re.sub(r"https?://\S+", "link", cleaned)
-            cleaned = re.sub(r"\s+", " ", cleaned).strip()
-            if cleaned:
-                blocks.append(cleaned)
+            if not skip_clean:
+                b = re.sub(r"[*_#`~]", "", b)
+                b = re.sub(r"https?://\S+", "link", b)
+            b = re.sub(r"\s+", " ", b).strip()
+            if b:
+                blocks.append(b)
         tts_prompt = " ".join(blocks)
     else:
-        tts_prompt = clean_for_tts(prompt)
+        tts_prompt = clean_for_tts(prompt) if not skip_clean else prompt.strip()
         blocks = tts_breathing_blocks(tts_prompt)
 
     # Multi-block: chunked background generation with SSE progress
@@ -762,7 +765,8 @@ def stream_audio():
 
     kokoro = load_model()
     lang = _voice_to_lang(voice)
-    tts_prompt = clean_for_tts(prompt)
+    skip_clean = data.get("skip_clean", False)
+    tts_prompt = clean_for_tts(prompt) if not skip_clean else prompt.strip()
 
     logger.info("Stream  \033[1m{}\033[0m | {} | {} chars", model_id, voice, len(prompt))
 

@@ -100,6 +100,25 @@ async function api(path, opts = {}) {
   return res.json();
 }
 
+// ---- Settings ----
+window.STS_SETTINGS = {
+  normalize: localStorage.getItem('sts-normalize') !== 'false',
+  clean: localStorage.getItem('sts-clean') !== 'false',
+};
+
+function settingsToggle(key, val) {
+  STS_SETTINGS[key] = val;
+  localStorage.setItem('sts-' + key, val);
+}
+
+// Restore toggles on load
+document.addEventListener('DOMContentLoaded', () => {
+  const normEl = $('#setting-normalize');
+  const cleanEl = $('#setting-clean');
+  if (normEl) normEl.checked = STS_SETTINGS.normalize;
+  if (cleanEl) cleanEl.checked = STS_SETTINGS.clean;
+});
+
 // ---- Time Ago ----
 function timeAgo(ts) {
   if (!ts) return '';

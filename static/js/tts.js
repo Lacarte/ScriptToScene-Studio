@@ -761,17 +761,19 @@ async function ttsHandleGenerate() {
       await ttsDownloadModel();
     }
 
-    ttsSetProgress('Normalizing text...');
     let genPrompt = prompt;
-    try {
-      const nr = await fetch('/api/tts/normalize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: prompt }),
-      });
-      const nd = await nr.json();
-      if (nd.normalized) genPrompt = nd.normalized;
-    } catch { /* use original */ }
+    if (STS_SETTINGS.normalize) {
+      ttsSetProgress('Normalizing text...');
+      try {
+        const nr = await fetch('/api/tts/normalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: prompt }),
+        });
+        const nd = await nr.json();
+        if (nd.normalized) genPrompt = nd.normalized;
+      } catch { /* use original */ }
+    }
 
     const speed = parseFloat($('#tts-speed')?.value || '1.0');
     const payload = {
@@ -780,6 +782,7 @@ async function ttsHandleGenerate() {
       prompt: genPrompt,
       speed,
       max_silence_ms: 500,
+      skip_clean: !STS_SETTINGS.clean,
     };
     if (_ttsState.blendMode) {
       payload.blend = {
@@ -905,6 +908,7 @@ async function ttsHandleStream() {
       voice: _ttsState.selectedVoice,
       prompt,
       speed,
+      skip_clean: !STS_SETTINGS.clean,
     };
     if (_ttsState.blendMode) {
       payload.blend = {
@@ -987,16 +991,29 @@ async function ttsHandleStream() {
 }
 
 // ---- Audio Playback ----
+
+function _ttsFmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
 function ttsPlayAudio(meta) {
   if (!meta || !meta.filename) return;
   _ttsState.nowPlaying = meta;
+
   const audioEl = $('#tts-audio-el');
   if (!audioEl) return;
 
   const url = `/output/tts/${meta.folder}/${meta.filename}`;
   audioEl.src = url;
   audioEl.load();
-  audioEl.play().catch(() => {});
+
+  // Wait for audio to be ready before playing
+  audioEl.oncanplay = () => {
+    audioEl.oncanplay = null;
+    audioEl.play().catch(() => {});
+    ttsUpdatePlayIcon();
+  };
 
   const playerEl = $('#tts-now-playing');
   if (playerEl) {
@@ -1005,21 +1022,29 @@ function ttsPlayAudio(meta) {
     $('#tts-np-text').textContent = (meta.prompt || '').slice(0, 80) + ((meta.prompt || '').length > 80 ? '...' : '');
     $('#tts-np-voice').textContent = m.name || meta.voice;
     $('#tts-np-duration').textContent = meta.duration_seconds ? `${meta.duration_seconds.toFixed(1)}s` : '';
+    $('#tts-time').textContent = `0:00 / ${_ttsFmtTime(meta.duration_seconds)}`;
   }
 }
 
 function ttsTogglePlayback() {
   const el = $('#tts-audio-el');
-  if (!el) return;
-  if (el.paused) el.play().catch(() => {});
-  else el.pause();
+  if (!el || !el.src) return;
+  if (el.paused) {
+    el.play().then(() => ttsUpdatePlayIcon()).catch(() => {});
+  } else {
+    el.pause();
+    ttsUpdatePlayIcon();
+  }
 }
 
 function ttsUpdatePlayIcon() {
   const el = $('#tts-audio-el');
-  const btn = $('#tts-play-btn');
-  if (!el || !btn) return;
-  btn.textContent = el.paused ? '\u25B6' : '\u23F8';
+  if (!el) return;
+  const paused = el.paused;
+  const iconPlay = $('#tts-icon-play');
+  const iconPause = $('#tts-icon-pause');
+  if (iconPlay) iconPlay.style.display = paused ? '' : 'none';
+  if (iconPause) iconPause.style.display = paused ? 'none' : '';
 }
 
 function ttsSeekAudio(e) {
@@ -1038,11 +1063,18 @@ function ttsUpdateSeekBar() {
   if (!el || !fill) return;
   const pct = el.duration ? (el.currentTime / el.duration * 100) : 0;
   fill.style.width = pct + '%';
-  if (time) {
-    const fmt = s => { const m = Math.floor(s / 60); return m + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
-    time.textContent = `${fmt(el.currentTime)} / ${fmt(el.duration || 0)}`;
-  }
+  if (time) time.textContent = `${_ttsFmtTime(el.currentTime)} / ${_ttsFmtTime(el.duration)}`;
 }
+
+// Register audio events
+(function _ttsAudioEvents() {
+  const el = $('#tts-audio-el');
+  if (!el) return;
+  el.addEventListener('play', ttsUpdatePlayIcon);
+  el.addEventListener('pause', ttsUpdatePlayIcon);
+  el.addEventListener('ended', ttsUpdatePlayIcon);
+  el.addEventListener('timeupdate', ttsUpdateSeekBar);
+})();
 
 // ---- History ----
 async function ttsLoadHistory() {

@@ -90,6 +90,33 @@
     </div>
   </div>
 
+  <!-- Alignment Fullscreen Karaoke Overlay -->
+  <div id="aln-fs-overlay" style="position:fixed;inset:0;z-index:70;background:rgba(6,9,14,0.96);backdrop-filter:blur(30px);display:none;flex-direction:column;opacity:0;transition:opacity 0.3s">
+    <button onclick="alnCloseKaraoke()" style="position:absolute;top:16px;right:20px;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:rgba(22,29,42,0.6);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:2" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:900px;width:100%;margin:0 auto;padding:60px 32px 24px;min-height:0">
+      <div id="aln-fs-info" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:24px;text-align:center"></div>
+      <div id="aln-fs-karaoke" style="flex:1;width:100%;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px 2px;line-height:2.2;align-content:flex-start;justify-content:center;padding:20px 0;min-height:0"></div>
+      <div style="display:flex;align-items:center;gap:16px;padding-top:20px;width:100%">
+        <button id="aln-fs-play-btn" onclick="alnTogglePlay()" style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#4ECDC4,#2FB8AE);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 3px 12px rgba(78,205,196,0.3);flex-shrink:0">
+          <svg class="aln-fs-icon-play" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="margin-left:2px"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="aln-fs-icon-pause" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+        <div style="flex:1;position:relative;height:24px;display:flex;align-items:center">
+          <input type="range" id="aln-fs-seek" min="0" max="100" value="0" step="0.1" style="width:100%;height:100%;opacity:0;cursor:pointer;position:absolute;z-index:2">
+          <div style="width:100%;height:4px;background:var(--border);border-radius:2px;position:relative">
+            <div id="aln-fs-seek-fill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#2FB8AE);border-radius:inherit;transition:width 0.1s linear"></div>
+          </div>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);min-width:80px;text-align:center;flex-shrink:0">
+          <span id="aln-fs-time-cur">0:00</span> / <span id="aln-fs-time-total">0:00</span>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);opacity:0.5;text-align:center;padding:8px 0 16px;font-family:'JetBrains Mono',monospace">Esc to exit</div>
+  </div>
+
   <!-- TTS Blend Voice Picker Modal -->
   <div id="tts-blend-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(10,14,19,0.85);backdrop-filter:blur(8px);display:none">
@@ -102,6 +129,20 @@
       </div>
       <div id="tts-blend-picker-tabs" style="padding:8px 18px;display:flex;flex-wrap:wrap;gap:4px"></div>
       <div id="tts-blend-picker-grid" style="padding:8px 18px 16px;overflow-y:auto;flex:1;display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+  </div>
+
+  <!-- TTS Picker Modal (for Alignment) -->
+  <div id="align-tts-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
+    aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
+    <div class="card w-full max-w-lg" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:600;color:var(--text)">Pick TTS Generation</span>
+        <button onclick="alignCloseTTSPicker()" style="width:28px;height:28px;border-radius:7px;border:none;background:rgba(255,107,107,0.1);color:var(--coral);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="align-tts-picker-list" style="padding:12px 18px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px"></div>
     </div>
   </div>
 
@@ -191,6 +232,13 @@
           <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
         </svg>
         <span class="nav-label">EDITOR</span>
+      </button>
+      <button class="nav-item" onclick="switchPage('settings')" data-page="settings">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+        <span class="nav-label">SETTINGS</span>
       </button>
     </div>
 
@@ -332,7 +380,10 @@
         <!-- Now Playing -->
         <div id="tts-now-playing" style="display:none;margin-top:16px" class="card p-4">
           <div class="flex items-center gap-3 mb-3">
-            <button id="tts-play-btn" onclick="ttsTogglePlayback()" style="width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(78,205,196,0.12);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:16px">&#9654;</button>
+            <button id="tts-play-btn" onclick="ttsTogglePlayback()" style="width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(78,205,196,0.12);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--accent)">
+              <svg id="tts-icon-play" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="tts-icon-pause" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+            </button>
             <div class="flex-1 min-w-0">
               <p id="tts-np-text" class="text-xs" style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
               <div class="flex items-center gap-2 mt-0.5" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
@@ -346,7 +397,7 @@
           <div id="tts-seek-bar" onclick="ttsSeekAudio(event)" style="height:6px;background:var(--bg-darkest);border-radius:3px;cursor:pointer;overflow:hidden">
             <div id="tts-seek-fill" style="height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 0.1s"></div>
           </div>
-          <audio id="tts-audio-el" onplay="ttsUpdatePlayIcon()" onpause="ttsUpdatePlayIcon()" ontimeupdate="ttsUpdateSeekBar()" onended="ttsUpdatePlayIcon()"></audio>
+          <audio id="tts-audio-el"></audio>
         </div>
 
         <!-- History -->
@@ -375,6 +426,16 @@
           <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Force Alignment</h2>
           <p class="text-sm mt-1" style="color:var(--text-secondary)">Align audio to text with word-level timestamps</p>
         </div>
+
+        <!-- TTS Source -->
+        <section class="card p-5 mb-4">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">From TTS</label>
+          <div style="display:flex;gap:8px">
+            <button onclick="alignUseTTS()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
+            <button onclick="alignPickTTS()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
+          </div>
+          <p id="align-tts-source" style="display:none;font-size:11px;color:var(--accent);margin-top:8px;font-family:'JetBrains Mono',monospace"></p>
+        </section>
 
         <!-- Upload audio -->
         <section class="card p-5 mb-4">
@@ -419,6 +480,10 @@
             <div class="flex items-center justify-between mb-3">
               <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Results</label>
               <div style="display:flex;gap:6px">
+                <button onclick="alnOpenKaraoke()" title="Fullscreen karaoke" class="action-btn hover-accent" style="display:flex;align-items:center;gap:4px;padding:4px 10px">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+                  Karaoke
+                </button>
                 <button onclick="copyAlignJSON()" title="Copy JSON" class="action-btn hover-accent">Copy JSON</button>
                 <button onclick="downloadAlignJSON()" title="Download JSON" class="action-btn hover-accent">Download</button>
                 <button onclick="deleteAlignResult()" title="Move to Trash" class="action-btn hover-coral-border">Delete</button>
@@ -797,6 +862,62 @@
         </div>
       </div>
       <iframe id="editor-iframe" style="display:none;width:100%;height:100%;border:none" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- PAGE: SETTINGS                                             -->
+    <!-- ========================================================== -->
+    <div id="page-settings" class="page">
+      <div style="max-width:640px;margin:0 auto;padding:32px 24px">
+        <div style="margin-bottom:32px">
+          <h2 style="font-size:20px;font-weight:700;letter-spacing:-0.02em;color:var(--text)">Settings</h2>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Configure generation parameters</p>
+        </div>
+
+        <!-- TTS Text Processing -->
+        <section class="card p-5 mb-4">
+          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Text Processing</label>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest);margin-bottom:6px">
+            <div style="flex:1;min-width:0">
+              <span style="font-size:13px;color:var(--text);font-weight:500">Text Normalization</span>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Convert numbers, symbols, abbreviations to spoken words before TTS</p>
+            </div>
+            <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
+              <input type="checkbox" id="setting-normalize" checked onchange="settingsToggle('normalize', this.checked)">
+              <span class="sts-toggle-slider"></span>
+            </label>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest)">
+            <div style="flex:1;min-width:0">
+              <span style="font-size:13px;color:var(--text);font-weight:500">Markdown Cleanup</span>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Strip markdown formatting, URLs, and brackets before generation</p>
+            </div>
+            <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
+              <input type="checkbox" id="setting-clean" checked onchange="settingsToggle('clean', this.checked)">
+              <span class="sts-toggle-slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Features Status -->
+        <section class="card p-5 mb-4">
+          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Features</label>
+          <div id="settings-feature-status" style="display:flex;flex-direction:column;gap:6px"></div>
+        </section>
+
+        <!-- About -->
+        <section class="card p-5">
+          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">About</label>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Application</span><span class="font-mono" style="font-size:13px;color:var(--text)">ScriptToScene Studio</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">TTS Engine</span><span class="font-mono" style="font-size:13px;color:var(--text)">kokoro-onnx</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Sample Rate</span><span class="font-mono" style="font-size:13px;color:var(--text)">24,000 Hz</span></div>
+            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Built by</span><span style="font-size:13px;font-weight:500;color:var(--accent)">Mr. Lacarte</span></div>
+          </div>
+        </section>
+      </div>
     </div>
 
   </div>

@@ -148,13 +148,17 @@ function alnTogglePlay() {
   if (_alnAudio.paused) {
     _alnAudio.play().then(() => {
       _alnSetPlayIcon(false);
+      _alnFsSetPlayIcon();
       $('#aln-playhead').style.opacity = '1';
       _alnAnimFrame = requestAnimationFrame(_alnTick);
+      if (_alnFsOpen) _alnFsStartRAF();
     }).catch(e => console.warn('Audio play failed:', e));
   } else {
     _alnAudio.pause();
     _alnSetPlayIcon(true);
+    _alnFsSetPlayIcon();
     if (_alnAnimFrame) { cancelAnimationFrame(_alnAnimFrame); _alnAnimFrame = null; }
+    _alnFsStopRAF();
   }
 }
 
@@ -373,6 +377,304 @@ async function deleteAlignHistItem(idx) {
     loadAlignHistory();
   } catch (e) { toast(e.message, 'error'); }
 }
+
+// ---- TTS → Alignment Integration ----
+
+async function _alignLoadTTSItem(item) {
+  if (!item || !item.folder || !item.filename) {
+    toast('Invalid TTS item', 'error');
+    return;
+  }
+  const url = `/output/tts/${item.folder}/${item.filename}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch audio');
+    const blob = await res.blob();
+    const file = new File([blob], item.filename, { type: 'audio/wav' });
+    setAlignFile(file);
+
+    // Populate transcript
+    const ta = $('#align-text-input');
+    if (ta && item.prompt) {
+      ta.value = item.prompt;
+      ta.dispatchEvent(new Event('input'));
+    }
+
+    // Show source indicator
+    const srcEl = $('#align-tts-source');
+    if (srcEl) {
+      const voice = item.voice || 'unknown';
+      const dur = item.duration_seconds ? `${item.duration_seconds.toFixed(1)}s` : '';
+      srcEl.textContent = `Loaded: ${voice} · ${dur} · ${item.filename}`;
+      srcEl.style.display = '';
+    }
+    toast('TTS audio loaded into alignment');
+  } catch (e) {
+    toast(e.message || 'Failed to load TTS audio', 'error');
+  }
+}
+
+function alignUseTTS() {
+  // Use the most recent TTS "now playing" or last generated item
+  if (_ttsState && _ttsState.history && _ttsState.history.length) {
+    _alignLoadTTSItem(_ttsState.history[0]);
+  } else {
+    toast('No TTS result available. Generate audio first.', 'error');
+  }
+}
+
+async function alignPickTTS() {
+  // Load TTS history if not loaded
+  let items = (_ttsState && _ttsState.history) || [];
+  if (!items.length) {
+    try {
+      const r = await fetch('/api/tts/generation');
+      items = await r.json();
+    } catch { /* no-op */ }
+  }
+  if (!items.length) {
+    toast('No TTS history. Generate audio first.', 'error');
+    return;
+  }
+
+  const modal = $('#align-tts-picker-modal');
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+
+  $('#align-tts-picker-list').innerHTML = items.map((item, i) => {
+    const text = item.prompt || '';
+    const truncated = text.length > 50 ? text.slice(0, 50) + '...' : text;
+    const voice = item.voice || '';
+    const dur = item.duration_seconds ? `${item.duration_seconds.toFixed(1)}s` : '';
+    return `
+    <div class="hist-item" style="cursor:pointer" onclick="alignSelectTTS(${i})">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px 10px 14px">
+        <div style="flex:1;min-width:0">
+          <p style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0">${esc(truncated)}</p>
+          <p class="font-mono" style="font-size:10px;color:var(--text-muted);margin:2px 0 0">${esc(voice)} · ${dur} · ${_ttsTimeAgo ? _ttsTimeAgo(item.timestamp) : timeAgo(item.timestamp)}</p>
+        </div>
+        <span class="font-mono" style="font-size:9px;color:var(--text-muted);flex-shrink:0;background:var(--bg-darkest);padding:2px 6px;border-radius:4px">${esc(item.filename || '')}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Store items for selection
+  window._alignTTSPickerItems = items;
+}
+
+function alignSelectTTS(idx) {
+  const items = window._alignTTSPickerItems || [];
+  const item = items[idx];
+  if (item) _alignLoadTTSItem(item);
+  alignCloseTTSPicker();
+}
+
+function alignCloseTTSPicker() {
+  const modal = $('#align-tts-picker-modal');
+  modal.classList.add('hidden');
+  modal.style.display = 'none';
+}
+
+// ---- Fullscreen Karaoke ----
+let _alnFsOpen = false;
+let _alnFsRAF = null;
+let _alnFsActiveIdx = -1;
+
+function _alnFmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
+function alnOpenKaraoke() {
+  const data = STATE.alignResult;
+  if (!data || !data.alignment || !data.alignment.length) {
+    toast('No alignment data — run alignment first', 'error');
+    return;
+  }
+  if (!_alnAudio) {
+    toast('No audio loaded', 'error');
+    return;
+  }
+
+  _alnFsOpen = true;
+  _alnFsActiveIdx = -1;
+
+  const words = data.alignment;
+
+  // Info line
+  const info = $('#aln-fs-info');
+  if (info) {
+    const dur = words[words.length - 1].end.toFixed(1);
+    info.textContent = `${words.length} words · ${dur}s · force-aligned`;
+  }
+
+  // Build word spans
+  const container = $('#aln-fs-karaoke');
+  if (container) {
+    container.innerHTML = words.map((w, i) =>
+      `<span class="aln-fs-word" data-idx="${i}" onclick="_alnFsKaraokeSeek(${i})">${w.word}</span>`
+    ).join('');
+  }
+
+  // Show overlay
+  const overlay = $('#aln-fs-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.style.opacity = '1');
+  }
+
+  // Sync state
+  _alnFsUpdateSeek();
+  _alnFsSetPlayIcon();
+  _alnFsUpdateKaraoke();
+  if (!_alnAudio.paused) _alnFsStartRAF();
+}
+
+function alnCloseKaraoke() {
+  _alnFsOpen = false;
+  _alnFsStopRAF();
+  const overlay = $('#aln-fs-overlay');
+  if (overlay) {
+    overlay.style.opacity = '0';
+    setTimeout(() => { overlay.style.display = 'none'; }, 300);
+  }
+}
+
+function _alnFsKaraokeSeek(idx) {
+  const words = STATE.alignResult?.alignment;
+  if (!_alnAudio || !words || !words[idx]) return;
+  _alnAudio.currentTime = words[idx].begin;
+  _alnFsActiveIdx = -1;
+  if (_alnAudio.paused) {
+    _alnAudio.play().then(() => {
+      _alnSetPlayIcon(false);
+      _alnFsSetPlayIcon();
+      $('#aln-playhead').style.opacity = '1';
+      _alnAnimFrame = requestAnimationFrame(_alnTick);
+      _alnFsStartRAF();
+    }).catch(() => {});
+  }
+}
+
+function _alnFsUpdateKaraoke() {
+  const words = STATE.alignResult?.alignment;
+  if (!_alnAudio || !words || !words.length) return;
+
+  const t = _alnAudio.currentTime;
+
+  // Binary search for the active word
+  let lo = 0, hi = words.length - 1, activeIdx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (t >= words[mid].begin && t < words[mid].end) { activeIdx = mid; break; }
+    if (t < words[mid].begin) hi = mid - 1;
+    else lo = mid + 1;
+  }
+
+  if (activeIdx === _alnFsActiveIdx) return;
+  _alnFsActiveIdx = activeIdx;
+
+  if (!_alnFsOpen) return;
+  const container = $('#aln-fs-karaoke');
+  if (!container) return;
+  const spans = container.children;
+
+  for (let i = 0; i < spans.length; i++) {
+    if (activeIdx >= 0 && i < activeIdx) spans[i].className = 'aln-fs-word spoken';
+    else if (i === activeIdx) spans[i].className = 'aln-fs-word active';
+    else spans[i].className = 'aln-fs-word';
+  }
+
+  // Auto-scroll active word to center
+  if (activeIdx >= 0 && activeIdx < spans.length) {
+    const span = spans[activeIdx];
+    const top = span.offsetTop - container.offsetTop;
+    container.scrollTo({ top: top - container.clientHeight / 2 + span.offsetHeight / 2, behavior: 'smooth' });
+  }
+}
+
+function _alnFsUpdateSeek() {
+  if (!_alnFsOpen || !_alnAudio) return;
+  const words = STATE.alignResult?.alignment;
+  const totalDuration = words?.length ? words[words.length - 1].end : (_alnAudio.duration || 1);
+  const pct = ((_alnAudio.currentTime / totalDuration) * 100);
+  const seekInput = $('#aln-fs-seek');
+  if (seekInput) seekInput.value = pct;
+  const fill = $('#aln-fs-seek-fill');
+  if (fill) fill.style.width = pct + '%';
+  const cur = $('#aln-fs-time-cur');
+  if (cur) cur.textContent = _alnFmtTime(_alnAudio.currentTime);
+  const tot = $('#aln-fs-time-total');
+  if (tot) tot.textContent = _alnFmtTime(totalDuration);
+}
+
+function _alnFsSetPlayIcon() {
+  if (!_alnAudio) return;
+  const paused = _alnAudio.paused;
+  const fsPlay = document.querySelector('.aln-fs-icon-play');
+  const fsPause = document.querySelector('.aln-fs-icon-pause');
+  if (fsPlay) fsPlay.style.display = paused ? '' : 'none';
+  if (fsPause) fsPause.style.display = paused ? 'none' : '';
+}
+
+function _alnFsStartRAF() {
+  _alnFsStopRAF();
+  function tick() {
+    if (!_alnAudio || _alnAudio.paused) { _alnFsRAF = null; return; }
+    _alnFsUpdateKaraoke();
+    _alnFsUpdateSeek();
+    _alnFsRAF = requestAnimationFrame(tick);
+  }
+  _alnFsRAF = requestAnimationFrame(tick);
+}
+
+function _alnFsStopRAF() {
+  if (_alnFsRAF) { cancelAnimationFrame(_alnFsRAF); _alnFsRAF = null; }
+}
+
+// Fullscreen seek bar input
+(function _alnFsSeekInit() {
+  const seekInput = $('#aln-fs-seek');
+  if (!seekInput) return;
+  seekInput.addEventListener('input', () => {
+    if (!_alnAudio) return;
+    const words = STATE.alignResult?.alignment;
+    const totalDuration = words?.length ? words[words.length - 1].end : (_alnAudio.duration || 1);
+    _alnAudio.currentTime = (seekInput.value / 100) * totalDuration;
+    _alnFsActiveIdx = -1;
+    const fill = $('#aln-fs-seek-fill');
+    if (fill) fill.style.width = seekInput.value + '%';
+  });
+})();
+
+// Escape key closes karaoke
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && _alnFsOpen) { alnCloseKaraoke(); e.preventDefault(); }
+});
+
+// Sync fullscreen play icon when audio events fire
+(function _alnFsAudioSync() {
+  // Observe _alnAudio changes — re-bind when new audio loads
+  const origLoad = _alnLoadAudio;
+  _alnLoadAudio = function(data) {
+    origLoad(data);
+    if (_alnAudio) {
+      _alnAudio.addEventListener('play', () => { _alnFsSetPlayIcon(); if (_alnFsOpen) _alnFsStartRAF(); });
+      _alnAudio.addEventListener('pause', () => { _alnFsSetPlayIcon(); _alnFsStopRAF(); });
+      _alnAudio.addEventListener('ended', () => {
+        _alnFsSetPlayIcon();
+        _alnFsStopRAF();
+        // Mark all words as spoken
+        if (_alnFsOpen) {
+          document.querySelectorAll('#aln-fs-karaoke .aln-fs-word').forEach(w => {
+            w.classList.remove('active'); w.classList.add('spoken');
+          });
+          _alnFsActiveIdx = -1;
+        }
+      });
+    }
+  };
+})();
 
 // Init
 loadAlignHistory();

@@ -36,6 +36,9 @@ function switchPage(page) {
   } else {
     $('#main-content').style.overflowY = 'auto';
   }
+  if (page === 'assets' && typeof loadAssetsHistory === 'function') {
+    loadAssetsHistory();
+  }
 }
 
 function toggleSidebar() {

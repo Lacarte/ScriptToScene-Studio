@@ -1,6 +1,6 @@
 /* ================================================================
-   ScriptToScene Studio — Assets Module (Image Generation & Management)
-   Consumes scene data → manages per-scene image generation via webhook.
+   ScriptToScene Studio — Assets Module (Automa Grabber)
+   Consumes scene data → sends prompts to Automa → polls for results.
    ================================================================ */
 
 // ---- Scene Type Config ----
@@ -11,9 +11,17 @@ const _ASSET_TYPES = {
   text:  { color: '#FFB347', bg: 'rgba(255,179,71,0.12)',  label: 'TEXT' },
 };
 
+const _PROVIDER_URLS = {
+  midjourney: 'https://www.midjourney.com/imagine',
+  'meta-ai': 'https://www.meta.ai/media',
+};
+
 function _typeConf(type) {
   return _ASSET_TYPES[type] || _ASSET_TYPES.video;
 }
+
+// ---- Grabber polling state ----
+let _grabberPollTimer = null;
 
 // ---- Source Loading ----
 
@@ -23,6 +31,7 @@ function loadScenesForAssets() {
     return;
   }
   STATE.assetsSceneData = STATE.scenesResult;
+  STATE.assetStatuses = {};  // Clear stale statuses from previous project
   renderAssetsFromScenes();
   toast(`Loaded ${STATE.scenesResult.scenes.length} scenes`);
 }
@@ -63,6 +72,7 @@ async function assetsSelectSceneProject(projectId) {
     const data = await api(`/api/scenes/${projectId}`);
     if (!data.scenes || !data.scenes.length) throw new Error('No scenes found');
     STATE.assetsSceneData = data;
+    STATE.assetStatuses = {};  // Clear stale statuses from previous project
     renderAssetsFromScenes();
     toast(`Loaded ${data.scenes.length} scenes from history`);
   } catch (e) {
@@ -92,6 +102,7 @@ function handleAssetsJSONImport(input) {
         return;
       }
       STATE.assetsSceneData = data;
+      STATE.assetStatuses = {};  // Clear stale statuses from previous project
       renderAssetsFromScenes();
       toast(`Loaded ${data.scenes.length} scenes from file`);
     } catch (err) {
@@ -100,6 +111,14 @@ function handleAssetsJSONImport(input) {
   };
   reader.readAsText(file);
   input.value = '';
+}
+
+// ---- Provider toggle ----
+
+function assetsProviderChanged() {
+  const provider = $('#assets-provider').value;
+  const argsWrap = $('#assets-args-wrap');
+  argsWrap.style.display = provider === 'midjourney' ? '' : 'none';
 }
 
 // ---- Main Render ----
@@ -121,7 +140,7 @@ function renderAssetsFromScenes() {
   // Init statuses (keyed by scene index)
   scenes.forEach(s => {
     if (!STATE.assetStatuses[s.index]) {
-      STATE.assetStatuses[s.index] = { status: 'pending', image_url: null, job_id: null, editedPrompt: null };
+      STATE.assetStatuses[s.index] = { status: 'pending', urls: [], local_files: [], editedPrompt: null };
     }
   });
 
@@ -181,20 +200,38 @@ function _buildAssetCard(scene) {
   const idx = scene.index;
   const st = STATE.assetStatuses[idx] || { status: 'pending' };
   const tc = _typeConf(scene.type_of_scene);
-  const hasImage = st.status === 'ready' && st.image_url;
-  const isGenerating = st.status === 'generating';
+  const files = st.local_files || [];
+  const hasImage = st.status === 'ready' && files.length > 0;
+  const isDownloading = st.status === 'downloading';
   const isError = st.status === 'error';
   const prompt = st.editedPrompt || scene.image_prompt || '';
 
-  // Preview area content
+  // Preview area — show gallery thumbnails when multiple files
   let previewContent;
   if (hasImage) {
-    previewContent = `<img src="${esc(st.image_url)}" alt="${esc(scene.title || 'Scene ' + idx)}" style="width:100%;height:100%;object-fit:cover" />`;
-  } else if (isGenerating) {
+    if (files.length === 1) {
+      previewContent = `
+        <img src="${esc(files[0])}" alt="Scene ${idx}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="assetsOpenLightbox(${idx},0)" />`;
+    } else {
+      // Multi-image grid (2x2 for 4, 1x2/1x3 for 2-3)
+      const thumbs = files.slice(0, 4).map((f, i) => `
+        <div style="overflow:hidden;cursor:pointer;position:relative" onclick="assetsOpenLightbox(${idx},${i})">
+          <img src="${esc(f)}" alt="Scene ${idx} #${i}" style="width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.2s" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform=''" />
+        </div>`).join('');
+
+      const cols = Math.min(files.length, 2);
+      const rowCount = files.length <= 2 ? 1 : 2;
+      previewContent = `<div style="display:grid;grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rowCount},1fr);gap:2px;height:100%">${thumbs}</div>`;
+      if (files.length > 4) {
+        previewContent += `<span style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.75);color:white;font-size:9px;padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;pointer-events:none">+${files.length - 4} more</span>`;
+      }
+    }
+    previewContent += `<span style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.7);color:white;font-size:9px;padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;pointer-events:none">${files.length} file${files.length > 1 ? 's' : ''}</span>`;
+  } else if (isDownloading) {
     previewContent = `
       <div style="text-align:center;color:${tc.color}">
         <div style="width:24px;height:24px;border:2px solid rgba(255,255,255,0.1);border-top-color:${tc.color};border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 8px"></div>
-        <p style="font-size:10px;font-weight:500;opacity:0.8">Generating...</p>
+        <p style="font-size:10px;font-weight:500;opacity:0.8">Downloading...</p>
       </div>`;
   } else if (isError) {
     previewContent = `
@@ -217,9 +254,11 @@ function _buildAssetCard(scene) {
       </div>`;
   }
 
-  // Status badge
-  const statusLabels = { pending: 'Pending', generating: 'Generating', ready: 'Ready', error: 'Error' };
-  const statusBadge = `<span class="status-badge ${st.status}">${statusLabels[st.status] || st.status}</span>`;
+  // Status badge — hide when ready with files (file count badge is enough)
+  const statusLabels = { pending: 'Pending', downloading: 'Downloading', ready: 'Ready', error: 'Error' };
+  const statusBadge = hasImage
+    ? ''
+    : `<span class="status-badge ${st.status === 'downloading' ? 'generating' : st.status}">${statusLabels[st.status] || st.status}</span>`;
 
   // Text content display (for text-type scenes)
   const textContentHTML = scene.text_content
@@ -230,7 +269,7 @@ function _buildAssetCard(scene) {
 
   return `
   <div class="asset-card" id="asset-card-${idx}" style="border-left:3px solid ${tc.color}">
-    <div class="asset-preview" style="height:180px;display:flex;align-items:center;justify-content:center;position:relative">
+    <div class="asset-preview" style="height:180px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
       ${previewContent}
       ${statusBadge}
     </div>
@@ -269,13 +308,64 @@ function _buildAssetCard(scene) {
 
       <!-- Actions -->
       <div style="display:flex;gap:6px;margin-top:10px">
-        <button onclick="generateSingleImage(${idx})" class="action-btn hover-accent" ${isGenerating ? 'disabled style="opacity:0.5"' : ''}>
-          ${isGenerating ? 'Generating...' : st.status === 'ready' ? 'Regenerate' : 'Generate'}
-        </button>
-        <button onclick="downloadAssetImage(${idx})" class="action-btn hover-accent" ${hasImage ? '' : 'disabled style="opacity:0.4"'}>Download</button>
+        <button onclick="downloadAssetImage(${idx})" class="action-btn hover-accent" ${hasImage ? '' : 'disabled style="opacity:0.4"'}>${hasImage ? `Download (${files.length})` : 'Download'}</button>
       </div>
     </div>
   </div>`;
+}
+
+// ---- Lightbox for viewing full-size images ----
+
+function assetsOpenLightbox(sceneIndex, fileIndex) {
+  const st = STATE.assetStatuses[sceneIndex];
+  if (!st || !st.local_files || !st.local_files.length) return;
+  const files = st.local_files;
+
+  // Remove existing lightbox
+  const existing = document.getElementById('assets-lightbox');
+  if (existing) existing.remove();
+
+  let currentIdx = fileIndex;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'assets-lightbox';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(10px)';
+
+  function render() {
+    overlay.innerHTML = `
+      <div style="position:absolute;top:16px;right:16px;display:flex;gap:8px;z-index:10">
+        <span class="font-mono" style="font-size:11px;color:rgba(255,255,255,0.5);padding:6px 12px;background:rgba(255,255,255,0.08);border-radius:6px">Scene #${sceneIndex} · ${currentIdx + 1}/${files.length}</span>
+        <button onclick="document.getElementById('assets-lightbox').remove()" style="background:rgba(255,255,255,0.1);border:none;color:white;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">&times;</button>
+      </div>
+      <img src="${esc(files[currentIdx])}" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5)" />
+      ${files.length > 1 ? `
+        <div style="display:flex;gap:8px;margin-top:16px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.05)">
+          ${files.map((f, i) => `
+            <div onclick="event.stopPropagation();document.getElementById('assets-lightbox')._goto(${i})" style="width:56px;height:56px;border-radius:6px;overflow:hidden;cursor:pointer;border:2px solid ${i === currentIdx ? 'var(--accent)' : 'transparent'};opacity:${i === currentIdx ? '1' : '0.6'};transition:all 0.2s">
+              <img src="${esc(f)}" style="width:100%;height:100%;object-fit:cover" />
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    `;
+  }
+
+  overlay._goto = (i) => { currentIdx = i; render(); };
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  // Keyboard nav
+  const onKey = (e) => {
+    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); }
+    if (e.key === 'ArrowRight' && currentIdx < files.length - 1) { currentIdx++; render(); }
+    if (e.key === 'ArrowLeft' && currentIdx > 0) { currentIdx--; render(); }
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('remove', () => document.removeEventListener('keydown', onKey));
+
+  render();
+  document.body.appendChild(overlay);
 }
 
 // ---- Single Card Update ----
@@ -297,15 +387,17 @@ function updateAssetsProgress() {
   const scenes = STATE.assetsSceneData.scenes;
   const total = scenes.length;
   const ready = scenes.filter(s => STATE.assetStatuses[s.index]?.status === 'ready').length;
-  const generating = scenes.filter(s => STATE.assetStatuses[s.index]?.status === 'generating').length;
+  const downloading = scenes.filter(s => STATE.assetStatuses[s.index]?.status === 'downloading').length;
+  const totalFiles = scenes.reduce((sum, s) => sum + (STATE.assetStatuses[s.index]?.local_files?.length || 0), 0);
 
   let text = `${ready} / ${total} complete`;
-  if (generating > 0) text += ` · ${generating} generating`;
+  if (totalFiles > 0) text += ` · ${totalFiles} files`;
+  if (downloading > 0) text += ` · ${downloading} downloading`;
   $('#assets-progress').textContent = text;
 
   // Progress bar
   const barWrap = $('#assets-progress-bar-wrap');
-  if (ready > 0 || generating > 0) {
+  if (ready > 0 || downloading > 0) {
     barWrap.style.display = '';
     const pct = total > 0 ? (ready / total) * 100 : 0;
     $('#assets-progress-bar').style.width = pct + '%';
@@ -332,7 +424,7 @@ function assetsSavePrompt(sceneIndex) {
     return;
   }
   if (!STATE.assetStatuses[sceneIndex]) {
-    STATE.assetStatuses[sceneIndex] = { status: 'pending', image_url: null, job_id: null, editedPrompt: null };
+    STATE.assetStatuses[sceneIndex] = { status: 'pending', urls: [], local_files: [], editedPrompt: null };
   }
   STATE.assetStatuses[sceneIndex].editedPrompt = newPrompt;
 
@@ -347,108 +439,173 @@ function assetsSavePrompt(sceneIndex) {
 function assetsCancelPromptEdit(sceneIndex) {
   $(`#asset-prompt-view-${sceneIndex}`).style.display = 'flex';
   $(`#asset-prompt-edit-${sceneIndex}`).style.display = 'none';
-  // Reset textarea to current prompt
   const scene = STATE.assetsSceneData?.scenes?.find(s => s.index === sceneIndex);
   const currentPrompt = STATE.assetStatuses[sceneIndex]?.editedPrompt || scene?.image_prompt || '';
   $(`#asset-prompt-input-${sceneIndex}`).value = currentPrompt;
 }
 
-// ---- Generation ----
+// ---- Assets Grabber ----
 
-async function generateSingleImage(sceneIndex) {
-  if (!STATE.assetsSceneData) return;
-  const scene = STATE.assetsSceneData.scenes.find(s => s.index === sceneIndex);
-  if (!scene) return;
-
-  const prompt = STATE.assetStatuses[sceneIndex]?.editedPrompt || scene.image_prompt;
-  if (!prompt) {
-    toast('No prompt available for this scene', 'error');
-    return;
-  }
-
-  STATE.assetStatuses[sceneIndex] = {
-    ...STATE.assetStatuses[sceneIndex],
-    status: 'generating',
-    image_url: null,
-    job_id: null,
-  };
-  updateAssetCard(sceneIndex);
-  updateAssetsProgress();
-
-  try {
-    const payload = {
-      scene_id: sceneIndex,
-      prompt: prompt,
-      provider: $('#assets-provider').value,
-      project_id: STATE.assetsSceneData.project_id || 'default',
-    };
-
-    // Include webhook URL override if configured
-    const webhookUrl = $('#assets-webhook-url').value.trim();
-    if (webhookUrl) payload.webhook_url = webhookUrl;
-
-    const res = await fetch('/api/assets/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Generation failed');
-
-    STATE.assetStatuses[sceneIndex].job_id = data.job_id;
-    pollImageStatus(sceneIndex, data.job_id);
-  } catch (e) {
-    STATE.assetStatuses[sceneIndex].status = 'error';
-    updateAssetCard(sceneIndex);
-    updateAssetsProgress();
-    toast(`Scene #${sceneIndex}: ${e.message}`, 'error');
-  }
-}
-
-async function pollImageStatus(sceneIndex, jobId) {
-  const poll = async () => {
-    try {
-      const res = await fetch(`/api/assets/status/${jobId}`);
-      const data = await res.json();
-      if (data.status === 'ready') {
-        STATE.assetStatuses[sceneIndex] = {
-          ...STATE.assetStatuses[sceneIndex],
-          status: 'ready',
-          image_url: data.image_url,
-          job_id: jobId,
-        };
-        updateAssetCard(sceneIndex);
-        updateAssetsProgress();
-        toast(`Scene #${sceneIndex} image ready`);
-      } else if (data.status === 'error') {
-        STATE.assetStatuses[sceneIndex].status = 'error';
-        updateAssetCard(sceneIndex);
-        updateAssetsProgress();
-        toast(`Scene #${sceneIndex} generation failed`, 'error');
-      } else {
-        setTimeout(poll, 3000);
-      }
-    } catch (e) {
-      STATE.assetStatuses[sceneIndex].status = 'error';
-      updateAssetCard(sceneIndex);
-      updateAssetsProgress();
-    }
-  };
-  poll();
-}
-
-async function generateAllImages() {
+async function assetsStartGrabber() {
   if (!STATE.assetsSceneData || !STATE.assetsSceneData.scenes) {
     toast('No scenes loaded', 'error');
     return;
   }
+
   const scenes = STATE.assetsSceneData.scenes;
-  for (const s of scenes) {
-    const st = STATE.assetStatuses[s.index];
-    if (st?.status !== 'ready' && st?.status !== 'generating') {
-      await generateSingleImage(s.index);
-      await new Promise(r => setTimeout(r, 500));
+  const provider = $('#assets-provider').value;
+  const arguments_ = provider === 'midjourney' ? ($('#assets-arguments').value || '-v 7 -ar 9:16') : '';
+  const projectId = STATE.assetsSceneData.project_id || 'default';
+
+  // Build scenes payload (respect edited prompts)
+  const scenesPayload = scenes
+    .filter(s => s.image_prompt || STATE.assetStatuses[s.index]?.editedPrompt)
+    .map(s => ({
+      prompt: STATE.assetStatuses[s.index]?.editedPrompt || s.image_prompt,
+      scene: s.index,
+    }));
+
+  if (!scenesPayload.length) {
+    toast('No prompts available', 'error');
+    return;
+  }
+
+  // Disable button
+  const btn = $('#assets-grabber-btn');
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+
+  _setGrabberStatus('Initializing grabber job...');
+
+  try {
+    const res = await fetch('/api/assets/grabber/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: projectId,
+        provider: provider,
+        arguments: arguments_,
+        scenes: scenesPayload,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to start grabber');
+
+    // Mark all scenes as pending
+    scenesPayload.forEach(s => {
+      if (STATE.assetStatuses[s.scene]) {
+        STATE.assetStatuses[s.scene].status = 'pending';
+      }
+    });
+    renderAssetGrid(scenes);
+    updateAssetsProgress();
+
+    // Open provider tab (reuse existing tab if already open)
+    const providerUrl = _PROVIDER_URLS[provider] || _PROVIDER_URLS.midjourney;
+    window.open(providerUrl, 'sts-provider-tab');
+
+    _setGrabberStatus(`Prompts ready (${data.scene_count} scenes) — activate Automa in the ${provider === 'midjourney' ? 'Midjourney' : 'Meta AI'} tab to start`);
+    toast(`Grabber ready — ${data.scene_count} prompts queued. Activate Automa to begin.`);
+
+    // Start polling for results
+    _startGrabberPolling(projectId);
+  } catch (e) {
+    toast(e.message || 'Grabber failed', 'error');
+    _setGrabberStatus('');
+  } finally {
+    btn.disabled = false;
+    btn.style.opacity = '';
+  }
+}
+
+function _setGrabberStatus(text) {
+  const el = $('#assets-grabber-status');
+  const textEl = $('#assets-grabber-status-text');
+  if (text) {
+    el.style.display = '';
+    textEl.textContent = text;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+function _startGrabberPolling(projectId) {
+  if (_grabberPollTimer) clearInterval(_grabberPollTimer);
+
+  _grabberPollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/assets/grabber/status/${encodeURIComponent(projectId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Update per-scene statuses
+      const sceneStatuses = data.scene_statuses || {};
+      let anyChange = false;
+
+      for (const [sceneNum, ss] of Object.entries(sceneStatuses)) {
+        const idx = parseInt(sceneNum);
+        if (!STATE.assetStatuses[idx]) continue;
+        const prev = STATE.assetStatuses[idx].status;
+
+        const filesChanged = (ss.local_files?.length || 0) !== (STATE.assetStatuses[idx].local_files?.length || 0);
+        if (ss.status !== prev || filesChanged) {
+          STATE.assetStatuses[idx].status = ss.status;
+          STATE.assetStatuses[idx].local_files = ss.local_files || [];
+          STATE.assetStatuses[idx].urls = ss.urls || [];
+          updateAssetCard(idx);
+          anyChange = true;
+
+          if (ss.status === 'ready' && prev !== 'ready') {
+            toast(`Scene #${sceneNum} — ${ss.local_files.length} file(s) downloaded`);
+          }
+        }
+      }
+
+      if (anyChange) updateAssetsProgress();
+
+      // Update status message
+      const statusMap = { waiting: 'Waiting for Automa...', grabbing: 'Automa is submitting prompts...', downloading: 'Downloading images...', done: 'All assets downloaded!', error: 'Grabber encountered errors' };
+      _setGrabberStatus(statusMap[data.status] || data.status);
+
+      // Stop polling when done
+      if (data.status === 'done' || data.status === 'error') {
+        clearInterval(_grabberPollTimer);
+        _grabberPollTimer = null;
+        loadAssetsHistory(); // refresh history
+      }
+    } catch (e) {
+      // Network error — keep polling
     }
+  }, 5000);
+}
+
+// ---- Re-download (retry failed/pending scenes) ----
+
+async function assetsRedownload() {
+  const projectId = STATE.assetsSceneData?.project_id;
+  if (!projectId) {
+    toast('No project loaded', 'error');
+    return;
+  }
+
+  const btn = $('#assets-redownload-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Retrying...'; }
+
+  try {
+    const res = await fetch(`/api/assets/redownload/${encodeURIComponent(projectId)}`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Retry failed');
+
+    if (data.status === 'nothing_to_retry') {
+      toast('All scenes already downloaded');
+    } else {
+      toast(`Retrying ${data.scenes_retrying} scene(s)...`);
+      _startGrabberPolling(projectId);
+    }
+  } catch (e) {
+    toast(e.message || 'Retry failed', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Retry Downloads'; }
   }
 }
 
@@ -456,46 +613,149 @@ async function generateAllImages() {
 
 function downloadAssetImage(sceneIndex) {
   const st = STATE.assetStatuses[sceneIndex];
-  if (!st || !st.image_url) return;
-  const a = document.createElement('a');
-  a.href = st.image_url;
-  a.download = `scene_${sceneIndex}.png`;
-  document.body.appendChild(a); a.click(); a.remove();
+  if (!st || !st.local_files || !st.local_files.length) return;
+  st.local_files.forEach((url, i) => {
+    setTimeout(() => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = url.split('/').pop();
+      document.body.appendChild(a); a.click(); a.remove();
+    }, i * 200);
+  });
 }
 
 function downloadAllAssets() {
   if (!STATE.assetsSceneData || !STATE.assetsSceneData.scenes) return;
   const readyScenes = STATE.assetsSceneData.scenes.filter(s =>
-    STATE.assetStatuses[s.index]?.status === 'ready' && STATE.assetStatuses[s.index]?.image_url
+    STATE.assetStatuses[s.index]?.status === 'ready' && STATE.assetStatuses[s.index]?.local_files?.length
   );
   if (!readyScenes.length) {
     toast('No images ready for download', 'error');
     return;
   }
-  readyScenes.forEach((s, i) => {
-    setTimeout(() => downloadAssetImage(s.index), i * 200);
+  let delay = 0;
+  readyScenes.forEach(s => {
+    const files = STATE.assetStatuses[s.index].local_files;
+    files.forEach(url => {
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = url.split('/').pop();
+        document.body.appendChild(a); a.click(); a.remove();
+      }, delay);
+      delay += 200;
+    });
   });
-  toast(`Downloading ${readyScenes.length} images`);
+  toast(`Downloading assets from ${readyScenes.length} scenes`);
 }
 
-// ---- Webhook Config ----
+// ---- Assets History ----
 
-async function assetsInitWebhookUrl() {
+async function loadAssetsHistory() {
+  const container = $('#assets-history-list');
+  if (!container) return;
+
   try {
-    const data = await api('/api/assets/webhook-url');
-    STATE._assetsDefaultWebhookUrl = data.url || '';
+    const projects = await api('/api/assets/history');
+    if (!projects || !projects.length) {
+      container.innerHTML = `<p style="text-align:center;color:var(--text-muted);font-size:12px;padding:20px 0">No asset projects yet</p>`;
+      return;
+    }
+
+    container.innerHTML = projects.map(p => {
+      const statusColors = { done: '#4ECDC4', downloading: '#FFB347', error: '#FF6B6B', waiting: '#8B8B8B', grabbing: '#A78BFA' };
+      const statusColor = statusColors[p.status] || '#8B8B8B';
+      const statusLabel = p.status || 'unknown';
+      const sceneCount = p.scene_count || 0;
+      const readyCount = p.ready_count || 0;
+      const diskFiles = p.disk_files || 0;
+      const time = p.created_at ? timeAgo(p.created_at) : timeAgo(p.timestamp);
+
+      return `
+      <div class="hist-item" style="cursor:pointer;transition:background 0.15s" onclick="assetsLoadFromHistory('${esc(p.project_id)}')" onmouseover="this.style.background='var(--bg-darkest)'" onmouseout="this.style.background=''">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 14px">
+          ${p.preview
+            ? `<div style="width:48px;height:48px;border-radius:6px;overflow:hidden;flex-shrink:0;border:1px solid var(--border)"><img src="${esc(p.preview)}" style="width:100%;height:100%;object-fit:cover" /></div>`
+            : `<div style="width:48px;height:48px;border-radius:6px;flex-shrink:0;background:var(--bg-darkest);display:flex;align-items:center;justify-content:center">
+                <svg width="20" height="20" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              </div>`
+          }
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+              <span style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.project_id)}</span>
+              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};flex-shrink:0"></span>
+              <span class="font-mono" style="font-size:9px;color:${statusColor};text-transform:uppercase;letter-spacing:0.05em">${esc(statusLabel)}</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span class="font-mono" style="font-size:10px;color:var(--text-muted)">${sceneCount} scene${sceneCount !== 1 ? 's' : ''}</span>
+              ${readyCount > 0 ? `<span class="font-mono" style="font-size:10px;color:#4ECDC4">${readyCount} ready</span>` : ''}
+              ${diskFiles > 0 ? `<span class="font-mono" style="font-size:10px;color:var(--text-secondary)">${diskFiles} files</span>` : ''}
+              <span class="font-mono" style="font-size:9px;color:var(--text-muted);opacity:0.7">${time}</span>
+              ${p.provider ? `<span class="font-mono" style="font-size:8px;padding:1px 5px;border-radius:3px;background:rgba(167,139,250,0.1);color:#A78BFA">${esc(p.provider)}</span>` : ''}
+            </div>
+          </div>
+          <svg width="16" height="16" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:0.4"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+      </div>`;
+    }).join('');
   } catch (e) {
-    STATE._assetsDefaultWebhookUrl = '';
+    container.innerHTML = `<p style="text-align:center;color:var(--coral);font-size:11px;padding:16px">Failed to load history</p>`;
   }
-  const saved = localStorage.getItem('sts-assets-webhook-url');
-  $('#assets-webhook-url').value = saved !== null ? saved : STATE._assetsDefaultWebhookUrl;
 }
 
-function assetsResetWebhookUrl() {
-  $('#assets-webhook-url').value = STATE._assetsDefaultWebhookUrl || '';
-  localStorage.removeItem('sts-assets-webhook-url');
-  toast('Webhook URL reset to default');
-}
+async function assetsLoadFromHistory(projectId) {
+  try {
+    const data = await api(`/api/assets/project/${encodeURIComponent(projectId)}`);
+    if (!data) throw new Error('No data returned');
 
-// ---- Init ----
-assetsInitWebhookUrl();
+    // Load corresponding scene data if available
+    let sceneData = null;
+    try {
+      sceneData = await api(`/api/scenes/${encodeURIComponent(projectId)}`);
+    } catch (e) {
+      // Scene data might not exist — that's fine
+    }
+
+    if (sceneData && sceneData.scenes && sceneData.scenes.length) {
+      STATE.assetsSceneData = sceneData;
+    } else {
+      // Build minimal scene data from the asset project
+      const scenes = [];
+      const prompts = data.prompts || {};
+      for (const [sceneNum, sceneInfo] of Object.entries(data.scenes)) {
+        scenes.push({
+          index: parseInt(sceneNum),
+          title: `Scene ${sceneNum}`,
+          type_of_scene: 'image',
+          image_prompt: prompts[sceneNum] || '',
+          duration: 3,
+          text_content: null,
+        });
+      }
+      scenes.sort((a, b) => a.index - b.index);
+      STATE.assetsSceneData = { project_id: projectId, scenes };
+    }
+
+    // Populate asset statuses from the project data
+    STATE.assetStatuses = {};
+    for (const [sceneNum, sceneInfo] of Object.entries(data.scenes)) {
+      const idx = parseInt(sceneNum);
+      const localFiles = sceneInfo.files_on_disk
+        ? sceneInfo.files_on_disk.map(f => f.url)
+        : sceneInfo.local_files || [];
+      const ss = data.scene_statuses?.[sceneNum];
+
+      STATE.assetStatuses[idx] = {
+        status: localFiles.length > 0 ? 'ready' : (ss?.status || 'pending'),
+        urls: sceneInfo.source_urls || ss?.urls || [],
+        local_files: localFiles,
+        editedPrompt: null,
+      };
+    }
+
+    renderAssetsFromScenes();
+    toast(`Loaded project ${projectId} (${Object.keys(data.scenes).length} scenes)`);
+  } catch (e) {
+    toast(e.message || 'Failed to load project', 'error');
+  }
+}

@@ -553,24 +553,34 @@
 
         <!-- Controls (shown when scenes loaded) -->
         <section id="assets-controls" class="card p-5 mb-4" style="display:none">
-          <!-- Webhook URL -->
-          <div style="margin-bottom:14px">
-            <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style="color:var(--text-muted)">Asset Webhook</label>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="text" id="assets-webhook-url" class="input-field font-mono" style="flex:1;padding:8px 12px;font-size:11px" placeholder="Asset webhook URL..." oninput="localStorage.setItem('sts-assets-webhook-url',this.value)">
-              <button onclick="assetsResetWebhookUrl()" class="action-btn hover-accent" style="padding:6px 10px;font-size:10px;white-space:nowrap">Reset</button>
-            </div>
-          </div>
-          <!-- Provider + Generate All + Progress -->
-          <div style="padding-top:14px;border-top:1px solid var(--border)">
-            <div class="flex gap-3 items-center flex-wrap">
-              <select id="assets-provider" class="input-field" style="padding:8px 12px;font-size:12px;font-family:inherit">
+          <!-- Provider + Arguments -->
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style="color:var(--text-muted)">Provider</label>
+              <select id="assets-provider" class="input-field" style="padding:8px 12px;font-size:12px;font-family:inherit" onchange="assetsProviderChanged()">
                 <option value="midjourney">Midjourney</option>
                 <option value="meta-ai">Meta AI (Imagine)</option>
               </select>
-              <button id="assets-generate-all-btn" onclick="generateAllImages()" class="gen-btn" style="padding:10px 20px;border-radius:10px;font-size:12px;font-weight:600;color:white;border:none;cursor:pointer;white-space:nowrap">Generate All</button>
+            </div>
+            <div id="assets-args-wrap">
+              <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style="color:var(--text-muted)">Arguments</label>
+              <input type="text" id="assets-arguments" class="input-field font-mono" style="padding:8px 12px;font-size:11px;width:200px" value="-v 7 -ar 9:16" placeholder="-v 7 -ar 9:16">
+            </div>
+          </div>
+          <!-- Grabber + Progress -->
+          <div style="padding-top:14px;border-top:1px solid var(--border)">
+            <div class="flex gap-3 items-center flex-wrap">
+              <button id="assets-grabber-btn" onclick="assetsStartGrabber()" class="gen-btn" style="padding:10px 20px;border-radius:10px;font-size:12px;font-weight:600;color:white;border:none;cursor:pointer;white-space:nowrap">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:6px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Assets Grabber
+              </button>
               <span id="assets-progress" class="font-mono text-xs" style="color:var(--text-muted)">0 / 0 complete</span>
-              <button onclick="downloadAllAssets()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px;margin-left:auto">Download All</button>
+              <button id="assets-redownload-btn" onclick="assetsRedownload()" class="action-btn" style="padding:6px 14px;font-size:11px;margin-left:auto;color:var(--text-muted)" title="Retry failed/pending downloads">Retry Downloads</button>
+              <button onclick="downloadAllAssets()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Download All</button>
+            </div>
+            <!-- Status message -->
+            <div id="assets-grabber-status" style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--bg-darkest);border:1px solid var(--border)">
+              <span id="assets-grabber-status-text" class="font-mono text-xs" style="color:var(--text-secondary)"></span>
             </div>
             <!-- Progress bar -->
             <div id="assets-progress-bar-wrap" style="display:none;margin-top:10px">
@@ -592,6 +602,22 @@
           <p style="margin-bottom:4px">No scenes loaded</p>
           <p style="font-size:11px;color:var(--text-muted);opacity:0.7">Generate scenes first, then load them here to create images</p>
         </div>
+
+        <!-- Assets History -->
+        <section class="card mt-6" style="overflow:hidden">
+          <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg width="16" height="16" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+              <span style="font-size:12px;font-weight:600;color:var(--text)">Recent Projects</span>
+            </div>
+            <button onclick="loadAssetsHistory()" class="action-btn" style="font-size:10px;padding:4px 10px;color:var(--text-muted)" title="Refresh">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            </button>
+          </div>
+          <div id="assets-history-list" style="max-height:400px;overflow-y:auto">
+            <p style="text-align:center;color:var(--text-muted);font-size:11px;padding:24px 0">Loading...</p>
+          </div>
+        </section>
 
       </div>
     </div>

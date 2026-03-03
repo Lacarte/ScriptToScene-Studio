@@ -7,3 +7,5 @@ soundfile
 stable-ts
 openai-whisper
 python-dotenv
+kokoro-onnx
+num2words

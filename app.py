@@ -41,12 +41,14 @@ logger.add(os.path.join(LOG_DIR, "studio_{time:YYYY-MM-DD}.log"),
 app = Flask(__name__, static_folder=None)
 CORS(app)
 
+from studio.tts import tts_bp
 from studio.timing import timing_bp
 from studio.segmenter import segmenter_bp
 from studio.scenes import scenes_bp
 from studio.assets import assets_bp
 from studio.editor import editor_bp
 
+app.register_blueprint(tts_bp)
 app.register_blueprint(timing_bp)
 app.register_blueprint(segmenter_bp)
 app.register_blueprint(scenes_bp)
@@ -76,10 +78,12 @@ def serve_js(filename):
 @app.route("/api/health")
 def health():
     from studio.timing.routes import _check_alignment_available, _find_ffmpeg
+    from studio.tts.routes import _model_files_present
     return jsonify({
         "status": "ok",
         "alignment": _check_alignment_available(),
         "ffmpeg": _find_ffmpeg() is not None,
+        "tts_model": _model_files_present(),
     })
 
 
@@ -121,12 +125,14 @@ if __name__ == "__main__":
     port = args.port if args.port else find_available_port(5050)
 
     from studio.timing.routes import _check_alignment_available
+    from studio.tts.routes import _model_files_present
 
     url = f"http://localhost:{port}"
 
     print()
     print(f"  \033[1mScriptToScene Studio\033[0m")
     print(f"  \033[92m>\033[0m {url}")
+    print(f"  \033[90m-\033[0m TTS model: {'cached' if _model_files_present() else 'not downloaded'}")
     print(f"  \033[90m-\033[0m Alignment: {'available' if _check_alignment_available() else 'unavailable'}")
     print(f"  \033[90m-\033[0m Scene webhook: {N8N_WEBHOOK_URL}")
     print(f"  \033[90m-\033[0m Asset webhook: {N8N_ASSET_WEBHOOK_URL}")

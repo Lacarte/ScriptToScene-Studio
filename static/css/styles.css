@@ -178,3 +178,61 @@ body {
   #mobile-nav button svg { width: 20px; height: 20px; }
 }
 @media (min-width: 768px) { #mobile-nav { display: none !important; } }
+
+/* ---- TTS Voice UI ---- */
+.tts-lang-tab {
+  padding: 4px 10px; border-radius: 6px; font-size: 10px; font-weight: 600;
+  font-family: inherit; border: 1px solid var(--border); background: transparent;
+  color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.tts-lang-tab:hover { border-color: var(--accent); color: var(--accent); }
+.tts-lang-tab.active { background: rgba(78,205,196,0.1); border-color: var(--accent); color: var(--accent); }
+.tts-lang-count {
+  font-size: 8px; font-weight: 700; background: rgba(255,255,255,0.06);
+  padding: 1px 4px; border-radius: 3px; margin-left: 2px;
+}
+
+.tts-gender-tag {
+  padding: 0px 4px; border-radius: 3px; font-size: 8px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em;
+}
+.tts-gender-f { background: rgba(255,155,155,0.15); color: #FF9B9B; }
+.tts-gender-m { background: rgba(111,227,218,0.15); color: #6FE3DA; }
+
+.tts-voice-chip { font-family: inherit; }
+.tts-voice-chip:hover { border-color: var(--accent) !important; }
+
+.tts-rec-card:hover { border-color: var(--accent) !important; background: rgba(78,205,196,0.04) !important; }
+
+.tts-blend-voice-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px;
+  border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg-darkest);
+  color: var(--text); font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: all 0.15s; font-family: inherit;
+}
+.tts-blend-voice-btn:hover { border-color: var(--accent); }
+
+.tts-blend-quick-btn {
+  flex: 1; padding: 4px 0; border-radius: 5px; font-size: 9px; font-weight: 600;
+  font-family: 'JetBrains Mono', monospace; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+}
+.tts-blend-quick-btn:hover { border-color: var(--accent); color: var(--accent); }
+.tts-blend-quick-btn.active { background: rgba(78,205,196,0.1); border-color: var(--accent); color: var(--accent); }
+
+.tts-blend-method-btn {
+  padding: 5px 12px; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.05em; border: none; background: transparent; color: var(--text-muted);
+  cursor: pointer; transition: all 0.15s;
+}
+.tts-blend-method-btn.active { background: rgba(78,205,196,0.1); color: var(--accent); }
+.tts-blend-method-btn:hover { color: var(--accent); }
+
+.tts-blend-preset-btn {
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; cursor: pointer; transition: all 0.15s;
+  text-align: left; color: var(--text); font-family: inherit;
+}
+.tts-blend-preset-btn:hover { border-color: var(--accent); background: rgba(78,205,196,0.04); }
+.tts-blend-preset-btn.active { border-color: var(--accent); background: rgba(78,205,196,0.08); }

@@ -90,6 +90,21 @@
     </div>
   </div>
 
+  <!-- TTS Blend Voice Picker Modal -->
+  <div id="tts-blend-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
+    aria-modal="true" style="background:rgba(10,14,19,0.85);backdrop-filter:blur(8px);display:none">
+    <div class="card w-full max-w-md" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span id="tts-blend-picker-title" style="font-size:13px;font-weight:600;color:var(--text)">Select Voice A</span>
+        <button onclick="ttsCloseBlendPicker()" style="width:28px;height:28px;border-radius:7px;border:none;background:rgba(255,107,107,0.1);color:var(--coral);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="tts-blend-picker-tabs" style="padding:8px 18px;display:flex;flex-wrap:wrap;gap:4px"></div>
+      <div id="tts-blend-picker-grid" style="padding:8px 18px 16px;overflow-y:auto;flex:1;display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+  </div>
+
   <!-- Segmenter Picker Modal -->
   <div id="seg-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
@@ -126,7 +141,17 @@
 
     <!-- Navigation -->
     <div class="flex-1 py-3 flex flex-col gap-0.5">
-      <button class="nav-item active" onclick="switchPage('timing')" data-page="timing">
+      <button class="nav-item active" onclick="switchPage('tts')" data-page="tts">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          viewBox="0 0 24 24">
+          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+          <path d="M19 10v2a7 7 0 01-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="23" />
+          <line x1="8" y1="23" x2="16" y2="23" />
+        </svg>
+        <span class="nav-label">TTS</span>
+      </button>
+      <button class="nav-item" onclick="switchPage('timing')" data-page="timing">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <path d="M4 7h16M4 12h16M4 17h10" />
@@ -183,7 +208,13 @@
 
   <!-- ===== MOBILE BOTTOM NAV ===== -->
   <div id="mobile-nav" style="display:none">
-    <button class="active" onclick="switchPage('timing')" data-page="timing">
+    <button class="active" onclick="switchPage('tts')" data-page="tts">
+      <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+      TTS
+    </button>
+    <button onclick="switchPage('timing')" data-page="timing">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
         <path d="M4 7h16M4 12h16M4 17h10" /><circle cx="19" cy="17" r="2" />
       </svg>
@@ -219,9 +250,124 @@
   <div id="main-content">
 
     <!-- ========================================================== -->
+    <!-- PAGE: TTS (Kokoro TTS)                                     -->
+    <!-- ========================================================== -->
+    <div id="page-tts" class="page active">
+      <div class="max-w-2xl mx-auto px-6 py-8">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Text to Speech</h2>
+            <p class="text-sm mt-1" style="color:var(--text-secondary)">Kokoro TTS with 50+ voices and voice blending</p>
+          </div>
+          <div id="tts-model-status" style="font-size:11px;font-family:'JetBrains Mono',monospace"></div>
+        </div>
+
+        <!-- Voice Selection -->
+        <section class="card p-5 mb-4">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="ttsToggleVoiceSection()">
+            <label id="tts-voice-label" class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted);cursor:pointer;pointer-events:none">Voice</label>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span id="tts-voice-summary" style="font-size:11px;color:var(--text-secondary)"></span>
+              <svg id="tts-voice-chevron" width="14" height="14" fill="none" stroke="var(--text-muted)" stroke-width="2" viewBox="0 0 24 24" style="transition:transform 0.2s"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div id="tts-voice-grid" style="display:none;margin-top:10px"></div>
+        </section>
+
+        <!-- Text Input -->
+        <section class="card p-5 mb-4">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Prompt</label>
+          <textarea id="tts-prompt" class="input-field" rows="4" oninput="ttsUpdateCounts()"
+            placeholder="Type or paste something to speak aloud..."
+            style="width:100%;font-size:13px;line-height:1.7;resize:none;padding:12px 14px;font-family:inherit"></textarea>
+          <div class="flex items-center justify-between mt-2">
+            <div class="flex items-center gap-2.5">
+              <p class="font-mono text-xs" style="color:var(--text-muted)"><span id="tts-text-count">0 words ~ 0 tokens</span></p>
+              <button id="tts-normalize-btn" onclick="ttsNormalize()" title="Normalize text for TTS" class="hover-accent"
+                style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">Format</button>
+              <button onclick="ttsCopyPrompt()" title="Copy plain text (without brackets)" class="hover-accent"
+                style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">Copy</button>
+              <button onclick="ttsRandomStory()" title="Load a random story excerpt" class="hover-accent"
+                style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">&#x1F3B2; Random</button>
+            </div>
+            <div class="flex items-center gap-1" style="color:var(--text-muted)">
+              <kbd style="padding:2px 5px;border-radius:3px;font-size:9px;border:1px solid var(--border);font-family:'JetBrains Mono',monospace">Ctrl</kbd>
+              <span style="font-size:9px">+</span>
+              <kbd style="padding:2px 5px;border-radius:3px;font-size:9px;border:1px solid var(--border);font-family:'JetBrains Mono',monospace">Enter</kbd>
+            </div>
+          </div>
+        </section>
+
+        <!-- Controls -->
+        <section class="card p-5 mb-4">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex items-center gap-2">
+              <label class="text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Speed</label>
+              <input id="tts-speed" type="number" min="0.5" max="2.0" step="0.1" value="1.0"
+                onchange="localStorage.setItem('sts-tts-speed',this.value)"
+                style="width:60px;background:var(--bg-darkest);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'JetBrains Mono',monospace;text-align:center">
+            </div>
+            <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto">
+              <button id="tts-mode-gen" onclick="ttsSetGenMode('generate')" class="text-xs px-3 py-1.5 font-medium"
+                style="background:none;border:none;cursor:pointer;color:var(--accent)">Generate</button>
+              <button id="tts-mode-listen" onclick="ttsSetGenMode('listen')" class="text-xs px-3 py-1.5 font-medium"
+                style="background:none;border:none;cursor:pointer;color:var(--text-muted);border-left:1px solid var(--border)">Listen</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Generate Button -->
+        <div style="display:flex;gap:8px;margin-bottom:4px">
+          <button id="tts-gen-btn" onclick="ttsHandleAction()" class="gen-btn flex-1"
+            style="padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;letter-spacing:0.02em;color:white;cursor:pointer;transition:all 0.3s;border:none;position:relative;overflow:hidden">
+            <span id="tts-gen-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
+            <span id="tts-gen-btn-label">Generate</span>
+          </button>
+          <button id="tts-abort-btn" onclick="ttsAbortGeneration()" style="display:none;padding:14px 16px;border-radius:12px;font-size:12px;font-weight:600;background:rgba(255,107,107,0.15);color:var(--coral);border:1.5px solid rgba(255,107,107,0.3);cursor:pointer">Abort</button>
+        </div>
+        <div id="tts-progress" style="display:none;font-size:11px;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;margin-top:6px;margin-bottom:12px"></div>
+
+        <!-- Now Playing -->
+        <div id="tts-now-playing" style="display:none;margin-top:16px" class="card p-4">
+          <div class="flex items-center gap-3 mb-3">
+            <button id="tts-play-btn" onclick="ttsTogglePlayback()" style="width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(78,205,196,0.12);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:16px">&#9654;</button>
+            <div class="flex-1 min-w-0">
+              <p id="tts-np-text" class="text-xs" style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+              <div class="flex items-center gap-2 mt-0.5" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
+                <span id="tts-np-voice"></span>
+                <span style="opacity:0.3">/</span>
+                <span id="tts-np-duration"></span>
+                <span id="tts-time" style="margin-left:auto"></span>
+              </div>
+            </div>
+          </div>
+          <div id="tts-seek-bar" onclick="ttsSeekAudio(event)" style="height:6px;background:var(--bg-darkest);border-radius:3px;cursor:pointer;overflow:hidden">
+            <div id="tts-seek-fill" style="height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 0.1s"></div>
+          </div>
+          <audio id="tts-audio-el" onplay="ttsUpdatePlayIcon()" onpause="ttsUpdatePlayIcon()" ontimeupdate="ttsUpdateSeekBar()" onended="ttsUpdatePlayIcon()"></audio>
+        </div>
+
+        <!-- History -->
+        <div style="margin-top:28px">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-display text-lg font-bold" style="color:var(--text)">History</h3>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="tts-history-count" class="font-mono text-xs" style="color:var(--text-muted)">0 files</span>
+              <button onclick="ttsDeleteAll()" class="action-btn hover-coral-border" style="padding:3px 10px;font-size:10px">Delete All</button>
+            </div>
+          </div>
+          <div id="tts-history-list"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
     <!-- PAGE: TIMING (Force Alignment)                             -->
     <!-- ========================================================== -->
-    <div id="page-timing" class="page active">
+    <div id="page-timing" class="page">
       <div class="max-w-2xl mx-auto px-6 py-8">
 
         <!-- Header -->
@@ -657,6 +803,7 @@
 
   <!-- ===== JavaScript Modules ===== -->
   <script src="js/app.js"></script>
+  <script src="js/tts.js"></script>
   <script src="js/timing.js"></script>
   <script src="js/segmenter.js"></script>
   <script src="js/scenes.js"></script>

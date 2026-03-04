@@ -8,4 +8,5 @@ stable-ts
 openai-whisper
 python-dotenv
 kokoro-onnx
+misaki[en]
 num2words

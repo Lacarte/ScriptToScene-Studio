@@ -3,9 +3,14 @@
    ================================================================ */
 
 function initEditorIframe() {
-  if (STATE.editorLoaded) return;
   const iframe = $('#editor-iframe');
-  iframe.src = '/timeline-editor/index.html';
+  const targetSrc = '/timeline-editor/editor.html';
+  if (STATE.editorLoaded && iframe.src.includes(targetSrc)) return;
+  STATE.editorLoaded = false;
+  iframe.style.display = 'none';
+  $('#editor-loading').style.display = '';
+  // Cache-bust to force reload+onload when src is already set
+  iframe.src = targetSrc + '?t=' + Date.now();
   iframe.onload = () => {
     STATE.editorLoaded = true;
     $('#editor-loading').style.display = 'none';
@@ -36,7 +41,11 @@ function initEditorIframe() {
 
 // Listen for messages from the editor iframe
 window.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'editor-export') {
+  if (!e.data) return;
+  if (e.data.type === 'editor-export') {
     toast('Export received from editor', 'info');
+  }
+  if (e.data.type === 'switch-page' && e.data.page) {
+    switchPage(e.data.page);
   }
 });

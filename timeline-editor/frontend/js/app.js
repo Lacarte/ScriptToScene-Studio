@@ -89,7 +89,8 @@ class App {
         try {
             const data = JSON.parse(stored);
             if (data && data.scenes && data.scenes.length) {
-                this.updateSourceInfo(`${data.scenes.length} scenes available`, false);
+                this.loadStudioData(data);
+                showToast(`Loaded ${data.scenes.length} scenes from Studio`);
             }
         } catch { /* ignore */ }
     }

@@ -783,3 +783,64 @@ async function assetsLoadFromHistory(projectId) {
     toast(e.message || 'Failed to load project', 'error');
   }
 }
+
+// ---- Stage to Editor ----
+
+function assetsSendToEditor() {
+  if (!STATE.assetsSceneData || !STATE.assetsSceneData.scenes || !STATE.assetsSceneData.scenes.length) {
+    toast('No scenes loaded — load a project first', 'error');
+    return;
+  }
+
+  const data = STATE.assetsSceneData;
+  const scenes = data.scenes.map(s => {
+    const status = STATE.assetStatuses[s.index] || {};
+    const firstImage = (status.local_files && status.local_files.length) ? status.local_files[0] : '';
+    return {
+      type: s.type_of_scene || 'image',
+      image_prompt: STATE.assetStatuses[s.index]?.editedPrompt || s.image_prompt || '',
+      text_content: s.text_content || null,
+      duration: s.duration || 3,
+      image_url: firstImage,
+      status: status.status === 'ready' ? 'ready' : 'pending',
+    };
+  });
+
+  const editorData = {
+    project_id: data.project_id || 'unknown',
+    scenes,
+    script: data.script || '',
+    timestamp: new Date().toISOString(),
+    style: data.analysis?.visual_style || '',
+  };
+
+  localStorage.setItem('sts-editor-scenes', JSON.stringify(editorData));
+
+  // Also write sessionStorage format that video-editor.js expects
+  const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
+  const stagedTimeline = {
+    project_id: editorData.project_id,
+    project_name: editorData.project_id,
+    total_duration: totalDuration,
+    scene_count: scenes.length,
+    staged_at: editorData.timestamp,
+    scenes: scenes.map((s, i) => ({
+      scene_id: i + 1,
+      type: s.type,
+      image_prompt: s.image_prompt,
+      text_content: s.text_content,
+      duration: s.duration,
+      timestamp: scenes.slice(0, i).reduce((t, x) => t + (x.duration || 0), 0),
+      image_url: s.image_url,
+      visual_fx: 'none',
+    })),
+  };
+  sessionStorage.setItem('staged_timeline', JSON.stringify(stagedTimeline));
+
+  // Reset editor loaded flag so it re-initializes with new data
+  STATE.editorLoaded = false;
+  switchPage('editor');
+
+  const readyCount = scenes.filter(s => s.status === 'ready').length;
+  toast(`Staged ${scenes.length} scenes to editor (${readyCount} with images)`);
+}

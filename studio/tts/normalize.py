@@ -69,11 +69,15 @@ _UNITS = {
 }
 
 _SYMBOLS = {
-    '&': 'and', '@': 'at', '#': 'number', '+': 'plus', '=': 'equals',
-    '>': 'greater than', '<': 'less than', '~': 'approximately',
-    '|': '', '\\': '', '/': ' or ',
-    '\u2013': '-', '\u2014': ',', '\u2026': '...',
+    '&': 'and', '@': 'at', '#': 'number', '=': 'equals',
+    '>': 'greater than', '<': 'less than',
+    '|': '', '\\': '',
+    '\u2013': '-',
     '\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'",
+    # Preserved for Kokoro intonation/pronunciation:
+    #   + (stress links), / (phonetic /slashes/), ~ (approx but rare)
+    #   \u2014 em dash, \u2026 ellipsis — used for intonation
+    #   ˈ ˌ stress markers, [] () markdown link syntax
 }
 
 _DATE_MONTHS = {
@@ -81,6 +85,31 @@ _DATE_MONTHS = {
     '05': 'May', '06': 'June', '07': 'July', '08': 'August',
     '09': 'September', '10': 'October', '11': 'November', '12': 'December',
 }
+
+# ---------------------------------------------------------------------------
+# Kokoro pronunciation markers
+# ---------------------------------------------------------------------------
+
+# Matches: [word](/phonetic/) or [word](-1) or [word](+2)
+_KOKORO_LINK_RE = re.compile(r'\[([^\[\]]+)\]\(([^)]+)\)')
+
+
+def _protect_kokoro(text):
+    """Extract Kokoro markdown links, returning (cleaned_text, replacements)."""
+    replacements = []
+    def _sub(m):
+        placeholder = f"\x00KK{len(replacements)}\x00"
+        replacements.append(m.group(0))
+        return placeholder
+    return _KOKORO_LINK_RE.sub(_sub, text), replacements
+
+
+def _restore_kokoro(text, replacements):
+    """Restore protected Kokoro markers."""
+    for i, original in enumerate(replacements):
+        text = text.replace(f"\x00KK{i}\x00", original)
+    return text
+
 
 # ---------------------------------------------------------------------------
 # Expansion helpers
@@ -165,7 +194,12 @@ def _expand_numbers(text):
 
 
 def normalize_for_tts(text: str) -> str:
-    """Full TTS normalization pipeline. Order matters."""
+    """Full TTS normalization pipeline. Order matters.
+
+    Kokoro markdown links like [word](/phonetic/) and [word](-1) are
+    protected from expansion and restored at the end.
+    """
+    text, kokoro = _protect_kokoro(text)
     text = _expand_symbols(text)
     text = _expand_contractions(text)
     text = _expand_abbreviations(text)
@@ -176,15 +210,23 @@ def normalize_for_tts(text: str) -> str:
     text = _expand_ordinals(text)
     text = _expand_numbers(text)
     text = re.sub(r'\s+', ' ', text)
+    text = _restore_kokoro(text, kokoro)
     return text.strip()
 
 
 def clean_for_tts(text: str) -> str:
-    """Strip markdown formatting, URLs, brackets, and excess whitespace."""
+    """Strip markdown formatting, URLs, and excess whitespace.
+
+    Preserves Kokoro pronunciation links [word](/phonetic/), stress
+    markers (ˈ ˌ), and intonation punctuation (—…).
+    """
+    text, kokoro = _protect_kokoro(text)
     text = re.sub(r"[*_#`~]", "", text)
     text = re.sub(r"https?://\S+", "link", text)
+    # Strip only orphan brackets (not part of Kokoro links — already protected)
     text = re.sub(r"[\[\]]", "", text)
     text = re.sub(r"\s+", " ", text)
+    text = _restore_kokoro(text, kokoro)
     return text.strip()
 
 
@@ -197,12 +239,15 @@ def tts_breathing_blocks(text: str, min_chars: int = 150, max_chars: int = 200) 
     if not text or not text.strip():
         return []
 
+    text, kokoro = _protect_kokoro(text)
     text = text.replace("\u201c", '"').replace("\u201d", '"')
     text = text.replace("\u2018", "'").replace("\u2019", "'")
-    text = text.replace("\u2014", ". ").replace("\u2013", "-").replace("\u2026", "...")
+    text = text.replace("\u2013", "-")
+    # Preserve em dash and ellipsis for Kokoro intonation
     text = re.sub(r"\s+", " ", text).strip()
+    text = _restore_kokoro(text, kokoro)
 
-    sentences = re.findall(r".+?(?:\.{3}|[.!?])(?:\s+|$)", text)
+    sentences = re.findall(r".+?(?:\u2026|\.{3}|[.!?\u2014])(?:\s+|$)", text)
     if not sentences:
         sentences = [text]
 

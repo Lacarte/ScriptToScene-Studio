@@ -134,6 +134,57 @@ def _blend_voices(kokoro_inst, voice_a: str, voice_b: str,
 
 
 # ---------------------------------------------------------------------------
+# Misaki G2P (pre-phonemizer for Kokoro pronunciation links)
+# ---------------------------------------------------------------------------
+
+_misaki_g2p = None
+_misaki_lock = threading.Lock()
+
+
+def _get_misaki_g2p(british=False):
+    """Lazy-load the misaki G2P engine (supports [word](+1) stress syntax)."""
+    global _misaki_g2p
+    with _misaki_lock:
+        if _misaki_g2p is None:
+            try:
+                from misaki import en
+                _misaki_g2p = en.G2P(trf=False, british=british)
+                logger.success("Misaki G2P loaded (british={})", british)
+            except ImportError:
+                logger.warning("misaki not installed — Kokoro pronunciation links will not work")
+                return None
+            except Exception:
+                logger.exception("Failed to load misaki G2P")
+                return None
+        return _misaki_g2p
+
+
+def _phonemize_with_misaki(text: str, lang: str = "en-us") -> tuple[str | None, bool]:
+    """Convert text to phonemes using misaki G2P.
+
+    Returns (phonemes, success).  If misaki is unavailable or fails,
+    returns (original_text, False) so the caller can fall back to
+    espeak via kokoro-onnx's default pipeline.
+    """
+    # Only use misaki for English — other languages use kokoro's built-in G2P
+    if not lang.startswith("en"):
+        return text, False
+
+    british = lang == "en-gb"
+    g2p = _get_misaki_g2p(british=british)
+    if g2p is None:
+        return text, False
+
+    try:
+        phonemes, _tokens = g2p(text)
+        if phonemes and phonemes.strip():
+            return phonemes, True
+    except Exception:
+        logger.exception("Misaki G2P failed, falling back to espeak")
+    return text, False
+
+
+# ---------------------------------------------------------------------------
 # Global state
 # ---------------------------------------------------------------------------
 
@@ -317,9 +368,13 @@ def _background_chunked_generate(job_id, voice_param, voice_name, sentences, spe
             q.put({"phase": "generating", "chunk": i + 1, "total": total,
                     "sentence": block})
 
+            phonemes, is_ph = _phonemize_with_misaki(block, lang)
             start = time.perf_counter()
             with generation_inference_lock:
-                chunk_audio, _sr = kokoro.create(text=block, voice=voice_param, speed=speed, lang=lang)
+                chunk_audio, _sr = kokoro.create(
+                    text=phonemes, voice=voice_param, speed=speed,
+                    lang=lang, is_phonemes=is_ph,
+                )
             elapsed = time.perf_counter() - start
             total_inference += elapsed
             audio_chunks.append(chunk_audio)
@@ -575,7 +630,8 @@ def generate():
 
     skip_clean = data.get("skip_clean", False)
 
-    pre_blocks = re.findall(r'\[([^\[\]]+)\]', prompt)
+    # Match breathing-block brackets [text] but NOT Kokoro links [word](...)
+    pre_blocks = re.findall(r'\[([^\[\]]+)\](?!\()', prompt)
     if pre_blocks and len(pre_blocks) >= 2:
         blocks = []
         for b in pre_blocks:
@@ -620,10 +676,14 @@ def generate():
     # Single block: synchronous fast path
     _cleanup_old_jobs()
     single_block = blocks[0] if blocks else tts_prompt
+    phonemes, is_ph = _phonemize_with_misaki(single_block, lang)
     start = time.perf_counter()
     try:
         with generation_inference_lock:
-            audio, _sr = kokoro.create(text=single_block, voice=voice_param, speed=speed, lang=lang)
+            audio, _sr = kokoro.create(
+                text=phonemes, voice=voice_param, speed=speed,
+                lang=lang, is_phonemes=is_ph,
+            )
     except Exception as e:
         logger.exception("TTS inference failed")
         return jsonify({"error": f"Generation failed: {e}"}), 500
@@ -772,6 +832,8 @@ def stream_audio():
 
     q = Queue()
 
+    stream_phonemes, stream_is_ph = _phonemize_with_misaki(tts_prompt, lang)
+
     def _run_stream():
         _stream_active.set()
         loop = asyncio.new_event_loop()
@@ -779,8 +841,8 @@ def stream_audio():
             async def _produce():
                 with generation_inference_lock:
                     stream = kokoro.create_stream(
-                        text=tts_prompt, voice=voice_param,
-                        speed=speed, lang=lang,
+                        text=stream_phonemes, voice=voice_param,
+                        speed=speed, lang=lang, is_phonemes=stream_is_ph,
                     )
                     async for samples, sr in stream:
                         q.put(("audio", samples, sr))

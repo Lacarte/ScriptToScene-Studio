@@ -122,6 +122,140 @@ Each step is **manual** — user clicks through 6 pages, picks outputs, clicks "
 
 ---
 
+## Dual-Mode UX: Projects Hub
+
+### Entry Point — New "Projects" Page
+
+When opening the app or starting a new project, a **Projects** page acts as the hub with two paths:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                                                                  │
+│                    New Project                                   │
+│                                                                  │
+│  ┌───────────────────────┐    ┌───────────────────────┐         │
+│  │                       │    │                       │         │
+│  │   ⚡ Auto Pipeline    │    │   🎛️ Manual Studio    │         │
+│  │                       │    │                       │         │
+│  │  Paste your story,    │    │  Full control over    │         │
+│  │  pick a preset,       │    │  each step. Tweak     │         │
+│  │  get a video.         │    │  voice, timing,       │         │
+│  │                       │    │  prompts, assets.     │         │
+│  │  Best for:            │    │                       │         │
+│  │  • Quick drafts       │    │  Best for:            │         │
+│  │  • Batch content      │    │  • Fine-tuning        │         │
+│  │  • Testing ideas      │    │  • Custom voices      │         │
+│  │                       │    │  • Complex stories    │         │
+│  └───────────────────────┘    └───────────────────────┘         │
+│                                                                  │
+│  Recent Projects:                                                │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │ 📁 The Lost Treasure    ⚡auto   3 min ago    [Resume]     │ │
+│  │ 📁 Horror Story #4      🎛️manual  2 hrs ago   [Resume]     │ │
+│  │ 📁 Reddit AITA          ⚡auto   yesterday    [Resume]     │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Auto Pipeline Path
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ⚡ Auto Pipeline                                           │
+│                                                             │
+│  Story:                                                     │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Paste your story here...                            │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  Preset:                                                    │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌─────────┐ │
+│  │ Reddit     │ │ Horror     │ │ Motivation │ │ Custom  │ │
+│  │ Story      │ │ /Dark      │ │ /Inspire   │ │         │ │
+│  └────────────┘ └────────────┘ └────────────┘ └─────────┘ │
+│                                                             │
+│  Each preset bundles: voice, speed, scene style,            │
+│  segment rhythm, image style                                │
+│                                                             │
+│                              [▶ Generate Video]             │
+│                                                             │
+│  💡 You can switch to Manual mode at any step               │
+│     to fine-tune before continuing.                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Pipeline Dashboard (during auto run)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Pipeline: "The Lost Treasure"                          ⏱ 2:34  │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ✅ TTS ──▶ ✅ Timing ──▶ ✅ Segment ──▶ 🔄 Scenes ──▶ ⏳ Assets ──▶ ⏳ Editor │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │ Step 4/6: Generating Scenes                                │ │
+│  │ ████████████████░░░░░░░░░░░░░░░░  8/15 scenes              │ │
+│  │                                                             │ │
+│  │  Scene 8: "A dimly lit corridor with ancient symbols..."    │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  Step Log:                                                       │
+│  ✅ TTS      — 24.3s audio, voice: af_heart, 156 words          │
+│  ✅ Timing   — 156 words aligned in 1.8s                        │
+│  ✅ Segment  — 15 scenes (avg 1.9s each)                        │
+│  🔄 Scenes   — 8/15 prompts generated...                        │
+│  ⏳ Assets   — waiting                                           │
+│  ⏳ Editor   — waiting                                           │
+│                                                                  │
+│                                          [Pause]  [Cancel]       │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Switch Between Modes Anytime
+
+The pipeline never locks you in. At any step:
+
+```
+Auto running...
+  ✅ TTS ──▶ ✅ Timing ──▶ 🔄 Segment ──▶ ⏳ Scenes ──▶ ⏳ Assets
+                              │
+                              ├── [⏸ Pause & Edit] → Opens that module's
+                              │    page with this project's data loaded.
+                              │    When done → [▶ Resume Pipeline]
+                              │
+                              └── [▶ Continue] (auto)
+```
+
+| Action | What happens |
+|---|---|
+| **Auto all the way** | Paste → preset → wait → review in editor |
+| **Auto then manual** | Pipeline runs, pause at any step, tweak, resume or go fully manual |
+| **Manual all the way** | Current flow — click through each page yourself |
+| **Manual then auto** | Do TTS manually, then hit "Auto-complete remaining steps" |
+
+### Sidebar Update
+
+The sidebar gains a **Projects** item at the top:
+
+```
+ ┌──────────────┐
+ │ 🎬 Projects  │  ← NEW: start screen / project picker
+ │──────────────│
+ │ 🎤 TTS       │
+ │ ⏱ Timing     │
+ │ ✂ Segmenter  │
+ │ 🎬 Scenes    │
+ │ 🖼 Assets    │
+ │ 🎞 Editor    │
+ │ ⚙ Settings   │
+ └──────────────┘
+```
+
+The **Projects** page is the hub — new projects, recent history, resume any project in either mode. The other 6 pages stay exactly as they are for manual mode.
+
+---
+
 ## Automated Vision (Post Phase 3)
 
 ```

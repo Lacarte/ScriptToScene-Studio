@@ -911,6 +911,7 @@ const elements = {
     exportProgressPercent: document.getElementById('export-progress-percent'),
     exportProgressMessage: document.getElementById('export-progress-message'),
     cancelExportBtn: document.getElementById('cancel-export'),
+    previewExportBtn: document.getElementById('preview-export'),
     downloadExportBtn: document.getElementById('download-export')
 };
 
@@ -1329,8 +1330,8 @@ function renderMediaGrid() {
             <div class="media-grid-item${EditorState.selectedScene?.id === scene.id ? ' selected' : ''}"
                  data-scene-id="${scene.id}" title="${(scene.image_prompt || 'Scene ' + scene.id).replace(/"/g, '&quot;')}">
                 ${hasMedia
-                    ? `<img src="${scene.mediaUrl}" alt="Scene ${scene.id}">`
-                    : `<div class="media-grid-placeholder">${icon}</div>`}
+                ? `<img src="${scene.mediaUrl}" alt="Scene ${scene.id}">`
+                : `<div class="media-grid-placeholder">${icon}</div>`}
                 ${hasMedia ? '<span class="media-grid-badge">Added</span>' : ''}
                 <span class="media-grid-duration">${dur}s</span>
                 <span class="media-grid-label">${label}</span>
@@ -1528,7 +1529,7 @@ function loadAudioFromURL(audioPath, audioFileName, hintDuration) {
     audio.addEventListener('ended', () => {
         if (EditorState.isLooping && EditorState.isPlaying) {
             audio.currentTime = 0;
-            audio.play().catch(() => {});
+            audio.play().catch(() => { });
             EditorState.playbackPosition = 0;
             if (EditorState.preview) { EditorState.preview.seek(0); EditorState.preview.play(); }
             if (elements.timelineTracks) elements.timelineTracks.scrollLeft = 0;
@@ -2227,8 +2228,8 @@ function renderSceneProperties() {
                 <label>Position</label>
                 <div class="property-position-info">
                     ${scene.text_x !== undefined && scene.text_x !== null ?
-                        `<span class="position-value">X: ${Math.round(scene.text_x)}%, Y: ${Math.round(scene.text_y)}%</span>` :
-                        `<span class="position-value position-auto">Using alignment</span>`}
+                `<span class="position-value">X: ${Math.round(scene.text_x)}%, Y: ${Math.round(scene.text_y)}%</span>` :
+                `<span class="position-value position-auto">Using alignment</span>`}
                     <button class="btn btn-small btn-reset-position" id="reset-text-position"
                             ${scene.text_x === undefined || scene.text_x === null ? 'disabled' : ''}>
                         Reset
@@ -3104,7 +3105,7 @@ function syncAudioPlayback() {
         // Sync bgMusic
         if (EditorState.bgMusicElement && EditorState.bgMusic) {
             EditorState.bgMusicElement.currentTime = EditorState.playbackPosition % (EditorState.bgMusic.duration || 999);
-            EditorState.bgMusicElement.play().catch(() => {});
+            EditorState.bgMusicElement.play().catch(() => { });
         }
 
         // Use audio as master clock for perfect sync
@@ -3484,6 +3485,8 @@ async function exportMp4() {
 /**
  * Actually start the export after profile is selected
  */
+let currentJobId = null;
+
 async function startExportWithProfile() {
     console.log('[Editor] startExportWithProfile() — preparing export data');
     const exportData = getExportData();
@@ -3513,7 +3516,7 @@ async function startExportWithProfile() {
     showExportProgress();
 
     // Track current job for download
-    let currentJobId = null;
+    currentJobId = null;
 
     console.log('[Editor] Calling exportAPI.startExport()...');
 
@@ -3569,6 +3572,9 @@ function showExportProgress() {
     if (elements.cancelExportBtn) {
         elements.cancelExportBtn.classList.remove('hidden');
     }
+    if (elements.previewExportBtn) {
+        elements.previewExportBtn.classList.add('hidden');
+    }
     if (elements.downloadExportBtn) {
         elements.downloadExportBtn.classList.add('hidden');
     }
@@ -3609,7 +3615,11 @@ function showExportComplete(downloadUrl) {
         elements.exportProgressMessage.textContent = 'Your video is ready for download';
     }
     if (elements.cancelExportBtn) {
-        elements.cancelExportBtn.classList.add('hidden');
+        elements.cancelExportBtn.textContent = 'Close';
+        elements.cancelExportBtn.classList.remove('hidden');
+    }
+    if (elements.previewExportBtn) {
+        elements.previewExportBtn.classList.remove('hidden');
     }
     if (elements.downloadExportBtn) {
         elements.downloadExportBtn.classList.remove('hidden');
@@ -3633,6 +3643,9 @@ function showExportError(error) {
     if (elements.cancelExportBtn) {
         elements.cancelExportBtn.textContent = 'Close';
         elements.cancelExportBtn.classList.remove('hidden');
+    }
+    if (elements.previewExportBtn) {
+        elements.previewExportBtn.classList.add('hidden');
     }
     if (elements.downloadExportBtn) {
         elements.downloadExportBtn.classList.add('hidden');
@@ -3675,6 +3688,14 @@ function setupExportProgressModal() {
     elements.downloadExportBtn?.addEventListener('click', () => {
         if (currentJobId) {
             exportAPI.downloadExport(currentJobId);
+        }
+    });
+
+    // Preview button
+    elements.previewExportBtn?.addEventListener('click', () => {
+        if (currentJobId) {
+            const url = `${exportAPI.baseUrl}/api/export/${currentJobId}/preview`;
+            window.open(url, '_blank');
         }
     });
 }
@@ -3722,12 +3743,12 @@ function showMusicPicker() {
 }
 
 // Expose for inline onclick
-window.editorCloseMusicPicker = function() {
+window.editorCloseMusicPicker = function () {
     const dialog = document.getElementById('music-picker-dialog');
     if (dialog) { dialog.classList.add('hidden'); dialog.style.display = ''; }
 };
 
-window.editorUploadMusic = async function(input) {
+window.editorUploadMusic = async function (input) {
     if (!input.files?.length) return;
     const file = input.files[0];
     const fd = new FormData();
@@ -3764,7 +3785,7 @@ function renderMusicList(files) {
     `).join('');
 }
 
-window.selectBgMusic = function(filename, path, duration) {
+window.selectBgMusic = function (filename, path, duration) {
     EditorState.bgMusic = {
         file: filename,
         path: path,
@@ -3812,7 +3833,7 @@ function renderBgMusicTrack() {
     `;
 }
 
-window.removeBgMusic = function() {
+window.removeBgMusic = function () {
     if (EditorState.bgMusicElement) {
         EditorState.bgMusicElement.pause();
         EditorState.bgMusicElement = null;
@@ -3930,7 +3951,7 @@ function setupExportModal() {
     elements.exportProgressModal?.addEventListener('click', (e) => {
         if (e.target === elements.exportProgressModal &&
             (elements.exportProgressModal.classList.contains('export-complete') ||
-             elements.exportProgressModal.classList.contains('export-error'))) {
+                elements.exportProgressModal.classList.contains('export-error'))) {
             hideExportProgress();
         }
     });

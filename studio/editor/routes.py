@@ -226,6 +226,29 @@ def download_export(job_id):
     )
 
 
+@editor_bp.route("/api/export/<job_id>/preview", methods=["GET"])
+def preview_export(job_id):
+    """Preview completed export in browser."""
+    if job_id not in _export_jobs:
+        logger.warning("Preview request for unknown job: {}", job_id[:8])
+        return jsonify({"error": "Job not found"}), 404
+
+    job = _export_jobs[job_id]
+    if job["status"] != "completed":
+        logger.warning("Preview attempt on non-completed job: {} (status={})", job_id[:8], job["status"])
+        return jsonify({"error": "Export not completed yet"}), 400
+    if not os.path.exists(job["output_path"]):
+        logger.error("Preview file missing: {}", job["output_path"])
+        return jsonify({"error": "Output file not found"}), 404
+
+    logger.info("Serving preview: {}", job["output_filename"])
+    return send_file(
+        job["output_path"],
+        mimetype="video/mp4",
+        as_attachment=False,
+    )
+
+
 @editor_bp.route("/api/export/<job_id>", methods=["DELETE"])
 def cancel_export(job_id):
     """Cancel/cleanup an export job."""

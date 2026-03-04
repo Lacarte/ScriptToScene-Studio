@@ -227,15 +227,20 @@ class VideoProcessor:
 
         font_paths = []
         if font_family in FONT_MAP:
-            font_paths = FONT_MAP[font_family].get(os_key, [])
+            # Create a copy so we can prepend bold variants without modifying the list we are iterating over
+            font_paths = list(FONT_MAP[font_family].get(os_key, []))
 
             if font_style == 'bold' and font_family in FONT_BOLD_MAP:
                 bold_name = FONT_BOLD_MAP[font_family]
+                bold_paths_to_add = []
                 for path in font_paths:
                     bold_path = path.replace('-Regular', '-Bold').replace('.ttf', '')
                     if '-Bold' not in bold_path:
                         bold_path = path.rsplit('.', 1)[0] + '-Bold.ttf'
-                    font_paths.insert(0, bold_path)
+                    bold_paths_to_add.append(bold_path)
+                
+                # Prepend the bold paths
+                font_paths = bold_paths_to_add + font_paths
 
         fallback_fonts = [
             'arial.ttf', 'arialbd.ttf',

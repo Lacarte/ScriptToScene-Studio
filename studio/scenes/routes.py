@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 from loguru import logger
 
 from config import SCENES_DIR, N8N_WEBHOOK_URL
+from studio.scenes.templates import SCENE_STYLE_TEMPLATES, TEMPLATES_BY_ID
 
 scenes_bp = Blueprint("scenes", __name__)
 
@@ -16,6 +17,12 @@ scenes_bp = Blueprint("scenes", __name__)
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+@scenes_bp.route("/api/scenes/templates")
+def get_templates():
+    """Return all available scene style templates."""
+    return jsonify(SCENE_STYLE_TEMPLATES)
+
 
 @scenes_bp.route("/api/scenes/webhook-url")
 def get_webhook_url():
@@ -39,9 +46,12 @@ def generate_scenes():
         return jsonify({"error": "No segments data provided"}), 400
 
     # Build the webhook payload (only what n8n needs)
+    style_id = data.get("style", "cinematic")
+    template = TEMPLATES_BY_ID.get(style_id, {})
     webhook_payload = {
         "script": data.get("script", ""),
-        "style": data.get("style", "cinematic"),
+        "style": style_id,
+        "style_prompt": data.get("style_prompt") or template.get("style_prompt", ""),
         "segments": data.get("segments", []),
     }
 
@@ -150,5 +160,8 @@ def get_scenes(project_id):
     json_path = os.path.join(SCENES_DIR, project_id, "scenes.json")
     if not os.path.isfile(json_path):
         return jsonify({"error": "Not found"}), 404
-    with open(json_path) as f:
-        return jsonify(json.load(f))
+    try:
+        with open(json_path) as f:
+            return jsonify(json.load(f))
+    except (json.JSONDecodeError, OSError) as e:
+        return jsonify({"error": f"Failed to read scene data: {e}"}), 500

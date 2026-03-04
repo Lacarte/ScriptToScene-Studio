@@ -208,6 +208,95 @@ class StudioAPIManager {
         return null;
     }
 
+    // ---- Ken Burns / Motion Auto-Assignment ----
+
+    /**
+     * Auto-assign visual effects (Ken Burns motion) to scenes based on narrative_role.
+     * Avoids consecutive repeats.
+     */
+    autoAssignEffects(scenes) {
+        const roleEffects = {
+            hook: ['zoom_in'],
+            buildup: ['pan_right', 'pan_left', 'zoom_in'],
+            peak: ['shake', 'zoom_in'],
+            transition: ['fade', 'zoom_out'],
+            final: ['zoom_out'],
+            final_statement: ['zoom_out'],
+            cta: ['static'],
+        };
+
+        let lastEffect = '';
+
+        return scenes.map(scene => {
+            // Text/CTA scenes always static
+            if (scene.scene_type === 'text' || scene.scene_type === 'cta') {
+                return { ...scene, visual_fx: 'static' };
+            }
+
+            const role = scene.narrative_role || scene.scene_type || 'buildup';
+            const candidates = roleEffects[role] || ['zoom_in', 'pan_right', 'zoom_out'];
+
+            // Pick an effect that isn't the same as the last one
+            let effect = candidates[0];
+            for (const c of candidates) {
+                if (c !== lastEffect) { effect = c; break; }
+            }
+            lastEffect = effect;
+
+            return { ...scene, visual_fx: effect };
+        });
+    }
+
+    // ---- Transition Presets ----
+
+    /**
+     * Auto-assign transitions between scenes based on narrative_role.
+     */
+    autoAssignTransitions(scenes) {
+        return scenes.map((scene, i) => {
+            if (i >= scenes.length - 1) {
+                return { ...scene, transition: { type: 'none', duration: 0 } };
+            }
+
+            const role = scene.narrative_role || scene.scene_type || 'buildup';
+            let transition;
+
+            switch (role) {
+                case 'hook':
+                case 'peak':
+                    transition = { type: 'cut', duration: 0 };
+                    break;
+                case 'text':
+                case 'cta':
+                    transition = { type: 'fade_black', duration: 0.4 };
+                    break;
+                case 'transition':
+                case 'final':
+                case 'final_statement':
+                    transition = { type: 'crossfade', duration: 0.5 };
+                    break;
+                case 'buildup':
+                default:
+                    transition = { type: 'crossfade', duration: 0.3 };
+                    break;
+            }
+
+            return { ...scene, transition };
+        });
+    }
+
+    // ---- Auto-Assemble ----
+
+    /**
+     * Full auto-assembly: build timeline from assets, then apply effects and transitions.
+     */
+    autoAssemble(sceneData, assetsData, segmenterData) {
+        let scenes = this.buildTimelineFromAssets(sceneData, assetsData, segmenterData);
+        scenes = this.autoAssignEffects(scenes);
+        scenes = this.autoAssignTransitions(scenes);
+        return scenes;
+    }
+
     /**
      * Try to find a matching alignment result for a given project.
      * Matches by project_id, falls back to most recent.

@@ -166,6 +166,58 @@ function scenesResetWebhookUrl() {
   toast('Webhook URL reset to default');
 }
 
+// ---- Style Templates ----
+
+let _scnTemplates = [];
+
+async function scenesLoadTemplates() {
+  try {
+    _scnTemplates = await api('/api/scenes/templates');
+  } catch (e) {
+    // Fallback if API unavailable
+    _scnTemplates = [{ id: 'cinematic', name: 'Cinematic', description: 'Default', color: '#4ECDC4', style_prompt: '' }];
+  }
+  _scnRenderTemplateGrid();
+}
+
+function _scnRenderTemplateGrid() {
+  const grid = $('#scenes-style-grid');
+  if (!grid || !_scnTemplates.length) return;
+  const current = $('#scenes-style').value || 'cinematic';
+  grid.innerHTML = _scnTemplates.map(t => {
+    const sel = t.id === current;
+    return `<div class="scene-style-card" data-style-id="${t.id}" onclick="scenesSelectStyle('${t.id}')"
+      style="padding:10px 12px;border-radius:10px;cursor:pointer;transition:all 0.2s;
+        border:1.5px solid ${sel ? t.color : 'var(--border)'};
+        background:${sel ? t.color + '12' : 'var(--bg-card)'};
+        ${sel ? 'box-shadow:0 0 12px ' + t.color + '25;' : ''}"
+      onmouseenter="this.style.borderColor='${t.color}'"
+      onmouseleave="if(!this.classList.contains('selected'))this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${t.color};flex-shrink:0"></span>
+        <span style="font-size:12px;font-weight:600;color:var(--text)">${esc(t.name)}</span>
+      </div>
+      <p style="font-size:10px;color:var(--text-muted);margin:0;line-height:1.4">${esc(t.description)}</p>
+    </div>`;
+  }).join('');
+
+  // Mark selected
+  grid.querySelectorAll('.scene-style-card').forEach(el => {
+    if (el.dataset.styleId === current) el.classList.add('selected');
+  });
+}
+
+function scenesSelectStyle(styleId) {
+  $('#scenes-style').value = styleId;
+  _scnRenderTemplateGrid();
+  _updateScenesSource(); // refresh payload preview
+}
+
+function _scnGetSelectedTemplate() {
+  const id = $('#scenes-style').value || 'cinematic';
+  return _scnTemplates.find(t => t.id === id) || {};
+}
+
 // ---- Webhook Payload Builder ----
 
 function _buildWebhookPayload(segData) {
@@ -174,9 +226,11 @@ function _buildWebhookPayload(segData) {
     .filter(s => !s.is_filler)
     .map(s => ({ index: s.index, words: s.words }));
 
+  const template = _scnGetSelectedTemplate();
   return {
     script: meta.transcript || '',
     style: $('#scenes-style').value || meta.style || 'cinematic',
+    style_prompt: template.style_prompt || '',
     segments: segments,
   };
 }
@@ -650,6 +704,8 @@ function sendToAssets() {
 function sendToEditor() {
   if (!STATE.scenesResult) { toast('No scenes to send', 'error'); return; }
   localStorage.setItem('sts-editor-scenes', JSON.stringify(STATE.scenesResult));
+  // Clear stale captions so they auto-regenerate from current alignment
+  localStorage.removeItem('sts-editor-captions');
   switchPage('editor');
   toast('Scenes sent to editor', 'info');
 }
@@ -694,3 +750,4 @@ async function loadScenesProject(projectId) {
 // Init
 loadScenesHistory();
 scenesInitWebhookUrl();
+scenesLoadTemplates();

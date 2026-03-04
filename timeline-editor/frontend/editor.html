@@ -161,26 +161,140 @@
                     </div>
                 </div>
                 <div class="tab-pane" data-pane="effects">
-                    <div class="tab-pane-body">
-                        <div class="media-empty">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                                <path d="M2 17l10 5 10-5"/>
-                                <path d="M2 12l10 5 10-5"/>
-                            </svg>
-                            <p>Effects & filters</p>
+                    <div class="tab-pane-body" style="padding:8px;display:flex;flex-direction:column;gap:8px;overflow-y:auto">
+                        <!-- No scene selected state -->
+                        <div id="fx-no-scene" class="fx-empty-state">
+                            <span>Select a scene to apply effects</span>
+                        </div>
+                        <!-- Effects grid -->
+                        <div id="fx-grid" class="fx-grid" style="display:none">
+                            <div class="fx-section-label">Motion Effects</div>
+                            <div class="fx-card-grid">
+                                <button class="fx-card" data-fx="static" title="No motion">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Static</span>
+                                </button>
+                                <button class="fx-card" data-fx="zoom_in" title="Slowly zoom into the scene">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                                            <path d="M11 8v6M8 11h6"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Zoom In</span>
+                                </button>
+                                <button class="fx-card" data-fx="zoom_out" title="Slowly zoom out from the scene">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                                            <path d="M8 11h6"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Zoom Out</span>
+                                </button>
+                                <button class="fx-card" data-fx="pan_left" title="Pan camera from right to left">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Pan Left</span>
+                                </button>
+                                <button class="fx-card" data-fx="pan_right" title="Pan camera from left to right">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Pan Right</span>
+                                </button>
+                                <button class="fx-card" data-fx="fade" title="Fade in from transparent">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/>
+                                            <circle cx="12" cy="12" r="4"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Fade</span>
+                                </button>
+                                <button class="fx-card" data-fx="shake" title="Camera shake for impact">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <path d="M2 12l3-3 3 6 3-6 3 6 3-6 3 3"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Shake</span>
+                                </button>
+                            </div>
+                            <button class="fx-auto-btn" id="fx-auto-assign" title="Auto-assign effects based on scene roles">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                                Auto-assign all scenes
+                            </button>
                         </div>
                     </div>
                 </div>
                 <div class="tab-pane" data-pane="transitions">
-                    <div class="tab-pane-body">
-                        <div class="media-empty">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <rect x="2" y="7" width="8" height="10" rx="1"/>
-                                <rect x="14" y="7" width="8" height="10" rx="1"/>
-                                <path d="M10 12h4" stroke-dasharray="2 2"/>
-                            </svg>
-                            <p>Scene transitions</p>
+                    <div class="tab-pane-body" style="padding:8px;display:flex;flex-direction:column;gap:8px;overflow-y:auto">
+                        <!-- No scene selected state -->
+                        <div id="tr-no-scene" class="fx-empty-state">
+                            <span>Select a scene to set transitions</span>
+                        </div>
+                        <!-- Transitions grid -->
+                        <div id="tr-grid" class="fx-grid" style="display:none">
+                            <div class="fx-section-label">Transition to next scene</div>
+                            <div class="fx-card-grid">
+                                <button class="fx-card" data-tr="none" title="No transition">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <path d="M18 6L6 18M6 6l12 12"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">None</span>
+                                </button>
+                                <button class="fx-card" data-tr="cut" title="Hard cut — instant switch">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <rect x="3" y="5" width="7" height="14" rx="1"/>
+                                            <rect x="14" y="5" width="7" height="14" rx="1"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Cut</span>
+                                </button>
+                                <button class="fx-card" data-tr="crossfade" title="Smooth crossfade blend">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <rect x="2" y="6" width="9" height="12" rx="1" opacity="0.5"/>
+                                            <rect x="13" y="6" width="9" height="12" rx="1" opacity="0.5"/>
+                                            <rect x="8" y="6" width="8" height="12" rx="1" fill="none" stroke-dasharray="2 2"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Crossfade</span>
+                                </button>
+                                <button class="fx-card" data-tr="fade_black" title="Fade to black then reveal">
+                                    <div class="fx-card-icon">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                            <rect x="3" y="5" width="18" height="14" rx="2"/>
+                                            <rect x="8" y="9" width="8" height="6" rx="1" fill="currentColor" opacity="0.4"/>
+                                        </svg>
+                                    </div>
+                                    <span class="fx-card-label">Fade Black</span>
+                                </button>
+                            </div>
+                            <!-- Duration control -->
+                            <div id="tr-duration-row" class="fx-duration-row" style="display:none">
+                                <label>Duration</label>
+                                <input type="range" id="tr-duration-slider" min="0.1" max="1.0" step="0.1" value="0.3">
+                                <span id="tr-duration-value">0.3s</span>
+                            </div>
+                            <button class="fx-auto-btn" id="tr-auto-assign" title="Auto-assign transitions based on scene roles">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                                Auto-assign all scenes
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -197,16 +311,82 @@
                     </div>
                 </div>
                 <div class="tab-pane" data-pane="caption">
-                    <div class="tab-pane-body">
-                        <div class="media-empty">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                                <path d="M6 14h4"/>
-                                <path d="M14 14h4"/>
-                                <path d="M6 18h12"/>
-                            </svg>
-                            <p>Auto captions & subtitles</p>
+                    <div class="tab-pane-body" style="padding:12px;display:flex;flex-direction:column;gap:12px">
+
+                        <!-- Enable toggle -->
+                        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg-darker);border-radius:6px;border:1px solid var(--border-subtle)">
+                            <span style="font-size:11px;font-weight:600;color:var(--text)">Enable Captions</span>
+                            <label class="caption-toggle">
+                                <input type="checkbox" id="caption-enabled-toggle">
+                                <span class="caption-toggle-slider"></span>
+                            </label>
                         </div>
+
+                        <!-- Status (no data) -->
+                        <div id="caption-no-data" style="text-align:center;padding:16px 8px;color:var(--text-muted);font-size:11px">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 8px;display:block;opacity:0.4">
+                                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                                <path d="M6 14h4"/><path d="M14 14h4"/><path d="M6 18h12"/>
+                            </svg>
+                            <p>No captions loaded.</p>
+                            <p style="margin-top:4px;font-size:10px;opacity:0.6">Send captions from the Studio Captions page, or they will load automatically from alignment data.</p>
+                        </div>
+
+                        <!-- Caption info (shown when data loaded) -->
+                        <div id="caption-info" style="display:none">
+                            <div style="padding:6px 10px;background:var(--bg-darker);border-radius:6px;border:1px solid var(--border-subtle)">
+                                <div style="display:flex;align-items:center;justify-content:space-between">
+                                    <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)">Loaded</span>
+                                    <span id="caption-info-count" style="font-size:10px;font-family:var(--font-mono);color:var(--accent)">0 captions</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Style controls (shown when data loaded) -->
+                        <div id="caption-style-controls" style="display:none;flex-direction:column;gap:10px">
+                            <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)">Style</div>
+
+                            <div>
+                                <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Preset</label>
+                                <select id="cap-ed-preset" class="cap-select">
+                                    <option value="bold_popup">Bold Pop-up</option>
+                                    <option value="subtitle_bar">Subtitle Bar</option>
+                                    <option value="karaoke">Karaoke</option>
+                                    <option value="minimal">Minimal</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Font</label>
+                                <select id="cap-ed-font" class="cap-select">
+                                    <option value="Montserrat">Montserrat</option>
+                                    <option value="Inter">Inter</option>
+                                    <option value="Bebas Neue">Bebas Neue</option>
+                                    <option value="DM Sans">DM Sans</option>
+                                </select>
+                            </div>
+
+                            <div style="display:flex;gap:8px">
+                                <div style="flex:1">
+                                    <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Size</label>
+                                    <input id="cap-ed-size" type="number" value="64" min="24" max="120" step="2" class="cap-input">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Color</label>
+                                    <input id="cap-ed-color" type="color" value="#FFFFFF" class="cap-color-input">
+                                </div>
+                                <div style="flex:1">
+                                    <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Stroke</label>
+                                    <input id="cap-ed-stroke" type="color" value="#000000" class="cap-color-input">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Position Y: <span id="cap-ed-pos-val">75%</span></label>
+                                <input id="cap-ed-position" type="range" min="10" max="95" value="75" class="cap-range">
+                            </div>
+                        </div>
+
                     </div>
                 </div>
                 <div class="tab-pane" data-pane="adjustment">
@@ -227,21 +407,15 @@
         <div class="panel-resize-handle" id="resize-media" data-panel="media"></div>
 
         <!-- Preview Panel -->
-        <section class="preview-panel">
+        <section class="preview-panel" id="preview-panel">
             <div class="player-card">
-                <!-- Player card header -->
-                <div class="player-card-header">
-                    <span class="player-card-title">Player</span>
-                    <button id="player-menu-btn" class="pc-btn" title="Player Options">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-                        </svg>
-                    </button>
+                <!-- Drag handle header -->
+                <div class="player-card-header" id="player-card-header">
+                    <span class="player-card-title">Preview</span>
                 </div>
-
                 <!-- Video stage — height-driven, keeps 9:16 ratio -->
                 <div class="preview-stage">
-                    <div class="preview-container">
+                    <div class="preview-container" id="preview-container">
                         <canvas id="preview-canvas" width="1080" height="1920"></canvas>
                         <div class="preview-placeholder hidden" id="preview-placeholder"></div>
                     </div>
@@ -251,45 +425,80 @@
                 <div class="preview-controls">
                     <input type="range" id="time-scrubber" class="time-scrubber" min="0" max="100" value="0">
                     <div class="preview-controls-row">
-                        <!-- Left group: timecode + storyboard -->
+                        <!-- Left group: timecode -->
                         <div class="pc-group-left">
                             <div class="time-display">
                                 <span id="current-time" class="tc-current">00:00:00:00</span>
                                 <span class="tc-sep">/</span>
                                 <span id="total-time">00:00:00:00</span>
                             </div>
-                            <button id="storyboard-btn" class="pc-btn" title="Storyboard View">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                                    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-                                </svg>
-                            </button>
                         </div>
 
-                        <!-- Center: play -->
+                        <!-- Center: skip-start, play, skip-end -->
                         <div class="pc-group-center">
+                            <button id="skip-start-btn" class="pc-btn" title="Jump to Start">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+                                </svg>
+                            </button>
                             <button id="play-btn" class="pc-play" title="Play/Pause">
                                 <svg viewBox="0 0 24 24" fill="currentColor">
                                     <polygon points="6 4 20 12 6 20 6 4" />
                                 </svg>
                             </button>
+                            <button id="skip-end-btn" class="pc-btn" title="Jump to End">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+                                </svg>
+                            </button>
                         </div>
 
-                        <!-- Right group: audio, full, zoom, ratio, expand -->
+                        <!-- Right group: loop, ratio, audio, fullscreen -->
                         <div class="pc-group-right">
+                            <button id="loop-btn" class="pc-btn" title="Toggle Loop">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <polyline points="17 1 21 5 17 9"/>
+                                    <path d="M3 11V9a4 4 0 014-4h14"/>
+                                    <polyline points="7 23 3 19 7 15"/>
+                                    <path d="M21 13v2a4 4 0 01-4 4H3"/>
+                                </svg>
+                            </button>
+                            <div class="ratio-dropdown-container">
+                                <button id="ratio-btn" class="pc-btn pc-btn-label" title="Aspect Ratio">9:16</button>
+                                <div id="ratio-dropdown" class="ratio-dropdown">
+                                    <div class="ratio-dropdown-header">Aspect Ratio</div>
+                                    <div class="ratio-option active" data-ratio="9:16" data-w="1080" data-h="1920">
+                                        <span class="ratio-label">9:16</span>
+                                        <span class="ratio-icon ratio-icon-9-16"></span>
+                                    </div>
+                                    <div class="ratio-option" data-ratio="16:9" data-w="1920" data-h="1080">
+                                        <span class="ratio-label">16:9</span>
+                                        <span class="ratio-icon ratio-icon-16-9"></span>
+                                    </div>
+                                    <div class="ratio-option" data-ratio="4:3" data-w="1440" data-h="1080">
+                                        <span class="ratio-label">4:3</span>
+                                        <span class="ratio-icon ratio-icon-4-3"></span>
+                                    </div>
+                                    <div class="ratio-option" data-ratio="1:1" data-w="1080" data-h="1080">
+                                        <span class="ratio-label">1:1</span>
+                                        <span class="ratio-icon ratio-icon-1-1"></span>
+                                    </div>
+                                    <div class="ratio-option" data-ratio="3:4" data-w="1080" data-h="1440">
+                                        <span class="ratio-label">3:4</span>
+                                        <span class="ratio-icon ratio-icon-3-4"></span>
+                                    </div>
+                                    <div class="ratio-option" data-ratio="2.35:1" data-w="1920" data-h="817">
+                                        <span class="ratio-label">2.35:1</span>
+                                        <span class="ratio-icon ratio-icon-235-1"></span>
+                                    </div>
+                                </div>
+                            </div>
                             <button id="volume-btn" class="pc-btn" title="Toggle Audio">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                                     <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
                                 </svg>
                             </button>
-                            <button id="fit-btn" class="pc-btn pc-btn-label" title="Fit to Preview">Full</button>
-                            <button id="zoom-preview-btn" class="pc-btn" title="Zoom Preview">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
-                                </svg>
-                            </button>
-                            <button id="ratio-btn" class="pc-btn pc-btn-label" title="Aspect Ratio">9:16</button>
-                            <button id="loop-btn" class="pc-btn" title="Toggle Loop">
+                            <button id="fullscreen-btn" class="pc-btn" title="Fullscreen Preview">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                                     <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
                                 </svg>
@@ -327,11 +536,11 @@
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Aspect ratio</span>
-                            <span class="detail-value">9:16</span>
+                            <span class="detail-value" id="info-ratio">9:16</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Resolution</span>
-                            <span class="detail-value">1080x1920</span>
+                            <span class="detail-value" id="info-resolution">1080x1920</span>
                         </div>
                         <div class="detail-row">
                             <span class="detail-label">Frame rate</span>
@@ -419,6 +628,17 @@
                         </svg>
                     </div>
                     <div class="track-content" id="text-track"></div>
+                </div>
+
+                <!-- Caption Track (hidden until enabled) -->
+                <div class="track" data-track="caption" id="caption-track-row" style="display:none">
+                    <div class="track-header">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <rect x="2" y="4" width="20" height="16" rx="2"/>
+                            <path d="M6 14h4"/><path d="M14 14h4"/><path d="M6 18h12"/>
+                        </svg>
+                    </div>
+                    <div class="track-content" id="caption-track"></div>
                 </div>
 
                 <!-- Audio Track -->
@@ -787,6 +1007,54 @@
             });
         });
 
+        // ---- Aspect Ratio Dropdown ----
+        (function() {
+            const ratioBtn = document.getElementById('ratio-btn');
+            const dropdown = document.getElementById('ratio-dropdown');
+            if (!ratioBtn || !dropdown) return;
+
+            ratioBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.ratio-dropdown-container')) {
+                    dropdown.classList.remove('open');
+                }
+            });
+
+            dropdown.querySelectorAll('.ratio-option').forEach(opt => {
+                opt.addEventListener('click', () => {
+                    const ratio = opt.dataset.ratio;
+                    const w = parseInt(opt.dataset.w);
+                    const h = parseInt(opt.dataset.h);
+
+                    // Update active state
+                    dropdown.querySelectorAll('.ratio-option').forEach(o => o.classList.remove('active'));
+                    opt.classList.add('active');
+                    ratioBtn.textContent = ratio;
+                    dropdown.classList.remove('open');
+
+                    // Resize canvas and update preview container aspect ratio
+                    const canvas = document.getElementById('preview-canvas');
+                    const container = document.getElementById('preview-container');
+                    if (canvas) {
+                        canvas.width = w;
+                        canvas.height = h;
+                    }
+                    if (container) {
+                        container.style.aspectRatio = `${w} / ${h}`;
+                    }
+
+                    // Dispatch event for video-editor.js to handle
+                    window.dispatchEvent(new CustomEvent('editor-ratio-change', {
+                        detail: { ratio, width: w, height: h }
+                    }));
+                });
+            });
+        })();
+
         // ---- Panel resize handles ----
         (function() {
             const layout = document.querySelector('.editor-layout');
@@ -833,7 +1101,7 @@
             // Panels can swap between slots by dragging headers.
             const slots = [
                 { col: 1, el: document.querySelector('.media-panel'),      handle: document.querySelector('.media-tabs') },
-                { col: 3, el: document.querySelector('.preview-panel'),    handle: document.querySelector('.player-card-header') },
+                { col: 3, el: document.querySelector('.preview-panel'),    handle: document.getElementById('player-card-header') },
                 { col: 5, el: document.querySelector('.properties-panel'), handle: document.querySelector('.detail-card-header') },
             ];
 
@@ -867,7 +1135,7 @@
                 if (!handle) return;
 
                 handle.addEventListener('mousedown', (e) => {
-                    if (e.target.closest('button, a, input, select')) return;
+                    if (e.target.closest('button, a, input, select, .ratio-dropdown-container')) return;
                     e.preventDefault();
 
                     // Ghost — compact preview that follows the cursor

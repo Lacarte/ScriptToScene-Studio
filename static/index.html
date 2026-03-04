@@ -26,6 +26,7 @@
       }
     }
   </script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 
@@ -182,6 +183,13 @@
 
     <!-- Navigation -->
     <div class="flex-1 py-3 flex flex-col gap-0.5">
+      <button class="nav-item" onclick="switchPage('pipeline')" data-page="pipeline" title="Pipeline Dashboard">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          viewBox="0 0 24 24">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        <span class="nav-label">PIPELINE</span>
+      </button>
       <button class="nav-item active" onclick="switchPage('tts')" data-page="tts" title="Text to Speech">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
@@ -257,6 +265,12 @@
 
   <!-- ===== MOBILE BOTTOM NAV ===== -->
   <div id="mobile-nav" style="display:none">
+    <button onclick="switchPage('pipeline')" data-page="pipeline">
+      <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+      </svg>
+      PIPELINE
+    </button>
     <button class="active" onclick="switchPage('tts')" data-page="tts">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
         <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -297,6 +311,81 @@
 
   <!-- ===== MAIN CONTENT ===== -->
   <div id="main-content">
+
+    <!-- ========================================================== -->
+    <!-- PAGE: PIPELINE (Auto Pipeline)                             -->
+    <!-- ========================================================== -->
+    <div id="page-pipeline" class="page">
+      <div class="max-w-2xl mx-auto px-6 py-8">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Pipeline</h2>
+            <p class="text-sm mt-1" style="color:var(--text-secondary)">Run the full TTS → Timing → Segment → Scenes pipeline</p>
+          </div>
+        </div>
+
+        <!-- Input -->
+        <section class="card p-5 mb-4">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Story Text</label>
+          <textarea id="pipeline-text" class="input-field" rows="6" placeholder="Enter your story text..." style="width:100%;resize:vertical;font-family:inherit;font-size:13px;line-height:1.6"></textarea>
+          <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Voice</label>
+              <select id="pipeline-voice" class="input-field" style="width:140px;font-size:12px">
+                <option value="af_heart">af_heart</option>
+                <option value="af_bella">af_bella</option>
+                <option value="am_adam">am_adam</option>
+                <option value="am_michael">am_michael</option>
+                <option value="bf_emma">bf_emma</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Speed</label>
+              <input id="pipeline-speed" type="number" class="input-field" value="1.0" min="0.5" max="2.0" step="0.1" style="width:80px;font-size:12px">
+            </div>
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Style</label>
+              <select id="pipeline-style" class="input-field" style="width:140px;font-size:12px">
+                <option value="cinematic">Cinematic</option>
+                <option value="dark_horror">Dark Horror</option>
+                <option value="reddit_story">Reddit Story</option>
+                <option value="motivational">Motivational</option>
+                <option value="nature_doc">Nature Doc</option>
+                <option value="anime">Anime</option>
+                <option value="surreal">Surreal</option>
+                <option value="noir">Noir</option>
+                <option value="minimal">Minimal</option>
+              </select>
+            </div>
+          </div>
+          <button id="pipeline-run-btn" class="action-btn hover-accent" style="margin-top:16px;padding:10px 24px;font-size:13px;font-weight:600" onclick="pipelineStart()">Run Pipeline</button>
+        </section>
+
+        <!-- Progress -->
+        <section id="pipeline-progress" class="card p-5 mb-4" style="display:none">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-4" style="color:var(--text-muted)">Progress</label>
+          <div id="pipeline-steps" style="margin-bottom:16px"></div>
+          <div id="pipeline-current-step" style="min-height:24px"></div>
+        </section>
+
+        <!-- Log -->
+        <section id="pipeline-log-section" class="card p-5 mb-4" style="display:none">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Log</label>
+          <div id="pipeline-log" class="font-mono" style="max-height:200px;overflow-y:auto;font-size:11px;line-height:1.6;padding:8px 12px;background:var(--bg-darkest);border-radius:8px;border:1px solid var(--border)"></div>
+        </section>
+
+        <!-- History -->
+        <section class="card p-5">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Recent Jobs</label>
+          <div id="pipeline-jobs" style="max-height:300px;overflow-y:auto">
+            <p style="text-align:center;color:var(--text-muted);font-size:11px;padding:24px 0">Loading...</p>
+          </div>
+        </section>
+
+      </div>
+    </div>
 
     <!-- ========================================================== -->
     <!-- PAGE: TTS (Kokoro TTS)                                     -->
@@ -630,24 +719,22 @@
         <!-- Settings -->
         <section class="card p-5 mb-4">
           <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Generation Settings</label>
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs mb-1" style="color:var(--text-secondary)">Style Preset</label>
-              <select id="scenes-style" class="input-field" style="width:100%;padding:8px 12px;font-size:12px;font-family:inherit">
-                <option value="cinematic">Cinematic Realistic</option>
-                <option value="anime">Anime / Manga</option>
-                <option value="abstract">Abstract / Artistic</option>
-                <option value="minimal">Minimalist</option>
-              </select>
+          <!-- Style Template Picker -->
+          <div style="margin-bottom:12px">
+            <label class="block text-xs mb-2" style="color:var(--text-secondary)">Style Template</label>
+            <div id="scenes-style-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
+              <!-- Populated by JS from /api/scenes/templates -->
             </div>
-            <div>
-              <label class="block text-xs mb-1" style="color:var(--text-secondary)">Aspect Ratio</label>
-              <select id="scenes-aspect" class="input-field" style="width:100%;padding:8px 12px;font-size:12px;font-family:inherit">
-                <option value="9:16">9:16 (Vertical / Reels)</option>
-                <option value="16:9">16:9 (Landscape)</option>
-                <option value="1:1">1:1 (Square)</option>
-              </select>
-            </div>
+            <input type="hidden" id="scenes-style" value="cinematic">
+          </div>
+          <!-- Aspect Ratio -->
+          <div>
+            <label class="block text-xs mb-1" style="color:var(--text-secondary)">Aspect Ratio</label>
+            <select id="scenes-aspect" class="input-field" style="width:100%;padding:8px 12px;font-size:12px;font-family:inherit">
+              <option value="9:16">9:16 (Vertical / Reels)</option>
+              <option value="16:9">16:9 (Landscape)</option>
+              <option value="1:1">1:1 (Square)</option>
+            </select>
           </div>
 
           <!-- Webhook Toggle -->
@@ -927,5 +1014,7 @@
   <script src="js/scenes.js"></script>
   <script src="js/assets.js"></script>
   <script src="js/editor.js"></script>
+  <script src="js/pipeline.js"></script>
+  <script src="js/captions.js"></script>
 </body>
 </html>

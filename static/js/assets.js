@@ -587,6 +587,9 @@ function _startGrabberPolling(projectId) {
         clearInterval(_grabberPollTimer);
         _grabberPollTimer = null;
         loadAssetsHistory(); // refresh history
+        if (data.status === 'done') {
+          showContinueBar('assets-controls', 'editor', 'Auto-Assemble & Edit →', autoAssembleAndSendToEditor);
+        }
       }
     } catch (e) {
       // Network error — keep polling
@@ -782,5 +785,45 @@ async function assetsLoadFromHistory(projectId) {
   } catch (e) {
     toast(e.message || 'Failed to load project', 'error');
   }
+}
+
+// ---- Auto-Assemble & Send to Editor ----
+
+async function autoAssembleAndSendToEditor() {
+  if (!STATE.assetsSceneData) {
+    toast('No scenes loaded', 'error');
+    return;
+  }
+  const projectId = STATE.assetsSceneData.project_id;
+
+  // Build asset data for the editor
+  const assetsData = {
+    scenes: {},
+    scene_statuses: {},
+  };
+  if (STATE.assetsSceneData.scenes) {
+    for (const scene of STATE.assetsSceneData.scenes) {
+      const st = STATE.assetStatuses[scene.index] || {};
+      assetsData.scenes[String(scene.index)] = {
+        files_on_disk: (st.local_files || []).map(f => ({ url: f })),
+      };
+      assetsData.scene_statuses[String(scene.index)] = {
+        status: st.status || 'pending',
+        local_files: st.local_files || [],
+      };
+    }
+  }
+
+  // Store scene data with auto-assemble flag
+  const storeData = {
+    ...STATE.assetsSceneData,
+    _autoAssemble: true,
+    _assetsData: assetsData,
+  };
+  localStorage.setItem('sts-editor-scenes', JSON.stringify(storeData));
+  // Clear stale captions so they auto-regenerate from current alignment
+  localStorage.removeItem('sts-editor-captions');
+  switchPage('editor');
+  toast('Auto-assembling timeline...', 'info');
 }
 

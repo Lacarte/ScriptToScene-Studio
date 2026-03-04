@@ -17,6 +17,7 @@
   --bg-primary:   var(--bg-darkest);
   --bg-secondary: var(--bg-dark);
   --bg-tertiary:  var(--bg-surface);
+  --bg-darker:    #0c1118;
 
   /* ---- Text ---- */
   --text:           #e8edf3;
@@ -47,8 +48,9 @@
   --status-error: var(--coral);
 
   /* ---- Borders ---- */
-  --border:       #1e2a3a;
-  --border-hover: #2a3a4e;
+  --border:        #1e2a3a;
+  --border-subtle: #172232;
+  --border-hover:  #2a3a4e;
 
   /* Aliases for editor */
   --border-color: var(--border);

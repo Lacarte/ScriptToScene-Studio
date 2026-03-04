@@ -415,6 +415,7 @@ def _step_scenes(segment_result, config, project_id):
         json={
             "script": config.get("text", ""),
             "style": config.get("style", "cinematic"),
+            "style_prompt": config.get("style_prompt", ""),
             "segments": segments,
         },
         timeout=120,

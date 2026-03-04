@@ -79,7 +79,21 @@ class App {
                 this.loadStudioData(e.data.data);
                 showToast('Scenes received from Studio', 'success');
             }
+            if (e.data && e.data.type === 'load-captions' && e.data.data) {
+                this.loadCaptions(e.data.data);
+            }
         });
+    }
+
+    /**
+     * Load captions data into the preview renderer.
+     */
+    loadCaptions(captionData) {
+        if (!captionData || !captionData.captions) return;
+        State.set({ captionData }, true);
+        if (this.timeline && this.timeline.preview) {
+            this.timeline.preview.setCaptions(captionData.captions, captionData.style || {});
+        }
     }
 
     checkStudioBridge() {
@@ -89,10 +103,71 @@ class App {
         try {
             const data = JSON.parse(stored);
             if (data && data.scenes && data.scenes.length) {
-                this.loadStudioData(data);
+                // Handle auto-assemble flag
+                if (data._autoAssemble && data._assetsData) {
+                    this.autoAssembleFromBridge(data);
+                } else {
+                    this.loadStudioData(data);
+                }
                 showToast(`Loaded ${data.scenes.length} scenes from Studio`);
             }
         } catch { /* ignore */ }
+
+        // Check for captions
+        const captionsStored = localStorage.getItem('sts-editor-captions');
+        if (captionsStored) {
+            try {
+                const capData = JSON.parse(captionsStored);
+                this.loadCaptions(capData);
+            } catch { /* ignore */ }
+        }
+    }
+
+    /**
+     * Auto-assemble from bridge: apply effects + transitions using StudioAPI.
+     */
+    async autoAssembleFromBridge(data) {
+        const assetsData = data._assetsData;
+        // Clean the flags before passing
+        const sceneData = { ...data };
+        delete sceneData._autoAssemble;
+        delete sceneData._assetsData;
+
+        try {
+            const segmenterData = await StudioAPI.findSegmenterForProject(sceneData);
+            const scenes = StudioAPI.autoAssemble(sceneData, assetsData, segmenterData);
+
+            if (!scenes.length) {
+                this.loadStudioData(sceneData);
+                return;
+            }
+
+            const projectId = sceneData.project_id || `studio_${Date.now()}`;
+            const project = {
+                project_id: projectId,
+                script: sceneData.script || '',
+                duration: scenes.reduce((sum, s) => sum + (s.duration || 0), 0),
+                created_at: sceneData.timestamp || new Date().toISOString(),
+            };
+
+            State.selectProject(project);
+            State.setScenes(scenes, true);
+            State.set({ studioSourceId: projectId }, true);
+
+            const welcomeMessage = document.getElementById('welcome-message');
+            if (welcomeMessage) welcomeMessage.classList.add('hidden');
+
+            this.updateSourceInfo(`${projectId.slice(0, 25)} · ${scenes.length} scenes (auto-assembled)`, true);
+            this.updateProjectInfoBar(projectId, scenes, segmenterData, null, project.created_at);
+            this.loadAlignmentForProject(projectId);
+            this.loadRecentProjects();
+            this.runValidation();
+
+            showToast(`Auto-assembled ${scenes.length} scenes with effects & transitions`);
+        } catch (e) {
+            console.warn('Auto-assemble failed, falling back:', e);
+            this.loadStudioData(sceneData);
+        }
     }
 
     useCurrentResult() {

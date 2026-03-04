@@ -100,7 +100,9 @@ const EditorState = {
     editHistory: [],  // History of edits for undo
     historyIndex: -1,  // Current position in history (-1 = no history)
     sceneErrors: new Map(),  // Map of sceneId -> [error messages]
-    savedAudioSettings: null  // Saved audio settings from localStorage
+    savedAudioSettings: null,  // Saved audio settings from localStorage
+    captionData: null,      // Caption data { captions: [], style: {} }
+    captionsEnabled: false  // Whether caption track is visible
 };
 
 // ============================================================
@@ -868,6 +870,8 @@ const elements = {
     timelineTracks: document.getElementById('timeline-tracks'),
     videoTrack: document.getElementById('video-track'),
     textTrack: document.getElementById('text-track'),
+    captionTrack: document.getElementById('caption-track'),
+    captionTrackRow: document.getElementById('caption-track-row'),
     audioTrack: document.getElementById('audio-track'),
     previewCanvas: document.getElementById('preview-canvas'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
@@ -877,6 +881,8 @@ const elements = {
     playBtn: document.getElementById('play-btn'),
     loopBtn: document.getElementById('loop-btn'),  // Loop toggle button
     volumeBtn: document.getElementById('volume-btn'),  // Volume/mute button
+    fullscreenBtn: document.getElementById('fullscreen-btn'),  // Fullscreen toggle
+    previewPanel: document.getElementById('preview-panel'),  // Preview panel for fullscreen
     selectFolderBtn: document.getElementById('select-folder'),
     randomizeMediaBtn: document.getElementById('randomize-media'),
     mediaStatus: document.getElementById('media-status'),
@@ -944,6 +950,16 @@ async function init() {
 
     // Load assets with progress
     await loadProjectMediaWithProgress();
+
+    // Load captions from localStorage if available
+    _loadCaptionsFromStorage();
+
+    // Listen for captions sent from parent studio via postMessage
+    window.addEventListener('message', (e) => {
+        if (e.data && e.data.type === 'load-captions' && e.data.data) {
+            _receiveCaptionData(e.data.data);
+        }
+    });
 
     // Hide loading overlay and show editor
     await hideLoadingOverlay();
@@ -1527,6 +1543,21 @@ window.addEventListener('editor-load-audio', (e) => {
     loadAudioFromURL(url, filename, duration);
 });
 
+// Handle aspect ratio changes from the dropdown
+window.addEventListener('editor-ratio-change', (e) => {
+    const { ratio, width, height } = e.detail;
+    if (EditorState.preview) {
+        EditorState.preview.width = width;
+        EditorState.preview.height = height;
+        EditorState.preview.render();
+    }
+    // Update detail panel
+    const infoRatio = document.getElementById('info-ratio');
+    const infoRes = document.getElementById('info-resolution');
+    if (infoRatio) infoRatio.textContent = ratio;
+    if (infoRes) infoRes.textContent = `${width}x${height}`;
+});
+
 /**
  * Render audio track with loaded audio - uses helper for width calculation
  */
@@ -1701,6 +1732,9 @@ function renderTimeline() {
     // Render text track — text clips positioned at matching scene times
     renderTextTrack();
 
+    // Render caption track
+    renderCaptionTrack();
+
     // Add click listeners
     elements.videoTrack.querySelectorAll('.scene-clip').forEach(clip => {
         clip.addEventListener('click', (e) => {
@@ -1762,6 +1796,183 @@ function renderTextTrack() {
     } else {
         elements.textTrack.innerHTML = `<div class="text-track-empty">No text overlays</div>`;
     }
+}
+
+/**
+ * Render caption track — shows caption text clips from caption data
+ */
+function renderCaptionTrack() {
+    if (!elements.captionTrack) return;
+
+    const captionData = EditorState.captionData;
+    if (!captionData || !captionData.captions || !captionData.captions.length) {
+        elements.captionTrack.innerHTML = `<div class="caption-track-empty">No captions</div>`;
+        return;
+    }
+
+    const captions = captionData.captions;
+    const totalDuration = EditorState.scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
+    if (!totalDuration) return;
+
+    // Total timeline width from scenes
+    let totalWidth = 0;
+    for (const scene of EditorState.scenes) {
+        totalWidth += getScenePixelWidth(scene);
+    }
+
+    const pxPerSec = totalWidth / totalDuration;
+    const clips = captions.map((c, i) => {
+        const left = c.start * pxPerSec;
+        const width = Math.max((c.end - c.start) * pxPerSec, 8);
+        const label = c.text.length > 20 ? c.text.substring(0, 20) + '...' : c.text;
+        return `<div class="caption-clip" data-cap-idx="${i}" style="left:${left}px;width:${width}px" title="${c.text.replace(/"/g, '&quot;')}">
+            <span class="caption-clip-label">${label.replace(/</g, '&lt;')}</span>
+        </div>`;
+    }).join('');
+
+    elements.captionTrack.innerHTML = `<div style="position:relative;width:${totalWidth}px;height:100%">${clips}</div>`;
+}
+
+/**
+ * Setup caption enable toggle and style controls in the sidebar Caption tab.
+ */
+function setupCaptionControls() {
+    const toggle = document.getElementById('caption-enabled-toggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', () => {
+        EditorState.captionsEnabled = toggle.checked;
+        const row = elements.captionTrackRow;
+        if (row) row.style.display = toggle.checked ? '' : 'none';
+
+        // Show/hide caption overlay in preview
+        if (EditorState.preview) {
+            if (toggle.checked && EditorState.captionData) {
+                EditorState.preview.setCaptions(EditorState.captionData.captions, EditorState.captionData.style || {});
+            } else {
+                EditorState.preview.setCaptions(null, null);
+            }
+        }
+
+        // Update UI
+        _capUpdateUI();
+        renderCaptionTrack();
+    });
+
+    // Style controls
+    const presetSel = document.getElementById('cap-ed-preset');
+    const fontSel = document.getElementById('cap-ed-font');
+    const sizeInput = document.getElementById('cap-ed-size');
+    const colorInput = document.getElementById('cap-ed-color');
+    const strokeInput = document.getElementById('cap-ed-stroke');
+    const posInput = document.getElementById('cap-ed-position');
+    const posVal = document.getElementById('cap-ed-pos-val');
+
+    const updateStyle = (key, value) => {
+        if (!EditorState.captionData?.style) return;
+        EditorState.captionData.style[key] = value;
+        if (EditorState.preview && EditorState.captionsEnabled) {
+            EditorState.preview.setCaptions(EditorState.captionData.captions, EditorState.captionData.style);
+        }
+    };
+
+    presetSel?.addEventListener('change', () => {
+        const PRESETS = {
+            bold_popup: { font_family: 'Montserrat', font_size: 64, font_weight: '800', color: '#FFFFFF', stroke_color: '#000000', stroke_width: 4, position_y: 75, animation: 'pop', text_transform: 'uppercase' },
+            subtitle_bar: { font_family: 'Inter', font_size: 48, font_weight: '600', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 85, animation: 'none', text_transform: 'none', bg_bar: true },
+            karaoke: { font_family: 'Bebas Neue', font_size: 72, font_weight: '400', color: '#FFFFFF', stroke_color: '#000000', stroke_width: 3, position_y: 70, animation: 'none', text_transform: 'uppercase', highlight: true },
+            minimal: { font_family: 'DM Sans', font_size: 42, font_weight: '500', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 80, animation: 'none', text_transform: 'none' },
+        };
+        const p = PRESETS[presetSel.value];
+        if (p && EditorState.captionData) {
+            EditorState.captionData.style = { ...p, preset: presetSel.value };
+            _capSyncStyleUI();
+            if (EditorState.preview && EditorState.captionsEnabled) {
+                EditorState.preview.setCaptions(EditorState.captionData.captions, EditorState.captionData.style);
+            }
+        }
+    });
+
+    fontSel?.addEventListener('change', () => updateStyle('font_family', fontSel.value));
+    sizeInput?.addEventListener('change', () => updateStyle('font_size', parseInt(sizeInput.value)));
+    colorInput?.addEventListener('input', () => updateStyle('color', colorInput.value));
+    strokeInput?.addEventListener('input', () => updateStyle('stroke_color', strokeInput.value));
+    posInput?.addEventListener('input', () => {
+        if (posVal) posVal.textContent = posInput.value + '%';
+        updateStyle('position_y', parseInt(posInput.value));
+    });
+}
+
+/**
+ * Sync style controls UI from caption data
+ */
+function _capSyncStyleUI() {
+    const style = EditorState.captionData?.style;
+    if (!style) return;
+    const s = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    s('cap-ed-preset', style.preset || 'bold_popup');
+    s('cap-ed-font', style.font_family || 'Montserrat');
+    s('cap-ed-size', style.font_size || 64);
+    s('cap-ed-color', style.color || '#FFFFFF');
+    s('cap-ed-stroke', style.stroke_color || '#000000');
+    s('cap-ed-position', style.position_y || 75);
+    const posVal = document.getElementById('cap-ed-pos-val');
+    if (posVal) posVal.textContent = (style.position_y || 75) + '%';
+}
+
+/**
+ * Update caption tab UI based on whether data is loaded
+ */
+function _capUpdateUI() {
+    const hasData = !!(EditorState.captionData && EditorState.captionData.captions && EditorState.captionData.captions.length);
+    const noDataEl = document.getElementById('caption-no-data');
+    const infoEl = document.getElementById('caption-info');
+    const styleEl = document.getElementById('caption-style-controls');
+
+    if (noDataEl) noDataEl.style.display = hasData ? 'none' : '';
+    if (infoEl) infoEl.style.display = hasData ? '' : 'none';
+    if (styleEl) styleEl.style.display = hasData ? 'flex' : 'none';
+
+    if (hasData) {
+        const countEl = document.getElementById('caption-info-count');
+        if (countEl) countEl.textContent = EditorState.captionData.captions.length + ' captions';
+    }
+}
+
+/**
+ * Load captions from localStorage (sent by studio)
+ */
+function _loadCaptionsFromStorage() {
+    try {
+        const stored = localStorage.getItem('sts-editor-captions');
+        if (stored) {
+            const data = JSON.parse(stored);
+            _receiveCaptionData(data);
+        }
+    } catch { /* ignore */ }
+}
+
+/**
+ * Receive caption data (from postMessage or localStorage) and update editor state
+ */
+function _receiveCaptionData(captionData) {
+    if (!captionData || !captionData.captions || !captionData.captions.length) return;
+    EditorState.captionData = captionData;
+
+    // Auto-enable captions when data arrives
+    EditorState.captionsEnabled = true;
+    const toggle = document.getElementById('caption-enabled-toggle');
+    if (toggle) toggle.checked = true;
+    if (elements.captionTrackRow) elements.captionTrackRow.style.display = '';
+
+    // Update preview
+    if (EditorState.preview) {
+        EditorState.preview.setCaptions(captionData.captions, captionData.style || {});
+    }
+
+    _capSyncStyleUI();
+    _capUpdateUI();
+    renderCaptionTrack();
 }
 
 /**
@@ -1903,6 +2114,8 @@ function selectScene(sceneId) {
     }
 
     renderSceneProperties();
+    updateEffectsTab();
+    updateTransitionsTab();
 
     // Sync media grid selection
     document.querySelectorAll('.media-grid-item').forEach(item => {
@@ -2402,11 +2615,23 @@ function setupEventListeners() {
     // Play/Pause
     elements.playBtn?.addEventListener('click', togglePlayback);
 
+    // Skip to Start / End
+    document.getElementById('skip-start-btn')?.addEventListener('click', skipToStart);
+    document.getElementById('skip-end-btn')?.addEventListener('click', skipToEnd);
+
     // Loop Toggle
     elements.loopBtn?.addEventListener('click', toggleLoop);
 
     // Volume/Mute Toggle
     elements.volumeBtn?.addEventListener('click', toggleMute);
+
+    // Fullscreen Toggle
+    elements.fullscreenBtn?.addEventListener('click', toggleFullscreen);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && elements.previewPanel?.classList.contains('fullscreen-mode')) {
+            toggleFullscreen();
+        }
+    });
 
     // Undo/Redo buttons
     document.getElementById('undo-btn')?.addEventListener('click', undoEdit);
@@ -2522,6 +2747,13 @@ function setupEventListeners() {
 
     // Prevent accidental window close - warn user about unsaved changes
     setupBeforeUnloadWarning();
+
+    // Caption controls
+    setupCaptionControls();
+
+    // Effects & Transitions tabs
+    setupEffectsTab();
+    setupTransitionsTab();
 }
 
 /**
@@ -2723,6 +2955,67 @@ function togglePlayback() {
     syncAudioPlayback();
 
     updatePlayButton();
+}
+
+/**
+ * Jump to start of timeline
+ */
+function skipToStart() {
+    EditorState.playbackPosition = 0;
+    if (EditorState.preview) EditorState.preview.seek(0);
+    if (EditorState.audioElement) EditorState.audioElement.currentTime = 0;
+    updatePlayhead();
+    updateTimeDisplay();
+}
+
+/**
+ * Jump to end of timeline
+ */
+function skipToEnd() {
+    const totalDuration = EditorState.preview
+        ? EditorState.preview.getTotalDuration()
+        : EditorState.scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
+    if (totalDuration <= 0) return;
+
+    // Pause first if playing
+    if (EditorState.isPlaying) togglePlayback();
+
+    EditorState.playbackPosition = Math.max(0, totalDuration - 0.01);
+    if (EditorState.preview) EditorState.preview.seek(EditorState.playbackPosition);
+    if (EditorState.audioElement) EditorState.audioElement.currentTime = EditorState.playbackPosition;
+    updatePlayhead();
+    updateTimeDisplay();
+}
+
+/**
+ * Toggle fullscreen preview mode
+ */
+function toggleFullscreen() {
+    const panel = elements.previewPanel;
+    if (!panel) return;
+
+    const isFullscreen = panel.classList.toggle('fullscreen-mode');
+
+    if (elements.fullscreenBtn) {
+        if (isFullscreen) {
+            elements.fullscreenBtn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/>
+                </svg>`;
+            elements.fullscreenBtn.classList.add('active');
+        } else {
+            elements.fullscreenBtn.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
+                </svg>`;
+            elements.fullscreenBtn.classList.remove('active');
+        }
+    }
+
+    // Re-render preview at new size
+    if (EditorState.preview) {
+        requestAnimationFrame(() => EditorState.preview.render());
+    }
 }
 
 /**
@@ -3100,7 +3393,8 @@ function getExportData() {
         EditorState.project,
         EditorState.scenes,
         '',
-        audioConfig
+        audioConfig,
+        EditorState.captionsEnabled ? EditorState.captionData : null
     );
 }
 
@@ -3441,6 +3735,180 @@ function setupExportModal() {
     });
 }
 
+// ---- Effects Tab ----
+
+function setupEffectsTab() {
+    const grid = document.getElementById('fx-grid');
+    if (!grid) return;
+
+    // Click on effect cards
+    grid.querySelectorAll('.fx-card[data-fx]').forEach(card => {
+        card.addEventListener('click', () => {
+            const scene = EditorState.selectedScene;
+            if (!scene || scene.type === 'text' || scene.type === 'cta') return;
+
+            const oldValue = scene.visual_fx;
+            const newValue = card.dataset.fx;
+            scene.visual_fx = newValue;
+            recordEdit(`Change effect (Scene ${scene.id})`, scene.id, 'visual_fx', oldValue, newValue);
+            updateEffectsTab();
+            renderSceneProperties();
+        });
+    });
+
+    // Auto-assign all
+    document.getElementById('fx-auto-assign')?.addEventListener('click', () => {
+        if (!EditorState.scenes.length) return;
+
+        const roleEffects = {
+            hook: ['zoom_in'], buildup: ['pan_right', 'pan_left', 'zoom_in'],
+            peak: ['shake', 'zoom_in'], transition: ['fade', 'zoom_out'],
+            final: ['zoom_out'], final_statement: ['zoom_out'], cta: ['static'],
+        };
+        let lastEffect = '';
+
+        EditorState.scenes.forEach(scene => {
+            const old = scene.visual_fx;
+            if (scene.type === 'text' || scene.type === 'cta') {
+                scene.visual_fx = 'static';
+            } else {
+                const role = scene.narrative_role || scene.scene_type || scene.type || 'buildup';
+                const candidates = roleEffects[role] || ['zoom_in', 'pan_right', 'zoom_out'];
+                let fx = candidates[0];
+                for (const c of candidates) { if (c !== lastEffect) { fx = c; break; } }
+                lastEffect = fx;
+                scene.visual_fx = fx;
+            }
+            if (old !== scene.visual_fx) {
+                recordEdit(`Auto effect (Scene ${scene.id})`, scene.id, 'visual_fx', old, scene.visual_fx);
+            }
+        });
+
+        updateEffectsTab();
+        renderSceneProperties();
+        showToast('Effects auto-assigned', 'success');
+    });
+}
+
+function updateEffectsTab() {
+    const noScene = document.getElementById('fx-no-scene');
+    const grid = document.getElementById('fx-grid');
+    if (!noScene || !grid) return;
+
+    const scene = EditorState.selectedScene;
+    const hasScene = scene && scene.type !== 'text' && scene.type !== 'cta';
+
+    noScene.style.display = hasScene ? 'none' : 'flex';
+    grid.style.display = hasScene ? 'flex' : 'none';
+
+    if (!hasScene) return;
+
+    const activeFx = scene.visual_fx || 'static';
+    grid.querySelectorAll('.fx-card[data-fx]').forEach(card => {
+        card.classList.toggle('active', card.dataset.fx === activeFx);
+    });
+}
+
+// ---- Transitions Tab ----
+
+function setupTransitionsTab() {
+    const grid = document.getElementById('tr-grid');
+    if (!grid) return;
+
+    const durationRow = document.getElementById('tr-duration-row');
+    const durationSlider = document.getElementById('tr-duration-slider');
+    const durationValue = document.getElementById('tr-duration-value');
+
+    // Click on transition cards
+    grid.querySelectorAll('.fx-card[data-tr]').forEach(card => {
+        card.addEventListener('click', () => {
+            const scene = EditorState.selectedScene;
+            if (!scene) return;
+
+            const type = card.dataset.tr;
+            const oldTr = scene.transition ? JSON.stringify(scene.transition) : 'none';
+            let duration = 0;
+
+            if (type === 'crossfade') duration = 0.3;
+            else if (type === 'fade_black') duration = 0.4;
+
+            scene.transition = { type, duration };
+            recordEdit(`Change transition (Scene ${scene.id})`, scene.id, 'transition', oldTr, JSON.stringify(scene.transition));
+            updateTransitionsTab();
+        });
+    });
+
+    // Duration slider
+    durationSlider?.addEventListener('input', (e) => {
+        const scene = EditorState.selectedScene;
+        if (!scene || !scene.transition) return;
+
+        const val = parseFloat(e.target.value);
+        scene.transition.duration = val;
+        if (durationValue) durationValue.textContent = val.toFixed(1) + 's';
+    });
+
+    // Auto-assign all
+    document.getElementById('tr-auto-assign')?.addEventListener('click', () => {
+        if (!EditorState.scenes.length) return;
+
+        EditorState.scenes.forEach((scene, i) => {
+            const old = scene.transition ? JSON.stringify(scene.transition) : 'none';
+            if (i >= EditorState.scenes.length - 1) {
+                scene.transition = { type: 'none', duration: 0 };
+            } else {
+                const role = scene.narrative_role || scene.scene_type || scene.type || 'buildup';
+                switch (role) {
+                    case 'hook': case 'peak':
+                        scene.transition = { type: 'cut', duration: 0 }; break;
+                    case 'text': case 'cta':
+                        scene.transition = { type: 'fade_black', duration: 0.4 }; break;
+                    case 'transition': case 'final': case 'final_statement':
+                        scene.transition = { type: 'crossfade', duration: 0.5 }; break;
+                    default:
+                        scene.transition = { type: 'crossfade', duration: 0.3 }; break;
+                }
+            }
+            if (old !== JSON.stringify(scene.transition)) {
+                recordEdit(`Auto transition (Scene ${scene.id})`, scene.id, 'transition', old, JSON.stringify(scene.transition));
+            }
+        });
+
+        updateTransitionsTab();
+        showToast('Transitions auto-assigned', 'success');
+    });
+}
+
+function updateTransitionsTab() {
+    const noScene = document.getElementById('tr-no-scene');
+    const grid = document.getElementById('tr-grid');
+    if (!noScene || !grid) return;
+
+    const scene = EditorState.selectedScene;
+
+    noScene.style.display = scene ? 'none' : 'flex';
+    grid.style.display = scene ? 'flex' : 'none';
+
+    if (!scene) return;
+
+    const tr = scene.transition || { type: 'none', duration: 0 };
+    grid.querySelectorAll('.fx-card[data-tr]').forEach(card => {
+        card.classList.toggle('active', card.dataset.tr === tr.type);
+    });
+
+    // Show/hide duration slider
+    const durationRow = document.getElementById('tr-duration-row');
+    const durationSlider = document.getElementById('tr-duration-slider');
+    const durationValue = document.getElementById('tr-duration-value');
+
+    const hasDuration = tr.type === 'crossfade' || tr.type === 'fade_black';
+    if (durationRow) durationRow.style.display = hasDuration ? 'flex' : 'none';
+    if (hasDuration && durationSlider) {
+        durationSlider.value = tr.duration || 0.3;
+        if (durationValue) durationValue.textContent = (tr.duration || 0.3).toFixed(1) + 's';
+    }
+}
+
 /**
  * Handle keyboard shortcuts
  */
@@ -3481,6 +3949,8 @@ function handleKeyboard(e) {
             el.classList.remove('selected');
         });
         renderSceneProperties();
+        updateEffectsTab();
+        updateTransitionsTab();
     }
 }
 

@@ -11,11 +11,15 @@ window.STATE = {
   alignFile: null,
   alignResult: null,
   alignHistory: [],
+  segmenterResult: null,
+  segmenterAlignment: null,
   scenesSegData: null,
   scenesResult: null,
   assetsSceneData: null,
   assetStatuses: {},
   editorLoaded: false,
+  captionData: null,
+  captionAlignment: null,
 };
 
 // ---- Navigation ----

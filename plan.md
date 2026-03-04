@@ -114,6 +114,7 @@ Each step is **manual** — user clicks through 6 pages, picks outputs, clicks "
 - [ ] Transition presets (#24)
 - [ ] Pipeline dashboard (#4)
 
+
 ### Phase 4: Polish
 - [ ] Auto-captions (#21)
 - [ ] Background music (#23)

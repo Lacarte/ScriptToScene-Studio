@@ -25,6 +25,7 @@ ALIGN_TRASH_DIR = os.path.join(ALIGN_DIR, "TRASH")
 SCENES_DIR = os.path.join(OUTPUT_DIR, "scenes")
 ASSETS_DIR = os.path.join(OUTPUT_DIR, "assets")
 SEGMENTER_DIR = os.path.join(OUTPUT_DIR, "segmenter")
+CAPTIONS_DIR = os.path.join(OUTPUT_DIR, "captions")
 TTS_DIR = os.path.join(OUTPUT_DIR, "tts")
 TTS_TRASH_DIR = os.path.join(TTS_DIR, "TRASH")
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
@@ -35,7 +36,7 @@ BIN_DIR = os.path.join(ROOT_DIR, "bin")
 # Ensure output directories exist
 # ---------------------------------------------------------------------------
 for _d in (LOG_DIR, ALIGN_DIR, ALIGN_TRASH_DIR, SCENES_DIR, ASSETS_DIR,
-           SEGMENTER_DIR, TTS_DIR, TTS_TRASH_DIR, MODELS_DIR):
+           SEGMENTER_DIR, CAPTIONS_DIR, TTS_DIR, TTS_TRASH_DIR, MODELS_DIR):
     os.makedirs(_d, exist_ok=True)
 
 # ---------------------------------------------------------------------------

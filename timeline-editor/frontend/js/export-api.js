@@ -222,7 +222,7 @@ export class ExportAPI {
  * Prepare comprehensive export data for Python backend
  * This includes all information needed to render the final video with FFmpeg
  */
-export function prepareExportData(project, scenes, mediaFolder, audioConfig = null) {
+export function prepareExportData(project, scenes, mediaFolder, audioConfig = null, captionData = null) {
     // Calculate total scenes duration
     const scenesDuration = scenes.reduce((sum, s) => sum + s.duration, 0);
 
@@ -337,12 +337,23 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
                 effect: getEffectConfig(scene.visual_fx || 'static'),
 
                 // Transition to next scene
-                transition: {
+                transition: scene.transition || {
                     type: index < scenes.length - 1 ? 'crossfade' : 'none',
                     duration: index < scenes.length - 1 ? 0.3 : 0
                 }
             };
-        })
+        }),
+
+        // Captions overlay data (shorts-style word captions)
+        captions: captionData ? {
+            style: captionData.style || {},
+            entries: (captionData.captions || []).map(c => ({
+                text: c.text,
+                start: c.start,
+                end: c.end,
+                words: c.words || []
+            }))
+        } : null
     };
 }
 

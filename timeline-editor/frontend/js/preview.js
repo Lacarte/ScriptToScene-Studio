@@ -19,6 +19,10 @@ export class CanvasPreview {
         this.onTimeUpdate = options.onTimeUpdate || (() => { });
         this.onPlaybackEnd = options.onPlaybackEnd || (() => { });
 
+        // Caption overlay
+        this.captions = [];
+        this.captionStyle = {};
+
         // Image cache
         this.imageCache = new Map();
 
@@ -269,6 +273,27 @@ export class CanvasPreview {
         } else {
             this.renderPlaceholder(scene);
         }
+
+        // Transition blending: crossfade into next scene
+        if (scene.transition && scene.transition.type === 'crossfade' && scene.transition.duration > 0) {
+            const transStart = 1.0 - (scene.transition.duration / scene.duration);
+            if (progress > transStart) {
+                const nextScene = this._getNextScene();
+                if (nextScene) {
+                    const nextImg = this.imageCache.get(nextScene.id);
+                    if (nextImg) {
+                        const alpha = (progress - transStart) / (1.0 - transStart);
+                        this.ctx.save();
+                        this.ctx.globalAlpha = alpha;
+                        this.renderImage(nextImg, nextScene.visual_fx || 'static', 0);
+                        this.ctx.restore();
+                    }
+                }
+            }
+        }
+
+        // Caption overlay on top
+        this.renderCaptionOverlay(this.currentTime);
     }
 
     /**
@@ -820,6 +845,126 @@ export class CanvasPreview {
      */
     _handleTouchEnd(e) {
         this._handleMouseUp({ clientX: 0, clientY: 0 });
+    }
+
+    /**
+     * Get the next scene after the current one
+     */
+    _getNextScene() {
+        let accumulated = 0;
+        for (let i = 0; i < this.scenes.length; i++) {
+            if (this.currentTime >= accumulated && this.currentTime < accumulated + this.scenes[i].duration) {
+                return this.scenes[i + 1] || null;
+            }
+            accumulated += this.scenes[i].duration;
+        }
+        return null;
+    }
+
+    // ---- Caption Overlay ----
+
+    /**
+     * Set captions data and style for overlay rendering
+     */
+    setCaptions(captions, style) {
+        this.captions = captions || [];
+        this.captionStyle = style || {};
+    }
+
+    /**
+     * Render active caption on top of scene at the given time
+     */
+    renderCaptionOverlay(time) {
+        if (!this.captions.length) return;
+
+        // Find active caption
+        let active = null;
+        for (const cap of this.captions) {
+            if (time >= cap.start && time < cap.end) { active = cap; break; }
+        }
+        if (!active) return;
+
+        const style = this.captionStyle;
+        const fontFamily = style.font_family || 'Montserrat';
+        const fontWeight = style.font_weight || '800';
+        const fontSize = (style.font_size || 64) * (this.height / 1920);
+        const color = style.color || '#FFFFFF';
+        const strokeColor = style.stroke_color || '#000000';
+        const strokeWidth = (style.stroke_width || 4) * (this.height / 1920);
+        const posY = (style.position_y || 75) / 100;
+        const transform = style.text_transform || 'uppercase';
+        const animation = style.animation || 'pop';
+
+        let text = active.text;
+        if (transform === 'uppercase') text = text.toUpperCase();
+
+        this.ctx.save();
+        this.ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+
+        // Word-wrap: split text into lines that fit within canvas width
+        const maxWidth = this.width * 0.85;
+        const lines = this._wrapText(text, maxWidth);
+        const lineHeight = fontSize * 1.25;
+        const totalHeight = lines.length * lineHeight;
+
+        const x = this.width / 2;
+        const baseY = this.height * posY - (totalHeight - lineHeight) / 2;
+
+        // Pop animation: scale in
+        if (animation === 'pop') {
+            const capProgress = (time - active.start) / (active.end - active.start);
+            const popScale = capProgress < 0.1 ? (capProgress / 0.1) * 0.1 + 0.9 : 1.0;
+            const alpha = capProgress < 0.05 ? capProgress / 0.05 : (capProgress > 0.9 ? (1.0 - capProgress) / 0.1 : 1.0);
+            this.ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+            const cx = this.width / 2;
+            const cy = this.height * posY;
+            this.ctx.translate(cx, cy);
+            this.ctx.scale(popScale, popScale);
+            this.ctx.translate(-cx, -cy);
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+            const ly = baseY + i * lineHeight;
+
+            // Stroke
+            if (strokeColor && strokeColor !== 'none' && strokeWidth > 0) {
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = strokeWidth;
+                this.ctx.lineJoin = 'round';
+                this.ctx.strokeText(lines[i], x, ly);
+            }
+
+            // Fill
+            this.ctx.fillStyle = color;
+            this.ctx.fillText(lines[i], x, ly);
+        }
+
+        this.ctx.restore();
+    }
+
+    /**
+     * Wrap text into lines that fit within maxWidth on the canvas
+     */
+    _wrapText(text, maxWidth) {
+        const words = text.split(' ');
+        if (words.length <= 1) return [text];
+
+        const lines = [];
+        let currentLine = words[0];
+
+        for (let i = 1; i < words.length; i++) {
+            const testLine = currentLine + ' ' + words[i];
+            if (this.ctx.measureText(testLine).width <= maxWidth) {
+                currentLine = testLine;
+            } else {
+                lines.push(currentLine);
+                currentLine = words[i];
+            }
+        }
+        lines.push(currentLine);
+        return lines;
     }
 
     /**

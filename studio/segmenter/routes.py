@@ -96,5 +96,8 @@ def get_segmenter_result(folder):
     json_path = os.path.join(SEGMENTER_DIR, folder, "segmented.json")
     if not os.path.isfile(json_path):
         return jsonify({"error": "Not found"}), 404
-    with open(json_path, "r") as f:
-        return jsonify(json.load(f))
+    try:
+        with open(json_path, "r") as f:
+            return jsonify(json.load(f))
+    except (json.JSONDecodeError, OSError) as e:
+        return jsonify({"error": f"Failed to read segmenter data: {e}"}), 500

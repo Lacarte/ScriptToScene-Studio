@@ -242,17 +242,17 @@
         </svg>
         <span class="nav-label">EDITOR</span>
       </button>
-      <button class="nav-item" onclick="switchPage('settings')" data-page="settings" title="Settings">
+    </div>
+
+    <!-- Bottom sticky: Settings + Collapse -->
+    <div style="border-top:1px solid var(--border);padding:8px 12px;display:flex;flex-direction:column;gap:2px">
+      <button class="nav-item" onclick="switchPage('settings')" data-page="settings" title="Settings" style="margin:0;width:100%">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
         </svg>
         <span class="nav-label">SETTINGS</span>
       </button>
-    </div>
-
-    <!-- Sidebar collapse toggle -->
-    <div style="border-top:1px solid var(--border);padding:12px">
       <button id="sidebar-toggle" onclick="toggleSidebar()" class="nav-item" style="margin:0;width:100%">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24" style="transition:transform 0.3s">
@@ -412,6 +412,30 @@
             </div>
           </div>
           <div id="tts-voice-grid" style="display:none;margin-top:10px"></div>
+        </section>
+
+        <!-- Multi-Voice Mode Toggle -->
+        <section class="card p-5 mb-4" id="tts-multivoice-section">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Voice Mode</label>
+            <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden">
+              <button id="tts-mode-single" onclick="ttsSetVoiceMode('single')" class="text-xs px-3 py-1.5 font-medium"
+                style="background:none;border:none;cursor:pointer;color:var(--accent)">Single Voice</button>
+              <button id="tts-mode-multi" onclick="ttsSetVoiceMode('multi')" class="text-xs px-3 py-1.5 font-medium"
+                style="background:none;border:none;cursor:pointer;color:var(--text-muted);border-left:1px solid var(--border)">Multi-Voice</button>
+            </div>
+          </div>
+          <!-- Multi-voice segment list (hidden by default) -->
+          <div id="tts-mv-panel" style="display:none;margin-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span class="text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Segments</span>
+              <div style="display:flex;gap:4px">
+                <button onclick="ttsAutoDetectRoles()" class="action-btn" style="padding:3px 8px;font-size:9px" title="Split text into narrator/dialogue segments">Auto-detect</button>
+                <button onclick="ttsAddMvSegment()" class="action-btn" style="padding:3px 8px;font-size:9px" title="Add segment">+ Add</button>
+              </div>
+            </div>
+            <div id="tts-mv-segments"></div>
+          </div>
         </section>
 
         <!-- Text Input -->

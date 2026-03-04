@@ -391,6 +391,103 @@
     text-align: right;
 }
 
+/* ---- Export Profile Selector ---- */
+.export-profile-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 4px 0;
+}
+
+.export-profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 8px 12px;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm, 8px);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: var(--text-secondary);
+}
+
+.export-profile-card:hover {
+    background: var(--bg-surface-hover);
+    border-color: var(--border-hover);
+    color: var(--text);
+}
+
+.export-profile-card.active {
+    background: rgba(78, 205, 196, 0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.ep-icon { opacity: 0.7; }
+.export-profile-card.active .ep-icon { opacity: 1; }
+
+.ep-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.ep-desc {
+    font-size: 0.6rem;
+    font-weight: 500;
+    opacity: 0.5;
+    font-family: var(--font-mono);
+}
+
+/* ---- Background Music Track ---- */
+.bgmusic-placeholder {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    opacity: 0.25;
+    padding: 0 8px;
+    font-style: italic;
+}
+
+.bgmusic-clip {
+    position: absolute;
+    height: calc(100% - 6px);
+    top: 3px;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    background: rgba(167, 139, 250, 0.12);
+    border: 1px solid rgba(167, 139, 250, 0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.bgmusic-clip-label {
+    font-size: 0.52rem;
+    font-family: var(--font-mono);
+    color: rgba(167, 139, 250, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bgmusic-remove {
+    background: none;
+    border: none;
+    color: rgba(167, 139, 250, 0.5);
+    cursor: pointer;
+    padding: 2px;
+    font-size: 12px;
+    line-height: 1;
+    margin-left: auto;
+}
+
+.bgmusic-remove:hover { color: var(--coral); }
+
 /* ---- Media Grid (CapCut-style thumbnails) ---- */
 .media-grid {
     display: grid;
@@ -1579,9 +1676,10 @@
     border-top: 1px solid rgba(255, 255, 255, 0.03);
 }
 
-/* Track header — narrow icon strip */
+/* Track header — narrow icon strip, pinned left */
 .track-header {
     width: 36px;
+    min-width: 36px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -1590,6 +1688,10 @@
     gap: 2px;
     padding: 4px 0;
     color: rgba(255, 255, 255, 0.3);
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: var(--bg-surface, #141522);
 }
 
 .track-header svg {

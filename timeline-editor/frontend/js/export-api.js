@@ -3,25 +3,68 @@
  * Handles communication with the Python backend for video export
  */
 
-const DEFAULT_API_URL = 'http://localhost:5000';
+import { backendLog } from './utils.js';
+
+const DEFAULT_API_URL = window.location.origin;
+
+// ---- Export Profile Presets ----
+export const EXPORT_PROFILES = {
+    yt_shorts: {
+        id: 'yt_shorts', name: 'YouTube Shorts',
+        icon: 'yt_shorts',
+        width: 1080, height: 1920, fps: 30, crf: 23,
+        codec: 'libx264', pixel_format: 'yuv420p', preset: 'medium',
+        desc: '9:16 · 1080×1920'
+    },
+    tiktok: {
+        id: 'tiktok', name: 'TikTok',
+        icon: 'tiktok',
+        width: 1080, height: 1920, fps: 30, crf: 22,
+        codec: 'libx264', pixel_format: 'yuv420p', preset: 'medium',
+        desc: '9:16 · 1080×1920'
+    },
+    reels: {
+        id: 'reels', name: 'Reels',
+        icon: 'reels',
+        width: 1080, height: 1920, fps: 30, crf: 23,
+        codec: 'libx264', pixel_format: 'yuv420p', preset: 'medium',
+        desc: '9:16 · 1080×1920'
+    },
+    yt_landscape: {
+        id: 'yt_landscape', name: 'YouTube',
+        icon: 'youtube',
+        width: 1920, height: 1080, fps: 30, crf: 22,
+        codec: 'libx264', pixel_format: 'yuv420p', preset: 'medium',
+        desc: '16:9 · 1920×1080'
+    },
+    square: {
+        id: 'square', name: 'Square',
+        icon: 'square',
+        width: 1080, height: 1080, fps: 30, crf: 23,
+        codec: 'libx264', pixel_format: 'yuv420p', preset: 'medium',
+        desc: '1:1 · 1080×1080'
+    }
+};
 
 export class ExportAPI {
     constructor(baseUrl = DEFAULT_API_URL) {
         this.baseUrl = baseUrl;
         this.currentJobId = null;
         this.pollInterval = null;
+        console.log('[ExportAPI] Initialized with baseUrl:', this.baseUrl);
     }
 
     /**
      * Check if the backend server is available and FFmpeg is installed
-     * @returns {Object} { available: boolean, ffmpeg: boolean, error: string|null }
      */
     async checkHealth() {
+        const url = `${this.baseUrl}/api/health`;
+        console.log('[ExportAPI] Health check:', url);
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-            const response = await fetch(`${this.baseUrl}/api/health`, {
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
                 signal: controller.signal
@@ -30,10 +73,13 @@ export class ExportAPI {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                return { available: false, ffmpeg: false, error: 'Server returned error' };
+                console.error('[ExportAPI] Health check failed: HTTP', response.status);
+                return { available: false, ffmpeg: false, error: `Server returned ${response.status}` };
             }
 
             const data = await response.json();
+            console.log('[ExportAPI] Health check response:', data);
+            backendLog.info('Health check OK', `ffmpeg=${data.ffmpeg} alignment=${data.alignment}`);
             return {
                 available: true,
                 ffmpeg: data.ffmpeg === true,
@@ -41,25 +87,34 @@ export class ExportAPI {
             };
         } catch (error) {
             if (error.name === 'AbortError') {
+                console.error('[ExportAPI] Health check timed out');
                 return { available: false, ffmpeg: false, error: 'Server timeout' };
             }
-            console.error('Health check failed:', error);
+            console.error('[ExportAPI] Health check error:', error);
             return { available: false, ffmpeg: false, error: error.message };
         }
     }
 
     /**
      * Start a video export job
-     * @param {Object} exportData - Export configuration
-     * @param {Function} onProgress - Progress callback (progress, message)
-     * @param {Function} onComplete - Completion callback (success, result)
      */
     async startExport(exportData, onProgress, onComplete) {
+        console.log('[ExportAPI] Starting export...');
+        console.log('[ExportAPI] Project:', exportData.project_id);
+        console.log('[ExportAPI] Scenes:', exportData.scenes?.length);
+        console.log('[ExportAPI] Output:', exportData.output);
+        console.log('[ExportAPI] Audio:', exportData.audio ? { path: exportData.audio.path, vol: exportData.audio.volume } : 'none');
+        console.log('[ExportAPI] BgMusic:', exportData.bgMusic ? { path: exportData.bgMusic.path, vol: exportData.bgMusic.volume } : 'none');
+        console.log('[ExportAPI] Captions:', exportData.captions?.entries?.length || 0, 'entries');
+        console.log('[ExportAPI] Full export data:', JSON.stringify(exportData, null, 2).substring(0, 2000));
+
         try {
             // Check server health first
             const health = await this.checkHealth();
+            console.log('[ExportAPI] Health result:', health);
 
             if (!health.available) {
+                console.error('[ExportAPI] Server not available:', health.error);
                 onComplete(false, {
                     error: `Backend server not available. ${health.error || 'Please run run.bat to start the server.'}`
                 });
@@ -67,35 +122,53 @@ export class ExportAPI {
             }
 
             if (!health.ffmpeg) {
+                console.error('[ExportAPI] FFmpeg not found on server');
                 onComplete(false, {
-                    error: 'FFmpeg not found. Please install FFmpeg to backend/bin/ folder.'
+                    error: 'FFmpeg not found. Please install FFmpeg to bin/ folder.'
                 });
                 return null;
             }
 
             onProgress(0, 'Starting export...');
 
-            const response = await fetch(`${this.baseUrl}/api/export`, {
+            const url = `${this.baseUrl}/api/export`;
+            console.log('[ExportAPI] POST', url, '(payload size:', JSON.stringify(exportData).length, 'bytes)');
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(exportData)
             });
 
+            console.log('[ExportAPI] Response status:', response.status, response.statusText);
+
             if (!response.ok) {
-                const error = await response.json();
-                onComplete(false, { error: error.error || 'Export failed to start' });
+                let errorMsg = 'Export failed to start';
+                try {
+                    const error = await response.json();
+                    errorMsg = error.error || errorMsg;
+                    console.error('[ExportAPI] Server error response:', error);
+                } catch (parseErr) {
+                    const text = await response.text();
+                    console.error('[ExportAPI] Non-JSON error response:', text.substring(0, 500));
+                    errorMsg = `Server returned ${response.status}: ${text.substring(0, 100)}`;
+                }
+                onComplete(false, { error: errorMsg });
                 return null;
             }
 
             const result = await response.json();
             this.currentJobId = result.job_id;
+            console.log('[ExportAPI] Export job created:', result);
+            backendLog.info('Export job created', `job=${result.job_id} scenes=${exportData.scenes?.length}`);
 
             // Start polling for status
             this.startPolling(onProgress, onComplete);
 
             return result.job_id;
         } catch (error) {
-            console.error('Export error:', error);
+            console.error('[ExportAPI] Export start exception:', error);
+            backendLog.error('Export start exception', error.message);
             onComplete(false, { error: error.message });
             return null;
         }
@@ -109,45 +182,50 @@ export class ExportAPI {
             clearInterval(this.pollInterval);
         }
 
-        // Track consecutive failures for resilience
+        console.log('[ExportAPI] Starting status polling for job:', this.currentJobId);
+
         let consecutiveFailures = 0;
         const maxFailures = 5;
+        let pollCount = 0;
 
         const poll = async () => {
+            pollCount++;
             const status = await this.getStatus();
 
             if (!status) {
                 consecutiveFailures++;
-                console.warn(`Status check failed (${consecutiveFailures}/${maxFailures})`);
+                console.warn(`[ExportAPI] Poll #${pollCount}: status check failed (${consecutiveFailures}/${maxFailures})`);
 
                 if (consecutiveFailures >= maxFailures) {
+                    console.error('[ExportAPI] Too many failures, stopping poll');
                     this.stopPolling();
                     onComplete(false, { error: 'Lost connection to server. Please check if the backend is running.' });
                 }
                 return;
             }
 
-            // Reset failure counter on success
             consecutiveFailures = 0;
+            console.log(`[ExportAPI] Poll #${pollCount}: ${status.status} ${status.progress}% - ${status.message}`);
 
             onProgress(status.progress, status.message);
 
             if (status.status === 'completed') {
+                console.log('[ExportAPI] Export completed!');
+                backendLog.info('Export completed', `job=${this.currentJobId}`);
                 this.stopPolling();
                 onComplete(true, {
                     jobId: this.currentJobId,
                     downloadUrl: `${this.baseUrl}/api/export/${this.currentJobId}/download`
                 });
             } else if (status.status === 'failed') {
+                console.error('[ExportAPI] Export failed:', status.error || status.message);
+                backendLog.error('Export failed', status.error || status.message);
                 this.stopPolling();
                 onComplete(false, { error: status.error || status.message });
             }
         };
 
-        // Initial poll immediately
         poll();
-
-        // Then poll every 2 seconds (less aggressive)
         this.pollInterval = setInterval(poll, 2000);
     }
 
@@ -156,6 +234,7 @@ export class ExportAPI {
      */
     stopPolling() {
         if (this.pollInterval) {
+            console.log('[ExportAPI] Stopping status polling');
             clearInterval(this.pollInterval);
             this.pollInterval = null;
         }
@@ -169,7 +248,7 @@ export class ExportAPI {
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
             const response = await fetch(
                 `${this.baseUrl}/api/export/${this.currentJobId}/status`,
@@ -178,13 +257,16 @@ export class ExportAPI {
 
             clearTimeout(timeoutId);
 
-            if (!response.ok) return null;
+            if (!response.ok) {
+                console.warn('[ExportAPI] Status response:', response.status);
+                return null;
+            }
             return await response.json();
         } catch (error) {
             if (error.name === 'AbortError') {
-                console.warn('Status check timed out');
+                console.warn('[ExportAPI] Status check timed out');
             } else {
-                console.error('Status check failed:', error);
+                console.error('[ExportAPI] Status check error:', error);
             }
             return null;
         }
@@ -198,12 +280,14 @@ export class ExportAPI {
 
         if (!this.currentJobId) return;
 
+        console.log('[ExportAPI] Cancelling export:', this.currentJobId);
         try {
-            await fetch(`${this.baseUrl}/api/export/${this.currentJobId}`, {
+            const resp = await fetch(`${this.baseUrl}/api/export/${this.currentJobId}`, {
                 method: 'DELETE'
             });
+            console.log('[ExportAPI] Cancel response:', resp.status);
         } catch (error) {
-            console.error('Cancel failed:', error);
+            console.error('[ExportAPI] Cancel failed:', error);
         }
 
         this.currentJobId = null;
@@ -214,15 +298,23 @@ export class ExportAPI {
      */
     downloadExport(jobId) {
         const url = `${this.baseUrl}/api/export/${jobId || this.currentJobId}/download`;
+        console.log('[ExportAPI] Downloading:', url);
         window.open(url, '_blank');
     }
 }
 
 /**
  * Prepare comprehensive export data for Python backend
- * This includes all information needed to render the final video with FFmpeg
  */
-export function prepareExportData(project, scenes, mediaFolder, audioConfig = null, captionData = null) {
+export function prepareExportData(project, scenes, mediaFolder, audioConfig = null, captionData = null, profile = null, bgMusicConfig = null) {
+    console.log('[prepareExportData] Building export payload...');
+    console.log('[prepareExportData] Project:', project?.id, project?.name);
+    console.log('[prepareExportData] Scenes:', scenes?.length);
+    console.log('[prepareExportData] Profile:', profile?.id || 'default (yt_shorts)');
+    console.log('[prepareExportData] Audio:', audioConfig ? audioConfig.file : 'none');
+    console.log('[prepareExportData] Captions:', captionData ? (captionData.captions?.length || 0) + ' entries' : 'none');
+    console.log('[prepareExportData] BgMusic:', bgMusicConfig ? bgMusicConfig.file : 'none');
+
     // Calculate total scenes duration
     const scenesDuration = scenes.reduce((sum, s) => sum + s.duration, 0);
 
@@ -230,7 +322,12 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
     const audioDuration = audioConfig?.trimmedDuration || audioConfig?.duration || 0;
     const totalDuration = Math.max(scenesDuration, audioDuration);
 
-    return {
+    console.log('[prepareExportData] Duration: scenes=', scenesDuration, 'audio=', audioDuration, 'total=', totalDuration);
+
+    // Use profile settings or defaults
+    const p = profile || EXPORT_PROFILES.yt_shorts;
+
+    const data = {
         // Project identification
         project_id: project.id,
         project_name: project.name,
@@ -241,26 +338,27 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
         // Output video settings
         output: {
             resolution: {
-                width: 1080,
-                height: 1920
+                width: p.width,
+                height: p.height
             },
-            fps: 30,
-            codec: 'libx264',
-            pixel_format: 'yuv420p',
-            preset: 'medium',  // FFmpeg preset: ultrafast, fast, medium, slow
-            crf: 23,           // Quality: 0-51, lower = better quality
-            format: 'mp4'
+            fps: p.fps,
+            codec: p.codec,
+            pixel_format: p.pixel_format,
+            preset: p.preset,
+            crf: p.crf,
+            format: 'mp4',
+            profile_id: p.id
         },
 
         // Audio configuration
         audio: audioConfig ? {
             file: audioConfig.file,
-            path: audioConfig.path,
+            path: audioConfig.path && audioConfig.path.startsWith('/output/') ? '..' + audioConfig.path : audioConfig.path,
             original_duration: audioConfig.duration,
             trimmed_duration: audioConfig.trimmedDuration || audioConfig.duration,
             volume: audioConfig.volume || 1.0,
             start_offset: audioConfig.start_offset || 0,
-            fade_out: 0.5  // Fade out audio at end
+            fade_out: 0.5
         } : null,
 
         // Timeline metadata
@@ -273,7 +371,6 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
 
         // Scene-by-scene export data
         scenes: scenes.map((scene, index) => {
-            // Calculate start time based on previous scenes
             let startTime = 0;
             for (let i = 0; i < index; i++) {
                 startTime += scenes[i].duration;
@@ -282,69 +379,57 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
             const mediaType = getMediaType(scene);
             const isTextScene = mediaType === 'text';
 
-            return {
-                // Scene identification
+            const sceneData = {
                 id: scene.id,
                 index: index,
                 type: scene.type,
 
-                // Timing
                 start_time: startTime,
                 duration: scene.duration,
                 end_time: startTime + scene.duration,
 
-                // Media source
                 media: {
                     type: mediaType,
-                    // For image scenes: filename in working-assets/{project_id}/
                     file: isTextScene ? null : (scene.image || `${index + 1}.jpg`),
-                    // Full path for backend to use
-                    path: isTextScene ? null : `working-assets/${project.id}/${scene.image || `${index + 1}.jpg`}`
+                    path: isTextScene ? null : (scene.mediaUrl && scene.mediaUrl.startsWith('/output/') ? '..' + scene.mediaUrl : `working-assets/${project.id}/${scene.image || `${index + 1}.jpg`}`)
                 },
 
-                // Text content (for text-type scenes)
                 text: isTextScene ? {
                     content: scene.text_content || scene.script || '',
                     font_family: scene.font_family || 'Inter',
                     font_size: scene.text_size || 48,
                     font_style: scene.font_style || 'bold',
-                    // Text color: 'white' or 'black' (determines background)
                     color: scene.text_color || 'white',
                     color_hex: (scene.text_color || 'white') === 'white' ? '#ffffff' : '#000000',
-                    // Text position (percentage 0-100, null = use alignment)
                     position: {
-                        x: scene.text_x ?? null,  // null means use text_align
-                        y: scene.text_y ?? null   // null means use vertical_align
+                        x: scene.text_x ?? null,
+                        y: scene.text_y ?? null
                     },
-                    // Text alignment (used when position is null)
                     text_align: scene.text_align || 'center',
                     vertical_align: scene.vertical_align || 'center',
-                    // Background options
                     background: {
-                        // Use image background if available
-                        // wbg.png = background for white text (dark/image bg)
-                        // bbg.png = background for black text (light/image bg)
-                        image: (scene.text_color || 'white') === 'white' ? 'wbg.png' : 'bbg.png',
-                        image_path: `working-assets/${project.id}/${(scene.text_color || 'white') === 'white' ? 'wbg.png' : 'bbg.png'}`,
-                        // Fallback solid color if no image
+                        image: null,
+                        image_path: null,
                         fallback_color: (scene.text_color || 'white') === 'white' ? '#000000' : '#ffffff'
                     },
-                    fade_in: 0.25,   // Fade in during first 25% of duration
-                    fade_out: 0.25  // Fade out during last 25% of duration
+                    fade_in: 0.25,
+                    fade_out: 0.25
                 } : null,
 
-                // Visual effect
                 effect: getEffectConfig(scene.visual_fx || 'static'),
 
-                // Transition to next scene
                 transition: scene.transition || {
                     type: index < scenes.length - 1 ? 'crossfade' : 'none',
                     duration: index < scenes.length - 1 ? 0.3 : 0
                 }
             };
+
+            console.log(`[prepareExportData] Scene ${index + 1}: type=${mediaType} dur=${scene.duration}s fx=${scene.visual_fx || 'static'} media=${sceneData.media.path || 'text'}`);
+
+            return sceneData;
         }),
 
-        // Captions overlay data (shorts-style word captions)
+        // Captions overlay data
         captions: captionData ? {
             style: captionData.style || {},
             entries: (captionData.captions || []).map(c => ({
@@ -353,8 +438,23 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
                 end: c.end,
                 words: c.words || []
             }))
+        } : null,
+
+        // Background music layer
+        bgMusic: bgMusicConfig ? {
+            file: bgMusicConfig.file,
+            path: bgMusicConfig.path,
+            volume: bgMusicConfig.volume ?? 0.15,
+            ducking_enabled: bgMusicConfig.duckingEnabled ?? true,
+            ducking_level: bgMusicConfig.duckingLevel ?? 0.08,
+            fade_in: bgMusicConfig.fadeIn ?? 2.0,
+            fade_out: bgMusicConfig.fadeOut ?? 3.0,
+            loop: bgMusicConfig.loop ?? true
         } : null
     };
+
+    console.log('[prepareExportData] Export data ready. Total payload keys:', Object.keys(data));
+    return data;
 }
 
 /**
@@ -371,7 +471,7 @@ function getEffectConfig(effectType) {
             description: 'Ken Burns zoom in effect',
             start_scale: 1.0,
             end_scale: 1.2,
-            anchor: 'center',  // center, top, bottom, left, right
+            anchor: 'center',
             easing: 'ease_in_out'
         },
         'zoom_out': {
@@ -385,7 +485,7 @@ function getEffectConfig(effectType) {
         'pan_left': {
             type: 'pan_left',
             description: 'Horizontal pan from right to left',
-            pan_amount: 0.2,  // 20% of image width
+            pan_amount: 0.2,
             easing: 'linear'
         },
         'pan_right': {
@@ -414,8 +514,8 @@ function getEffectConfig(effectType) {
         'shake': {
             type: 'shake',
             description: 'Camera shake effect',
-            intensity: 5,      // Pixels of movement
-            frequency: 20      // Shakes per second
+            intensity: 5,
+            frequency: 20
         }
     };
 
@@ -426,12 +526,10 @@ function getEffectConfig(effectType) {
  * Get media type for a scene
  */
 function getMediaType(scene) {
-    // Text scenes don't have media files
     if (scene.type === 'text' || scene.type === 'cta') {
         return 'text';
     }
 
-    // Check file extension if image is specified
     if (scene.image) {
         const ext = scene.image.split('.').pop().toLowerCase();
         if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) {
@@ -449,17 +547,16 @@ export function validateExportData(exportData) {
     const errors = [];
     const warnings = [];
 
-    // Check project ID
+    console.log('[validateExportData] Validating export data...');
+
     if (!exportData.project_id) {
         errors.push('Missing project ID');
     }
 
-    // Check scenes
     if (!exportData.scenes || exportData.scenes.length === 0) {
         errors.push('No scenes to export');
     }
 
-    // Validate each scene
     exportData.scenes?.forEach((scene, index) => {
         if (scene.duration <= 0) {
             errors.push(`Scene ${index + 1}: Invalid duration (${scene.duration}s)`);
@@ -470,26 +567,25 @@ export function validateExportData(exportData) {
         }
 
         if (scene.media.type === 'text' && !scene.text?.content) {
-            // Only warn if it's explicitly a text type, not CTA (which may just show background)
             if (scene.type === 'text') {
                 warnings.push(`Scene ${index + 1}: Text scene has no script content (will show background only)`);
             }
         }
     });
 
-    // Check audio
     if (exportData.audio && !exportData.audio.path) {
         warnings.push('Audio specified but no file path');
     }
 
-    // Check total duration
     if (exportData.timeline.total_duration <= 0) {
         errors.push('Total duration must be greater than 0');
     }
 
-    return {
-        valid: errors.length === 0,
-        errors,
-        warnings
-    };
+    const result = { valid: errors.length === 0, errors, warnings };
+    console.log('[validateExportData] Result:', result.valid ? 'VALID' : 'INVALID',
+        '| errors:', errors.length, '| warnings:', warnings.length);
+    if (errors.length) console.error('[validateExportData] Errors:', errors);
+    if (warnings.length) console.warn('[validateExportData] Warnings:', warnings);
+
+    return result;
 }

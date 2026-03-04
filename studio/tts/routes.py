@@ -1071,6 +1071,189 @@ def convert_to_mp3(filename):
     )
 
 
+# --- Multi-voice generation ---
+
+def _background_multivoice_generate(job_id, segments, speed, gap_ms, prompt, basename):
+    """Generate audio with different voices per segment, then concatenate."""
+    with generation_jobs_lock:
+        job = generation_jobs[job_id]
+    q = job["queue"]
+    try:
+        kokoro = load_model()
+        audio_chunks = []
+        total = len(segments)
+        total_inference = 0.0
+        voices_used = set()
+
+        for i, seg in enumerate(segments):
+            if job.get("abort"):
+                q.put({"phase": "aborted"})
+                with generation_jobs_lock:
+                    job["status"] = "aborted"
+                return
+
+            seg_text = seg.get("text", "").strip()
+            seg_voice = seg.get("voice", "af_heart")
+            seg_speed = max(0.5, min(2.0, float(seg.get("speed", speed))))
+            seg_blend = seg.get("blend")
+
+            if not seg_text:
+                continue
+
+            voices_used.add(seg_voice)
+            q.put({"phase": "generating", "chunk": i + 1, "total": total,
+                    "sentence": seg_text[:60], "voice": seg_voice})
+
+            # Resolve voice param (blend or single)
+            voice_param = seg_voice
+            if seg_blend:
+                va = seg_blend.get("voice_a", "")
+                vb = seg_blend.get("voice_b", "")
+                ratio = max(0.0, min(1.0, float(seg_blend.get("ratio", 0.5))))
+                method = seg_blend.get("method", "slerp")
+                if va in VOICES and vb in VOICES:
+                    voice_param = _blend_voices(kokoro, va, vb, ratio, method)
+
+            lang = _voice_to_lang(seg_voice)
+            phonemes, is_ph = _phonemize_with_misaki(seg_text, lang)
+            start = time.perf_counter()
+            with generation_inference_lock:
+                chunk_audio, _sr = kokoro.create(
+                    text=phonemes, voice=voice_param, speed=seg_speed,
+                    lang=lang, is_phonemes=is_ph,
+                )
+            elapsed = time.perf_counter() - start
+            total_inference += elapsed
+            audio_chunks.append(chunk_audio)
+
+        if not audio_chunks:
+            q.put({"phase": "error", "message": "No audio generated"})
+            with generation_jobs_lock:
+                job["status"] = "error"
+            return
+
+        q.put({"phase": "concatenating"})
+        audio = concatenate_chunks(audio_chunks, sample_rate=24000, gap_ms=gap_ms, crossfade_ms=20)
+        audio = pad_audio(audio, sample_rate=24000)
+
+        job_dir = _tts_job_dir(basename)
+        os.makedirs(job_dir, exist_ok=True)
+        wav_path = os.path.join(job_dir, basename + ".wav")
+        sf.write(wav_path, audio, 24000)
+
+        q.put({"phase": "normalizing"})
+        run_loudnorm(wav_path)
+
+        info = sf.info(wav_path)
+        duration_generated = info.duration
+        rtf = total_inference / duration_generated if duration_generated > 0 else 0
+        logger.success("Multi-voice  {:.1f}s audio in {:.2f}s | RTF {:.2f} | {} segments",
+                       duration_generated, total_inference, rtf, total)
+
+        clean_prompt = re.sub(r'[\[\]]', '', prompt).strip()
+        metadata = {
+            "filename": basename + ".wav",
+            "folder": basename,
+            "prompt": clean_prompt,
+            "model": "kokoro-v1.0",
+            "model_id": "kokoro",
+            "voice": f"multi-voice ({len(voices_used)} voices)",
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "inference_time": round(total_inference, 3),
+            "rtf": round(rtf, 4),
+            "duration_seconds": round(duration_generated, 2),
+            "sample_rate": 24000,
+            "speed": speed,
+            "max_silence_ms": gap_ms,
+            "words": len(clean_prompt.split()),
+            "approx_tokens": int(len(clean_prompt.split()) * 1.3),
+            "chunked": True,
+            "num_chunks": total,
+            "multi_voice": True,
+            "voices_used": sorted(voices_used),
+            "segments": [{"voice": s.get("voice"), "text": s.get("text", "")[:50]} for s in segments],
+        }
+
+        json_path = os.path.join(job_dir, basename + ".json")
+        with open(json_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        q.put({"phase": "done", "metadata": metadata})
+        with generation_jobs_lock:
+            job["status"] = "done"
+            job["metadata"] = metadata
+
+    except Exception as e:
+        logger.exception("Multi-voice generation failed")
+        q.put({"phase": "error", "message": str(e)})
+        with generation_jobs_lock:
+            job["status"] = "error"
+
+
+@tts_bp.route("/api/tts/generate-multivoice", methods=["POST"])
+def generate_multivoice():
+    """Generate audio with different voices per segment.
+
+    Accepts: {
+        segments: [{text, voice, speed?, blend?}, ...],
+        gap_ms: int (default 80),
+        prompt: str (original full text for metadata)
+    }
+    Returns: {job_id, status: "chunking", total_chunks} (202)
+    Progress via /api/tts/generate-progress/<job_id>
+    """
+    data = request.get_json(force=True)
+    segments = data.get("segments", [])
+    gap_ms = max(0, min(2000, int(data.get("gap_ms", 80))))
+    prompt = data.get("prompt", "")
+    speed = max(0.5, min(2.0, float(data.get("speed", 1.0))))
+
+    if not segments:
+        return jsonify({"error": "No segments provided"}), 400
+
+    # Validate voices
+    for i, seg in enumerate(segments):
+        v = seg.get("voice", "")
+        if v and v not in VOICES:
+            return jsonify({"error": f"Unknown voice in segment {i + 1}: {v}"}), 400
+
+    if _stream_active.is_set():
+        return jsonify({"error": "A stream is already in progress."}), 429
+    with generation_jobs_lock:
+        for job in generation_jobs.values():
+            if job.get("status") == "running":
+                return jsonify({"error": "A generation is already in progress."}), 429
+
+    if not _model_files_present():
+        return jsonify({"error": "Model not downloaded. Download it first."}), 400
+
+    _cleanup_old_jobs()
+    job_id = uuid.uuid4().hex[:12]
+    basename = generate_filename(prompt or "multivoice")
+
+    with generation_jobs_lock:
+        generation_jobs[job_id] = {
+            "queue": Queue(),
+            "status": "running",
+            "metadata": None,
+            "created": time.time(),
+            "abort": False,
+        }
+
+    t = threading.Thread(
+        target=_background_multivoice_generate,
+        args=(job_id, segments, speed, gap_ms, prompt, basename),
+        daemon=True,
+    )
+    t.start()
+
+    return jsonify({
+        "job_id": job_id,
+        "status": "chunking",
+        "total_chunks": len(segments),
+    }), 202
+
+
 # --- Serve TTS audio files ---
 @tts_bp.route("/output/tts/<path:filename>")
 def serve_audio(filename):

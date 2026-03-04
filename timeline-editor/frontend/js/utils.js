@@ -163,3 +163,50 @@ export function showToast(message, type = 'info', delay = 0) {
         setTimeout(() => toast.remove(), 300);
     }, 3000 + staggerDelay);
 }
+
+
+// ---------------------------------------------------------------------------
+// Backend log relay — sends frontend logs to /api/log for unified logging
+// ---------------------------------------------------------------------------
+const _logQueue = [];
+let _logFlushTimer = null;
+
+function _flushLogQueue() {
+    if (!_logQueue.length) return;
+    const batch = _logQueue.splice(0, 20);
+    for (const entry of batch) {
+        fetch('/api/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(entry)
+        }).catch(() => {}); // fire-and-forget
+    }
+}
+
+function _queueLog(level, source, message, context) {
+    _logQueue.push({ level, source, message, context: context || '' });
+    clearTimeout(_logFlushTimer);
+    _logFlushTimer = setTimeout(_flushLogQueue, 300);
+}
+
+export const backendLog = {
+    info:    (msg, ctx) => { console.log(`[${msg}]`, ctx || '');   _queueLog('info',    'editor', msg, ctx); },
+    warn:    (msg, ctx) => { console.warn(`[${msg}]`, ctx || '');  _queueLog('warning', 'editor', msg, ctx); },
+    error:   (msg, ctx) => { console.error(`[${msg}]`, ctx || ''); _queueLog('error',   'editor', msg, ctx); },
+    debug:   (msg, ctx) => { console.debug(`[${msg}]`, ctx || ''); _queueLog('debug',   'editor', msg, ctx); },
+};
+
+// ---------------------------------------------------------------------------
+// Global error handlers — catch all uncaught errors and relay to backend
+// ---------------------------------------------------------------------------
+window.addEventListener('error', (event) => {
+    const loc = event.filename ? `${event.filename.split('/').pop()}:${event.lineno}:${event.colno}` : 'unknown';
+    _queueLog('error', 'frontend', `Uncaught: ${event.message}`, loc);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason;
+    const msg = reason instanceof Error ? `${reason.message}` : String(reason);
+    const stack = reason?.stack ? reason.stack.split('\n').slice(0, 3).join(' | ') : '';
+    _queueLog('error', 'frontend', `Unhandled rejection: ${msg}`, stack);
+});

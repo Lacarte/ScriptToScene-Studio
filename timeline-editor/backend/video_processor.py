@@ -9,6 +9,7 @@ import tempfile
 import shutil
 from PIL import Image, ImageDraw, ImageFont
 import platform
+from loguru import logger
 
 # Check if ffmpeg-python is available, fallback to subprocess
 try:
@@ -16,7 +17,26 @@ try:
     USE_FFMPEG_PYTHON = True
 except ImportError:
     USE_FFMPEG_PYTHON = False
-    print("Warning: ffmpeg-python not found, using subprocess fallback")
+    logger.warning("ffmpeg-python not installed, using subprocess fallback")
+
+
+def _find_ffmpeg():
+    """Locate ffmpeg binary: project bin/ first, then system PATH."""
+    from config import BIN_DIR
+    exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    local = os.path.join(BIN_DIR, exe)
+    if os.path.isfile(local):
+        logger.info("FFmpeg found in bin/: {}", local)
+        return local
+    found = shutil.which("ffmpeg")
+    if found:
+        logger.info("FFmpeg found on PATH: {}", found)
+        return found
+    logger.error("FFmpeg not found in bin/ or PATH")
+    return None
+
+
+FFMPEG_BIN = _find_ffmpeg() or "ffmpeg"
 
 
 # Font family mapping: frontend name -> system font paths by OS
@@ -123,13 +143,6 @@ class VideoProcessor:
     """Processes scenes into a final video using FFmpeg"""
 
     def __init__(self, export_data, progress_callback=None):
-        """
-        Initialize processor with export data from frontend
-
-        Args:
-            export_data: Complete export configuration from prepareExportData()
-            progress_callback: Function(progress, message) for progress updates
-        """
         self.export_data = export_data
         self.progress_callback = progress_callback or (lambda p, m: None)
 
@@ -152,21 +165,27 @@ class VideoProcessor:
         self.project_root = os.path.dirname(self.backend_dir)
         self.frontend_dir = os.path.join(self.project_root, 'frontend')
 
+        logger.info("VideoProcessor init: {}x{} {}fps crf={} codec={} preset={}",
+                     self.width, self.height, self.fps, self.crf, self.codec, self.preset)
+        logger.debug("VideoProcessor paths: backend={} root={} frontend={}",
+                      self.backend_dir, self.project_root, self.frontend_dir)
+        logger.debug("VideoProcessor ffmpeg: {} (lib={})", FFMPEG_BIN, USE_FFMPEG_PYTHON)
+
     def _update_progress(self, progress, message):
         """Update progress callback"""
         self.progress_callback(progress, message)
 
     def _get_media_path(self, relative_path):
-        """
-        Resolve media path from working-assets folder
-
-        Media files are in frontend/working-assets/{project_id}/
-        """
+        """Resolve media path from working-assets folder"""
         if not relative_path:
+            logger.warning("Empty media path provided")
             return None
 
         if os.path.isabs(relative_path):
-            return relative_path
+            if os.path.exists(relative_path):
+                return relative_path
+            logger.error("Absolute media path does not exist: {}", relative_path)
+            raise FileNotFoundError(f"Media file not found: {relative_path}")
 
         # Try paths relative to frontend folder
         paths_to_try = [
@@ -177,24 +196,21 @@ class VideoProcessor:
 
         for path in paths_to_try:
             if os.path.exists(path):
-                return os.path.abspath(path)
+                resolved = os.path.abspath(path)
+                logger.debug("Resolved media: {} -> {}", relative_path, resolved)
+                return resolved
 
+        logger.error("Media not found. Tried: {}", paths_to_try)
         raise FileNotFoundError(f"Media file not found: {relative_path}")
 
     def _create_text_scene(self, scene, temp_dir, index):
-        """
-        Create a video clip for a text scene
-
-        Renders text on background (image or solid color)
-        """
+        """Create a video clip for a text scene"""
         text_config = scene.get('text', {})
         duration = scene.get('duration', 3)
 
-        # Create text image
         text_image_path = os.path.join(temp_dir, f"text_{index:03d}.png")
         self._render_text_image(text_config, text_image_path)
 
-        # Convert to video
         output_path = os.path.join(temp_dir, f"scene_{index:03d}.mp4")
 
         if USE_FFMPEG_PYTHON:
@@ -205,36 +221,22 @@ class VideoProcessor:
         return output_path
 
     def _load_font(self, font_family, font_size, font_style='normal'):
-        """
-        Load font by family name with fallback support
-
-        Args:
-            font_family: Font family name from frontend (e.g., 'Inter', 'Roboto')
-            font_size: Font size in pixels
-            font_style: 'normal', 'bold', or 'italic'
-
-        Returns:
-            PIL ImageFont object
-        """
+        """Load font by family name with fallback support"""
         current_os = platform.system().lower()
         os_key = 'win32' if current_os == 'windows' else ('darwin' if current_os == 'darwin' else 'linux')
 
-        # Get font paths for this family
         font_paths = []
         if font_family in FONT_MAP:
             font_paths = FONT_MAP[font_family].get(os_key, [])
 
-            # If bold style requested, try bold variant first
             if font_style == 'bold' and font_family in FONT_BOLD_MAP:
                 bold_name = FONT_BOLD_MAP[font_family]
-                # Try to find bold in same directories
                 for path in font_paths:
                     bold_path = path.replace('-Regular', '-Bold').replace('.ttf', '')
                     if '-Bold' not in bold_path:
                         bold_path = path.rsplit('.', 1)[0] + '-Bold.ttf'
                     font_paths.insert(0, bold_path)
 
-        # Add fallback fonts
         fallback_fonts = [
             'arial.ttf', 'arialbd.ttf',
             'C:/Windows/Fonts/arial.ttf',
@@ -245,51 +247,36 @@ class VideoProcessor:
         ]
         font_paths.extend(fallback_fonts)
 
-        # Try each font path
         for font_path in font_paths:
             try:
                 font = ImageFont.truetype(font_path, font_size)
-                print(f"    [Font] Loaded: {font_path}")
+                logger.debug("Font loaded: {}", font_path)
                 return font
             except (OSError, IOError):
                 continue
 
-        # Final fallback to default
-        print(f"    [Font] Using default font (requested: {font_family})")
+        logger.warning("No font file found for '{}', using PIL default", font_family)
         return ImageFont.load_default()
 
     def _render_text_image(self, text_config, output_path):
-        """
-        Render text overlay on background image or solid color
-
-        Supports:
-        - Custom font family and style
-        - Percentage-based positioning (text_x, text_y)
-        - Text alignment (left, center, right)
-        - Vertical alignment (top, center, bottom)
-        """
+        """Render text overlay on background image or solid color"""
         content = text_config.get('content', '')
-        text_color = text_config.get('color', 'white')
         color_hex = text_config.get('color_hex', '#ffffff')
         background = text_config.get('background', {})
 
-        # Get font settings
         font_family = text_config.get('font_family', 'Inter')
         font_size = text_config.get('font_size', 48)
         font_style = text_config.get('font_style', 'bold')
 
-        # Get position settings
         position = text_config.get('position', {})
-        text_x = position.get('x')  # Percentage 0-100, or None
-        text_y = position.get('y')  # Percentage 0-100, or None
+        text_x = position.get('x')
+        text_y = position.get('y')
 
-        # Get alignment settings (used when position is null)
         text_align = text_config.get('text_align', 'center')
         vertical_align = text_config.get('vertical_align', 'center')
 
-        print(f"    [Text] Font: {font_family} {font_size}px {font_style}")
-        print(f"    [Text] Position: x={text_x}, y={text_y}")
-        print(f"    [Text] Align: {text_align}/{vertical_align}")
+        logger.debug("Text scene: font={} {}px {} align={}/{} pos=({},{})",
+                      font_family, font_size, font_style, text_align, vertical_align, text_x, text_y)
 
         # Try to load background image
         bg_image = None
@@ -298,77 +285,59 @@ class VideoProcessor:
             try:
                 full_path = self._get_media_path(bg_image_path)
                 bg_image = Image.open(full_path).convert('RGB')
-                # Resize to target resolution
                 bg_image = bg_image.resize((self.width, self.height), Image.Resampling.LANCZOS)
-                print(f"    [Text] Background: {bg_image_path}")
+                logger.debug("Text background image: {}", bg_image_path)
             except Exception as e:
-                print(f"    [Text] Could not load background image: {e}")
+                logger.warning("Could not load text background image: {}", e)
                 bg_image = None
 
-        # Create image with background
         if bg_image:
             img = bg_image
         else:
-            # Fallback to solid color
             fallback_color = background.get('fallback_color', '#000000')
             img = Image.new('RGB', (self.width, self.height), fallback_color)
-            print(f"    [Text] Using solid background: {fallback_color}")
+            logger.debug("Text solid background: {}", fallback_color)
 
         draw = ImageDraw.Draw(img)
-
-        # Load font with family and style
         font = self._load_font(font_family, font_size, font_style)
 
-        # Word wrap text
         padding = text_config.get('padding', 80)
         max_width = self.width - (padding * 2)
         lines = self._wrap_text(content, font, max_width, draw)
 
-        # Calculate line height and total text height
         line_height = font_size * 1.3
         total_height = len(lines) * line_height
 
-        # Determine Y position
         if text_y is not None:
-            # Use percentage-based Y position (0=top, 100=bottom)
-            # Position is the center of the text block
             y = (text_y / 100) * self.height - (total_height / 2)
         else:
-            # Use vertical alignment
             if vertical_align == 'top':
                 y = padding
             elif vertical_align == 'bottom':
                 y = self.height - total_height - padding
-            else:  # center
+            else:
                 y = (self.height - total_height) / 2
 
-        # Draw each line
         for line in lines:
             bbox = draw.textbbox((0, 0), line, font=font)
             text_width = bbox[2] - bbox[0]
 
-            # Determine X position for this line
             if text_x is not None:
-                # Use percentage-based X position (0=left, 100=right)
-                # Position is the center of the text
                 x = (text_x / 100) * self.width - (text_width / 2)
             else:
-                # Use text alignment
                 if text_align == 'left':
                     x = padding
                 elif text_align == 'right':
                     x = self.width - text_width - padding
-                else:  # center
+                else:
                     x = (self.width - text_width) / 2
 
-            # Clamp X to prevent text going off-screen
             x = max(padding / 2, min(x, self.width - text_width - padding / 2))
-
             draw.text((x, y), line, fill=color_hex, font=font)
             y += line_height
 
         img.save(output_path, 'PNG')
-        print(f"    [Text] Saved: {output_path}")
+        logger.debug("Text image saved: {}", output_path)
 
     def _wrap_text(self, text, font, max_width, draw):
         """Wrap text to fit within max_width"""
@@ -399,32 +368,34 @@ class VideoProcessor:
         media_type = media.get('type', 'image')
         scene_id = scene.get('id', index + 1)
 
-        print(f"  [Scene {scene_id}] Media type: {media_type}")
+        logger.debug("Scene {}: type={}", scene_id, media_type)
 
         # Handle text scenes
         if media_type == 'text':
-            print(f"  [Scene {scene_id}] Creating text scene...")
+            logger.debug("Scene {}: creating text scene", scene_id)
             return self._create_text_scene(scene, temp_dir, index)
 
         # Handle image scenes
         media_path = media.get('path')
         if not media_path:
+            logger.error("Scene {} has no media path", scene_id)
             raise ValueError(f"Scene {scene_id} has no media path")
 
-        print(f"  [Scene {scene_id}] Looking for media: {media_path}")
+        logger.debug("Scene {}: looking for media: {}", scene_id, media_path)
 
         try:
             full_media_path = self._get_media_path(media_path)
-            print(f"  [Scene {scene_id}] Found media at: {full_media_path}")
+            logger.debug("Scene {}: resolved media: {}", scene_id, full_media_path)
         except FileNotFoundError as e:
-            print(f"  [Scene {scene_id}] ERROR: {e}")
+            logger.error("Scene {}: media not found: {}", scene_id, e)
             raise
 
         duration = scene.get('duration', 3)
         effect = scene.get('effect', {})
         effect_type = effect.get('type', 'static')
 
-        print(f"  [Scene {scene_id}] Duration: {duration}s, Effect: {effect_type}")
+        logger.info("Scene {}: {}s effect={} path={}",
+                     scene_id, duration, effect_type, os.path.basename(full_media_path))
 
         output_path = os.path.join(temp_dir, f"scene_{index:03d}.mp4")
 
@@ -433,10 +404,18 @@ class VideoProcessor:
         else:
             self._create_scene_subprocess(full_media_path, output_path, duration, effect)
 
+        # Verify output was created
+        if os.path.exists(output_path):
+            size = os.path.getsize(output_path)
+            logger.debug("Scene {}: output {} ({:.1f} KB)", scene_id, output_path, size / 1024)
+        else:
+            logger.error("Scene {}: output file was NOT created: {}", scene_id, output_path)
+
         return output_path
 
     def _create_video_from_image_ffmpeg(self, image_path, output_path, duration):
         """Create video from static image using ffmpeg-python"""
+        logger.debug("ffmpeg-python: image->video {}s {}", duration, image_path)
         (
             ffmpeg
             .input(image_path, loop=1, t=duration)
@@ -450,13 +429,13 @@ class VideoProcessor:
                 preset=self.preset
             )
             .overwrite_output()
-            .run(quiet=True)
+            .run(cmd=FFMPEG_BIN, quiet=True)
         )
 
     def _create_video_from_image_subprocess(self, image_path, output_path, duration):
         """Create video from static image using subprocess"""
         cmd = [
-            'ffmpeg', '-y',
+            FFMPEG_BIN, '-y',
             '-loop', '1',
             '-i', image_path,
             '-t', str(duration),
@@ -468,32 +447,32 @@ class VideoProcessor:
             '-preset', self.preset,
             output_path
         ]
-        subprocess.run(cmd, check=True, capture_output=True)
+        logger.debug("subprocess: image->video cmd={}", ' '.join(cmd[:8]) + '...')
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error("FFmpeg image->video failed: {}", result.stderr[:500])
+            raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
 
     def _create_scene_ffmpeg(self, media_path, output_path, duration, effect):
         """Create scene video with effects using ffmpeg-python"""
         effect_type = effect.get('type', 'static')
 
-        print(f"    [FFmpeg] Creating {duration}s clip with effect: {effect_type}")
+        logger.debug("Creating {}s clip: effect={}", duration, effect_type)
 
-        # For static scenes or simple effects, use fast method
         if effect_type in ['static', 'fade']:
             self._create_simple_scene(media_path, output_path, duration, effect_type)
             return
 
-        # For zoom/pan effects, use zoompan filter (slower but necessary)
         self._create_effect_scene(media_path, output_path, duration, effect)
 
     def _create_simple_scene(self, media_path, output_path, duration, effect_type):
         """Fast method for static/fade scenes without zoompan"""
-        # Build filter string for scale and crop (cover fit)
         filters = [
             f"scale='if(gte(iw/ih,{self.width}/{self.height}),-2,{self.width})':'if(gte(iw/ih,{self.width}/{self.height}),{self.height},-2)'",
             f"crop={self.width}:{self.height}",
             f"fps={self.fps}"
         ]
 
-        # Add fade effect if requested
         if effect_type == 'fade':
             fade_dur = 0.5
             filters.append(f"fade=t=in:st=0:d={fade_dur}")
@@ -502,21 +481,23 @@ class VideoProcessor:
         vf = ','.join(filters)
 
         cmd = [
-            'ffmpeg', '-y',
+            FFMPEG_BIN, '-y',
             '-loop', '1',
             '-i', media_path,
             '-t', str(duration),
             '-vf', vf,
             '-c:v', self.codec,
             '-pix_fmt', self.pixel_format,
-            '-preset', 'fast',  # Use fast preset for speed
+            '-preset', 'fast',
             '-crf', str(self.crf),
             output_path
         ]
 
+        logger.debug("Simple scene cmd: {}", ' '.join(cmd[:10]) + '...')
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"    [FFmpeg] ERROR: {result.stderr[:500]}")
+            logger.error("FFmpeg simple scene failed:\nstdout: {}\nstderr: {}",
+                          result.stdout[:300], result.stderr[:500])
             raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
 
     def _create_effect_scene(self, media_path, output_path, duration, effect):
@@ -524,11 +505,9 @@ class VideoProcessor:
         effect_type = effect.get('type', 'static')
         frames = int(duration * self.fps)
 
-        # Build zoompan parameters based on effect
         if effect_type == 'zoom_in':
             start_scale = effect.get('start_scale', 1.0)
             end_scale = effect.get('end_scale', 1.2)
-            # zoompan: z is zoom level, starts at start_scale, increases each frame
             z_expr = f"'min({start_scale}+on*{(end_scale-start_scale)/frames},{end_scale})'"
             x_expr = "'iw/2-(iw/zoom/2)'"
             y_expr = "'ih/2-(ih/zoom/2)'"
@@ -549,18 +528,16 @@ class VideoProcessor:
             x_expr = f"'iw*{pan_amount}*on/{frames}'"
             y_expr = "'(ih-oh)/2'"
         else:
-            # Fallback to simple scene
             self._create_simple_scene(media_path, output_path, duration, 'static')
             return
 
-        # Build zoompan filter - use a lower fps for zoompan then convert
-        zoompan_fps = 25  # Lower fps for faster processing
+        zoompan_fps = 25
         zoompan_frames = int(duration * zoompan_fps)
 
         vf = f"zoompan=z={z_expr}:x={x_expr}:y={y_expr}:d={zoompan_frames}:s={self.width}x{self.height}:fps={zoompan_fps},fps={self.fps}"
 
         cmd = [
-            'ffmpeg', '-y',
+            FFMPEG_BIN, '-y',
             '-i', media_path,
             '-vf', vf,
             '-t', str(duration),
@@ -571,23 +548,23 @@ class VideoProcessor:
             output_path
         ]
 
-        print(f"    [FFmpeg] Running zoompan effect...")
+        logger.info("Zoompan effect: {} {}s", effect_type, duration)
+        logger.debug("Zoompan cmd: {}", ' '.join(cmd))
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"    [FFmpeg] ERROR: {result.stderr[:500]}")
+            logger.error("FFmpeg zoompan failed:\nstdout: {}\nstderr: {}",
+                          result.stdout[:300], result.stderr[:500])
             raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
 
     def _create_scene_subprocess(self, media_path, output_path, duration, effect):
         """Create scene video with effects using subprocess (fallback)"""
         effect_type = effect.get('type', 'static')
 
-        # Build filter chain
         vf_filters = [
             f"scale='if(gte(iw/ih,{self.width}/{self.height}),-2,{self.width})':'if(gte(iw/ih,{self.width}/{self.height}),{self.height},-2)'",
             f"crop={self.width}:{self.height}"
         ]
 
-        # Add effect filters
         if effect_type == 'fade':
             fade_duration = effect.get('fade_duration', 0.5)
             vf_filters.append(f"fade=t=in:st=0:d={fade_duration}")
@@ -596,7 +573,7 @@ class VideoProcessor:
         vf = ','.join(vf_filters)
 
         cmd = [
-            'ffmpeg', '-y',
+            FFMPEG_BIN, '-y',
             '-loop', '1',
             '-i', media_path,
             '-t', str(duration),
@@ -608,17 +585,23 @@ class VideoProcessor:
             '-preset', self.preset,
             output_path
         ]
-        subprocess.run(cmd, check=True, capture_output=True)
+        logger.debug("Subprocess scene cmd: {}", ' '.join(cmd[:10]) + '...')
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error("FFmpeg subprocess scene failed:\nstdout: {}\nstderr: {}",
+                          result.stdout[:300], result.stderr[:500])
+            raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
 
     def _concat_scenes(self, scene_clips, output_path):
         """Concatenate scene clips into final video"""
-        # Create concat list file
         concat_list_path = os.path.join(os.path.dirname(scene_clips[0]), 'concat_list.txt')
+
+        logger.info("Concatenating {} clips", len(scene_clips))
         with open(concat_list_path, 'w') as f:
             for clip in scene_clips:
-                # Use forward slashes for FFmpeg compatibility
                 clip_path = clip.replace('\\', '/')
                 f.write(f"file '{clip_path}'\n")
+                logger.debug("  concat: {}", os.path.basename(clip_path))
 
         audio_config = self.export_data.get('audio')
 
@@ -628,27 +611,35 @@ class VideoProcessor:
             self._concat_subprocess(concat_list_path, output_path, audio_config)
 
     def _concat_ffmpeg(self, concat_list_path, output_path, audio_config):
-        """Concatenate using ffmpeg-python"""
+        """Concatenate using ffmpeg-python (delegates to subprocess for bgMusic mixing)."""
+        bg_music = self.export_data.get('bgMusic')
+        bgmusic_path = self._resolve_music_path(bg_music) if bg_music else None
+
+        if bgmusic_path:
+            logger.info("BgMusic present, using subprocess path for filter_complex")
+            self._concat_subprocess(concat_list_path, output_path, audio_config)
+            return
+
         video = ffmpeg.input(concat_list_path, format='concat', safe=0)
 
         if audio_config and audio_config.get('path'):
             try:
                 audio_path = self._get_media_path(audio_config['path'])
+                logger.info("Concat with audio: {}", audio_path)
                 audio = ffmpeg.input(audio_path)
 
-                # Apply volume
                 volume = audio_config.get('volume', 1.0)
                 audio = audio.filter('volume', volume=volume)
 
-                # Trim audio if needed
                 trimmed_duration = audio_config.get('trimmed_duration')
                 if trimmed_duration:
                     audio = audio.filter('atrim', duration=trimmed_duration)
 
-                # Apply fade out
                 fade_out = audio_config.get('fade_out', 0.5)
                 total_duration = self.export_data.get('timeline', {}).get('total_duration', 60)
                 audio = audio.filter('afade', type='out', start_time=total_duration - fade_out, duration=fade_out)
+
+                logger.debug("Audio: vol={} fade_out={}s total_dur={}s", volume, fade_out, total_duration)
 
                 (
                     ffmpeg
@@ -661,109 +652,368 @@ class VideoProcessor:
                         shortest=None
                     )
                     .overwrite_output()
-                    .run(quiet=True)
+                    .run(cmd=FFMPEG_BIN, quiet=True)
                 )
+                logger.info("Concat with audio completed: {}", output_path)
             except FileNotFoundError as e:
-                print(f"Audio file not found, exporting without audio: {e}")
+                logger.warning("Audio file not found, exporting without audio: {}", e)
                 self._concat_video_only(video, output_path)
         else:
+            logger.info("Concat without audio")
             self._concat_video_only(video, output_path)
 
     def _concat_video_only(self, video_stream, output_path):
         """Concatenate video only (no audio)"""
+        logger.debug("Concat video-only: {}", output_path)
         (
             ffmpeg
             .output(video_stream, output_path, vcodec='copy', an=None)
             .overwrite_output()
-            .run(quiet=True)
+            .run(cmd=FFMPEG_BIN, quiet=True)
         )
 
+    def _resolve_music_path(self, bg_music):
+        """Resolve background music file path."""
+        music_path = bg_music.get('path', '')
+        if not music_path:
+            logger.debug("BgMusic: no path specified")
+            return None
+        if music_path.startswith('/output/music/'):
+            from config import MUSIC_DIR
+            fname = music_path.replace('/output/music/', '', 1)
+            full = os.path.join(MUSIC_DIR, fname)
+            if os.path.isfile(full):
+                logger.debug("BgMusic resolved: {} -> {}", music_path, full)
+                return full
+            logger.warning("BgMusic file not found: {}", full)
+        try:
+            resolved = self._get_media_path(music_path)
+            logger.debug("BgMusic resolved via media path: {}", resolved)
+            return resolved
+        except FileNotFoundError:
+            logger.warning("BgMusic not found anywhere: {}", music_path)
+            return None
+
+    def _build_audio_filter(self, audio_config, bg_music, total_duration):
+        """Build FFmpeg audio filter complex for narration + bgMusic mixing."""
+        has_narration = audio_config and audio_config.get('path')
+        has_bgmusic = bg_music is not None and self._resolve_music_path(bg_music) is not None
+
+        if not has_narration and not has_bgmusic:
+            logger.debug("Audio filter: no audio sources")
+            return None, None
+
+        filters = []
+        narration_label = None
+        bgmusic_label = None
+
+        if has_narration:
+            vol = audio_config.get('volume', 1.0)
+            fade_out = audio_config.get('fade_out', 0.5)
+            fade_start = max(0, total_duration - fade_out)
+            filters.append(f"[1:a]volume={vol},afade=t=out:st={fade_start}:d={fade_out}[narration]")
+            narration_label = '[narration]'
+            logger.debug("Audio filter: narration vol={} fade_out={}s", vol, fade_out)
+
+        if has_bgmusic:
+            bgm_input_idx = 2 if has_narration else 1
+            vol = bg_music.get('volume', 0.15)
+            fade_in = bg_music.get('fade_in', 2.0)
+            fade_out = bg_music.get('fade_out', 3.0)
+            ducking = bg_music.get('ducking_enabled', True)
+            duck_level = bg_music.get('ducking_level', 0.08)
+
+            effective_vol = duck_level if (ducking and has_narration) else vol
+
+            fade_out_start = max(0, total_duration - fade_out)
+            parts = [
+                f"[{bgm_input_idx}:a]volume={effective_vol}",
+                f"afade=t=in:st=0:d={fade_in}",
+                f"afade=t=out:st={fade_out_start}:d={fade_out}",
+                f"atrim=0:{total_duration}",
+                f"asetpts=PTS-STARTPTS"
+            ]
+            filters.append(','.join(parts) + '[bgm]')
+            bgmusic_label = '[bgm]'
+            logger.debug("Audio filter: bgmusic vol={} (effective={}) fade_in={} fade_out={} ducking={}",
+                          vol, effective_vol, fade_in, fade_out, ducking)
+
+        if narration_label and bgmusic_label:
+            filters.append(f"{narration_label}{bgmusic_label}amix=inputs=2:duration=longest:normalize=0[audio_out]")
+            out_label = '[audio_out]'
+            logger.debug("Audio filter: mixing narration + bgmusic")
+        elif narration_label:
+            out_label = narration_label
+        else:
+            out_label = bgmusic_label
+
+        filter_str = ';'.join(filters)
+        logger.debug("Audio filter_complex: {}", filter_str)
+        return filter_str, out_label
+
     def _concat_subprocess(self, concat_list_path, output_path, audio_config):
-        """Concatenate using subprocess (fallback)"""
+        """Concatenate using subprocess with optional bgMusic mixing."""
+        bg_music = self.export_data.get('bgMusic')
+        total_duration = self.export_data.get('timeline', {}).get('total_duration', 60)
+
+        narration_path = None
         if audio_config and audio_config.get('path'):
             try:
-                audio_path = self._get_media_path(audio_config['path'])
-                volume = audio_config.get('volume', 1.0)
-
-                cmd = [
-                    'ffmpeg', '-y',
-                    '-f', 'concat', '-safe', '0', '-i', concat_list_path,
-                    '-i', audio_path,
-                    '-filter:a', f'volume={volume}',
-                    '-c:v', 'copy',
-                    '-c:a', 'aac', '-b:a', '192k',
-                    '-shortest',
-                    output_path
-                ]
+                narration_path = self._get_media_path(audio_config['path'])
+                logger.info("Narration audio: {}", narration_path)
             except FileNotFoundError:
-                cmd = [
-                    'ffmpeg', '-y',
-                    '-f', 'concat', '-safe', '0', '-i', concat_list_path,
-                    '-c:v', 'copy', '-an',
-                    output_path
-                ]
-        else:
+                logger.warning("Narration audio not found: {}", audio_config.get('path'))
+                narration_path = None
+
+        bgmusic_path = self._resolve_music_path(bg_music) if bg_music else None
+
+        if not narration_path and not bgmusic_path:
+            logger.info("Concat: no audio, video-only")
             cmd = [
-                'ffmpeg', '-y',
+                FFMPEG_BIN, '-y',
                 '-f', 'concat', '-safe', '0', '-i', concat_list_path,
                 '-c:v', 'copy', '-an',
                 output_path
             ]
+            logger.debug("Concat cmd: {}", ' '.join(cmd))
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error("FFmpeg concat (no audio) failed:\nstderr: {}", result.stderr[:500])
+                raise RuntimeError(f"FFmpeg concat failed: {result.stderr[:200]}")
+            return
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        # Build input list
+        cmd = [FFMPEG_BIN, '-y', '-f', 'concat', '-safe', '0', '-i', concat_list_path]
+        if narration_path:
+            cmd += ['-i', narration_path]
+        if bgmusic_path:
+            loop_flag = bg_music.get('loop', True)
+            if loop_flag:
+                cmd += ['-stream_loop', '-1']
+            cmd += ['-i', bgmusic_path]
+            logger.info("BgMusic input: {} (loop={})", bgmusic_path, loop_flag)
+
+        # Build filter complex
+        filter_str, out_label = self._build_audio_filter(
+            audio_config if narration_path else None,
+            bg_music if bgmusic_path else None,
+            total_duration
+        )
+
+        if filter_str:
+            cmd += ['-filter_complex', filter_str, '-map', '0:v', '-map', out_label]
+        else:
+            cmd += ['-map', '0:v', '-an']
+
+        cmd += ['-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', output_path]
+
+        logger.info("Concat with audio: {} inputs, filter_complex={}",
+                     2 + (1 if bgmusic_path else 0), bool(filter_str))
+        logger.debug("Full concat cmd: {}", ' '.join(cmd))
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error("FFmpeg concat failed:\nstdout: {}\nstderr: {}",
+                          result.stdout[:300], result.stderr[:500])
+            raise RuntimeError(f"FFmpeg concat failed: {result.stderr[:200]}")
+        logger.info("Concat completed: {}", output_path)
+
+    def _resolve_font_path(self, family, weight='normal'):
+        """Resolve a font family name to a filesystem path for FFmpeg drawtext."""
+        current_os = platform.system().lower()
+        os_key = 'win32' if current_os == 'windows' else ('darwin' if current_os == 'darwin' else 'linux')
+
+        if weight == 'bold' and family in FONT_BOLD_MAP:
+            bold_name = FONT_BOLD_MAP[family]
+            candidates = []
+            if os_key == 'win32':
+                candidates.append(f'C:/Windows/Fonts/{bold_name}')
+            elif os_key == 'darwin':
+                candidates.append(f'/Library/Fonts/{bold_name}')
+            else:
+                candidates.append(f'/usr/share/fonts/truetype/{family.lower().replace(" ", "-")}/{bold_name}')
+            for c in candidates:
+                if os.path.isfile(c):
+                    logger.debug("Font resolved (bold): {} -> {}", family, c)
+                    return c
+
+        if family in FONT_MAP:
+            for path in FONT_MAP[family].get(os_key, []):
+                if os.path.isfile(path):
+                    logger.debug("Font resolved: {} -> {}", family, path)
+                    return path
+
+        fallbacks = {
+            'win32': 'C:/Windows/Fonts/arial.ttf',
+            'darwin': '/System/Library/Fonts/Helvetica.ttc',
+            'linux': '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+        }
+        fb = fallbacks.get(os_key, 'arial.ttf')
+        if os.path.isfile(fb):
+            logger.debug("Font fallback: {} -> {}", family, fb)
+            return fb
+        logger.warning("No font found for '{}', using arial.ttf", family)
+        return 'arial.ttf'
+
+    def _burn_captions(self, video_path, output_path):
+        """Burn caption overlays into the video using FFmpeg drawtext filter."""
+        captions = self.export_data.get('captions')
+        if not captions:
+            logger.debug("No captions to burn")
+            return video_path
+
+        entries = captions.get('entries', [])
+        if not entries:
+            logger.debug("Captions present but no entries")
+            return video_path
+
+        style = captions.get('style', {})
+        font_family = style.get('fontFamily', 'Inter')
+        font_weight = style.get('fontWeight', 'bold')
+        font_size = style.get('fontSize', 48)
+        font_color = style.get('color', '#FFFFFF').lstrip('#')
+        bg_color = style.get('backgroundColor', '')
+        text_transform = style.get('textTransform', 'none')
+        stroke_width = style.get('strokeWidth', 2)
+        stroke_color = style.get('strokeColor', '#000000').lstrip('#')
+        position_y = style.get('positionY', 80)
+
+        font_path = self._resolve_font_path(font_family, font_weight)
+        font_path_esc = font_path.replace('\\', '/').replace(':', '\\:')
+
+        logger.info("Burning {} captions: font={} {}px color=#{} stroke={}px pos_y={}%",
+                     len(entries), font_family, font_size, font_color, stroke_width, position_y)
+
+        drawtext_parts = []
+        for i, entry in enumerate(entries):
+            text = entry.get('text', '')
+            if not text:
+                continue
+
+            if text_transform == 'uppercase':
+                text = text.upper()
+
+            start = entry.get('start', 0)
+            end = entry.get('end', start + 1)
+
+            escaped = (text
+                       .replace("\\", "\\\\")
+                       .replace("'", "\u2019")
+                       .replace(":", "\\:")
+                       .replace("%", "%%")
+                       .replace("\n", " "))
+
+            y_expr = f"h*{position_y}/100-{font_size}/2"
+
+            dt = (
+                f"drawtext=fontfile='{font_path_esc}'"
+                f":text='{escaped}'"
+                f":fontsize={font_size}"
+                f":fontcolor=#{font_color}"
+                f":borderw={stroke_width}"
+                f":bordercolor=#{stroke_color}"
+                f":x=(w-text_w)/2"
+                f":y={y_expr}"
+                f":enable='between(t,{start},{end})'"
+            )
+
+            if bg_color and bg_color != 'transparent':
+                bg_hex = bg_color.lstrip('#')
+                dt += f":box=1:boxcolor=#{bg_hex}@0.6:boxborderw=8"
+
+            drawtext_parts.append(dt)
+            logger.debug("  Caption {}: [{:.1f}s-{:.1f}s] '{}'", i + 1, start, end, text[:40])
+
+        if not drawtext_parts:
+            logger.debug("No valid caption entries after filtering")
+            return video_path
+
+        vf = ','.join(drawtext_parts)
+
+        cmd = [
+            FFMPEG_BIN, '-y',
+            '-i', video_path,
+            '-vf', vf,
+            '-c:v', self.codec,
+            '-crf', str(self.crf),
+            '-preset', 'fast',
+            '-pix_fmt', self.pixel_format,
+            '-c:a', 'copy',
+            output_path
+        ]
+
+        logger.info("Running caption burn-in ({} drawtext filters)...", len(drawtext_parts))
+        logger.debug("Caption cmd: {} ... (vf len={})", ' '.join(cmd[:6]), len(vf))
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error("Caption burn-in failed:\nstdout: {}\nstderr: {}",
+                          result.stdout[:300], result.stderr[:500])
+            raise RuntimeError(f"Caption burn-in failed: {result.stderr[:200]}")
+
+        logger.success("Caption burn-in complete: {}", output_path)
+        return output_path
 
     def process(self, output_path):
-        """
-        Process all scenes into a final video
-
-        Args:
-            output_path: Path for output video
-        """
+        """Process all scenes into a final video"""
         scenes = self.export_data.get('scenes', [])
         if not scenes:
+            logger.error("No scenes to process")
             raise ValueError("No scenes to process")
 
-        print(f"[VideoProcessor] Starting export with {len(scenes)} scenes")
-        print(f"[VideoProcessor] Output path: {output_path}")
-        print(f"[VideoProcessor] Timeline editor dir: {self.frontend_dir}")
+        logger.info("=== Export started: {} scenes -> {} ===", len(scenes), output_path)
+        logger.debug("Frontend dir: {}", self.frontend_dir)
 
         self._update_progress(0, "Starting video processing")
 
-        # Create temp directory for intermediate files
         temp_dir = tempfile.mkdtemp(prefix='video_export_')
-        print(f"[VideoProcessor] Temp directory: {temp_dir}")
+        logger.debug("Temp directory: {}", temp_dir)
 
         try:
             scene_clips = []
             total_scenes = len(scenes)
 
-            # Process each scene
             for i, scene in enumerate(scenes):
                 progress = int((i / total_scenes) * 80)
                 scene_type = scene.get('media', {}).get('type', 'image')
                 scene_id = scene.get('id', i + 1)
-                print(f"[VideoProcessor] Processing scene {i + 1}/{total_scenes} (id={scene_id}, type={scene_type})")
+                logger.info("Processing scene {}/{} (id={} type={})",
+                            i + 1, total_scenes, scene_id, scene_type)
                 self._update_progress(progress, f"Processing scene {i + 1}/{total_scenes} ({scene_type})")
 
                 try:
                     clip_path = self._create_scene_clip(scene, temp_dir, i)
                     scene_clips.append(clip_path)
-                    print(f"[VideoProcessor] Scene {i + 1} completed: {clip_path}")
+                    logger.info("Scene {}/{} done: {}", i + 1, total_scenes, os.path.basename(clip_path))
                 except Exception as e:
-                    print(f"[VideoProcessor] ERROR in scene {i + 1}: {e}")
+                    logger.error("Scene {}/{} FAILED: {}", i + 1, total_scenes, e)
                     raise
 
-            # Concatenate all scenes with audio
-            print(f"[VideoProcessor] Concatenating {len(scene_clips)} clips...")
-            self._update_progress(85, "Concatenating scenes and adding audio")
-            self._concat_scenes(scene_clips, output_path)
+            logger.info("All scenes rendered, concatenating {} clips...", len(scene_clips))
+            self._update_progress(82, "Concatenating scenes and adding audio")
 
-            print(f"[VideoProcessor] Export completed successfully!")
+            has_captions = bool(self.export_data.get('captions', {}).get('entries'))
+            if has_captions:
+                concat_output = os.path.join(temp_dir, 'concat_output.mp4')
+                logger.debug("Captions detected — concat to temp before burn-in")
+            else:
+                concat_output = output_path
+
+            self._concat_scenes(scene_clips, concat_output)
+
+            if has_captions:
+                logger.info("Starting caption burn-in...")
+                self._update_progress(90, "Burning captions into video")
+                self._burn_captions(concat_output, output_path)
+
+            if os.path.exists(output_path):
+                size = os.path.getsize(output_path)
+                logger.success("=== Export completed: {} ({:.1f} MB) ===", output_path, size / (1024 * 1024))
+            else:
+                logger.error("=== Export output file missing: {} ===", output_path)
+
             self._update_progress(100, "Export completed")
 
         finally:
-            # Cleanup temp directory
-            print(f"[VideoProcessor] Cleaning up temp directory...")
+            logger.debug("Cleaning up temp directory: {}", temp_dir)
             shutil.rmtree(temp_dir, ignore_errors=True)
 
         return output_path

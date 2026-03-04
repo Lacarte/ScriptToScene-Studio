@@ -741,7 +741,9 @@ function ttsApplyGenMode() {
 // ---- Generate / Stream ----
 async function ttsHandleAction() {
   if (_ttsState.isGenerating) return;
-  if (_ttsState.genMode === 'listen') {
+  if (_ttsState.multiVoiceMode && _ttsState.genMode === 'generate') {
+    await ttsHandleMultiVoiceGenerate();
+  } else if (_ttsState.genMode === 'listen') {
     await ttsHandleStream();
   } else {
     await ttsHandleGenerate();
@@ -1226,6 +1228,176 @@ function _ttsTimeAgo(ts) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// ---- Multi-Voice Mode ----
+
+_ttsState.multiVoiceMode = false;
+_ttsState.mvSegments = []; // [{text, voice, role}]
+
+function ttsSetVoiceMode(mode) {
+  _ttsState.multiVoiceMode = mode === 'multi';
+  const singleBtn = $('#tts-mode-single');
+  const multiBtn = $('#tts-mode-multi');
+  const panel = $('#tts-mv-panel');
+  if (singleBtn) singleBtn.style.color = mode === 'single' ? 'var(--accent)' : 'var(--text-muted)';
+  if (multiBtn) multiBtn.style.color = mode === 'multi' ? 'var(--accent)' : 'var(--text-muted)';
+  if (panel) panel.style.display = mode === 'multi' ? 'block' : 'none';
+}
+
+function ttsAddMvSegment(text = '', voice = 'af_heart', role = 'narrator') {
+  _ttsState.mvSegments.push({ text, voice, role });
+  ttsRenderMvSegments();
+}
+
+function ttsRemoveMvSegment(idx) {
+  _ttsState.mvSegments.splice(idx, 1);
+  ttsRenderMvSegments();
+}
+
+function ttsMvUpdateSegment(idx, field, value) {
+  if (_ttsState.mvSegments[idx]) {
+    _ttsState.mvSegments[idx][field] = value;
+  }
+}
+
+function ttsRenderMvSegments() {
+  const container = $('#tts-mv-segments');
+  if (!container) return;
+
+  if (!_ttsState.mvSegments.length) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:10px;padding:12px 0">No segments. Click "Auto-detect" to split your prompt, or "+ Add" to add manually.</p>';
+    return;
+  }
+
+  container.innerHTML = _ttsState.mvSegments.map((seg, i) => {
+    const m = VOICE_META[seg.voice] || {};
+    const voiceName = m.name || seg.voice;
+    const hue = m.hue || 'var(--text-muted)';
+    const roleOptions = ['narrator', 'dialogue', 'character'].map(r =>
+      `<option value="${r}"${seg.role === r ? ' selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`
+    ).join('');
+
+    // Build voice options grouped by language
+    let voiceOptions = '';
+    for (const lang of LANG_ORDER) {
+      const langVoices = _ttsState.voices.filter(v => (VOICE_META[v] || {}).lang === lang);
+      if (!langVoices.length) continue;
+      voiceOptions += `<optgroup label="${LANG_NAMES[lang] || lang}">`;
+      for (const v of langVoices) {
+        const vm = VOICE_META[v] || {};
+        voiceOptions += `<option value="${v}"${seg.voice === v ? ' selected' : ''}>${vm.name || v} (${vm.g === 'f' ? 'F' : 'M'})</option>`;
+      }
+      voiceOptions += '</optgroup>';
+    }
+
+    return `<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;padding:8px;background:var(--bg-darkest);border-radius:8px;border:1px solid var(--border)">
+      <span style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;padding-top:6px;min-width:16px">${i + 1}</span>
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+        <textarea rows="2" onchange="ttsMvUpdateSegment(${i},'text',this.value)"
+          style="width:100%;font-size:11px;line-height:1.5;resize:vertical;padding:6px 8px;background:var(--bg-darker);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:inherit">${esc(seg.text)}</textarea>
+        <div style="display:flex;gap:4px;align-items:center">
+          <select onchange="ttsMvUpdateSegment(${i},'role',this.value)"
+            style="font-size:10px;padding:2px 6px;background:var(--bg-darker);border:1px solid var(--border);border-radius:4px;color:var(--text-muted)">${roleOptions}</select>
+          <select onchange="ttsMvUpdateSegment(${i},'voice',this.value)"
+            style="font-size:10px;padding:2px 6px;background:var(--bg-darker);border:1px solid var(--border);border-radius:4px;color:var(--text);flex:1">${voiceOptions}</select>
+          <span style="width:8px;height:8px;border-radius:50%;background:${hue};flex-shrink:0" title="${voiceName}"></span>
+        </div>
+      </div>
+      <button onclick="ttsRemoveMvSegment(${i})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px" title="Remove">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function ttsAutoDetectRoles() {
+  const text = $('#tts-prompt')?.value?.trim();
+  if (!text) { toast('Enter text in the prompt first', 'error'); return; }
+
+  _ttsState.mvSegments = [];
+
+  // Split by existing brackets first
+  const bracketBlocks = text.match(/\[([^\[\]]+)\]/g);
+  let blocks;
+  if (bracketBlocks && bracketBlocks.length >= 2) {
+    blocks = bracketBlocks.map(b => b.replace(/^\[|\]$/g, '').trim()).filter(Boolean);
+  } else {
+    // Split by sentences/paragraphs
+    blocks = text.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+  }
+
+  // Heuristic: quoted text = dialogue, rest = narrator
+  const narratorVoice = _ttsState.selectedVoice;
+  const dialogueVoice = narratorVoice.startsWith('af_') ? 'am_adam' :
+                        narratorVoice.startsWith('am_') ? 'af_heart' :
+                        narratorVoice.startsWith('bf_') ? 'bm_george' :
+                        narratorVoice.startsWith('bm_') ? 'bf_emma' : 'am_adam';
+
+  for (const block of blocks) {
+    const hasQuotes = /[""\u201C\u201D]/.test(block);
+    _ttsState.mvSegments.push({
+      text: block,
+      voice: hasQuotes ? dialogueVoice : narratorVoice,
+      role: hasQuotes ? 'dialogue' : 'narrator',
+    });
+  }
+
+  ttsRenderMvSegments();
+  toast(`Split into ${_ttsState.mvSegments.length} segments`);
+}
+
+async function ttsHandleMultiVoiceGenerate() {
+  if (!_ttsState.mvSegments.length) {
+    toast('Add segments first (use Auto-detect or + Add)', 'error');
+    return;
+  }
+
+  const validSegments = _ttsState.mvSegments.filter(s => s.text.trim());
+  if (!validSegments.length) {
+    toast('All segments are empty', 'error');
+    return;
+  }
+
+  _ttsState.isGenerating = true;
+  ttsSetGeneratingUI(true);
+
+  try {
+    if (!_ttsState.modelReady) {
+      ttsSetProgress('Downloading model...');
+      await ttsDownloadModel();
+    }
+
+    const speed = parseFloat($('#tts-speed')?.value || '1.0');
+    const prompt = $('#tts-prompt')?.value?.trim() || validSegments.map(s => s.text).join(' ');
+
+    ttsSetProgress('Starting multi-voice generation...');
+    const r = await fetch('/api/tts/generate-multivoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        segments: validSegments.map(s => ({ text: s.text, voice: s.voice, speed })),
+        gap_ms: 80,
+        prompt,
+        speed,
+      }),
+    });
+    const d = await r.json();
+
+    if (d.job_id) {
+      _ttsState.currentJobId = d.job_id;
+      await ttsStreamChunkedProgress(d.job_id, d.total_chunks);
+    } else if (d.error) {
+      throw new Error(d.error);
+    }
+  } catch (e) {
+    toast(e.message || 'Multi-voice generation failed', 'error');
+  } finally {
+    _ttsState.isGenerating = false;
+    _ttsState.currentJobId = null;
+    ttsSetGeneratingUI(false);
+    ttsSetProgress('');
+  }
 }
 
 // Keyboard shortcut

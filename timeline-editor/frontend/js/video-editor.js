@@ -5,7 +5,7 @@
 
 import { SCENE_COLORS, formatTimestamp, showToast } from './utils.js';
 import { CanvasPreview } from './preview.js';
-import { ExportAPI, prepareExportData, validateExportData } from './export-api.js';
+import { ExportAPI, EXPORT_PROFILES, prepareExportData, validateExportData } from './export-api.js';
 
 // Export API instance
 const exportAPI = new ExportAPI();
@@ -102,7 +102,10 @@ const EditorState = {
     sceneErrors: new Map(),  // Map of sceneId -> [error messages]
     savedAudioSettings: null,  // Saved audio settings from localStorage
     captionData: null,      // Caption data { captions: [], style: {} }
-    captionsEnabled: false  // Whether caption track is visible
+    captionsEnabled: false, // Whether caption track is visible
+    selectedExportProfile: 'yt_shorts',  // Export profile ID
+    bgMusic: null,          // { file, path, duration, volume, duckingEnabled, duckingLevel, fadeIn, fadeOut, loop }
+    bgMusicElement: null    // HTML Audio element for bgmusic playback
 };
 
 // ============================================================
@@ -2744,6 +2747,10 @@ function setupEventListeners() {
 
     // Setup export progress modal (cancel/close and download buttons)
     setupExportProgressModal();
+    setupExportProfileSelector();
+
+    // Background music
+    document.getElementById('add-bgmusic')?.addEventListener('click', showMusicPicker);
 
     // Prevent accidental window close - warn user about unsaved changes
     setupBeforeUnloadWarning();
@@ -2964,6 +2971,7 @@ function skipToStart() {
     EditorState.playbackPosition = 0;
     if (EditorState.preview) EditorState.preview.seek(0);
     if (EditorState.audioElement) EditorState.audioElement.currentTime = 0;
+    if (EditorState.bgMusicElement) EditorState.bgMusicElement.currentTime = 0;
     updatePlayhead();
     updateTimeDisplay();
 }
@@ -3044,9 +3052,12 @@ function toggleLoop() {
 function toggleMute() {
     EditorState.isMuted = !EditorState.isMuted;
 
-    // Apply mute to audio element
+    // Apply mute to audio elements
     if (EditorState.audioElement) {
         EditorState.audioElement.muted = EditorState.isMuted;
+    }
+    if (EditorState.bgMusicElement) {
+        EditorState.bgMusicElement.muted = EditorState.isMuted;
     }
 
     // Update button icon
@@ -3090,12 +3101,19 @@ function syncAudioPlayback() {
         EditorState.audioElement.currentTime = EditorState.playbackPosition;
         EditorState.audioElement.play().catch(e => console.warn('Audio play failed:', e));
 
+        // Sync bgMusic
+        if (EditorState.bgMusicElement && EditorState.bgMusic) {
+            EditorState.bgMusicElement.currentTime = EditorState.playbackPosition % (EditorState.bgMusic.duration || 999);
+            EditorState.bgMusicElement.play().catch(() => {});
+        }
+
         // Use audio as master clock for perfect sync
         if (EditorState.preview) {
             EditorState.preview.setTimeSource(() => EditorState.audioElement.currentTime);
         }
     } else {
         EditorState.audioElement.pause();
+        if (EditorState.bgMusicElement) EditorState.bgMusicElement.pause();
 
         // Clear external time source when paused
         if (EditorState.preview) {
@@ -3110,6 +3128,9 @@ function syncAudioPlayback() {
 function seekAudio(time) {
     if (EditorState.audioElement && EditorState.audio?.loaded) {
         EditorState.audioElement.currentTime = time;
+    }
+    if (EditorState.bgMusicElement && EditorState.bgMusic) {
+        EditorState.bgMusicElement.currentTime = time % (EditorState.bgMusic.duration || 999);
     }
 }
 
@@ -3378,6 +3399,11 @@ async function randomizeSceneMedia() {
  * Get prepared export data with audio config
  */
 function getExportData() {
+    console.log('[Editor] getExportData() called');
+    console.log('[Editor] Project:', EditorState.project?.id, EditorState.project?.name);
+    console.log('[Editor] Scenes:', EditorState.scenes?.length);
+    console.log('[Editor] Selected profile:', EditorState.selectedExportProfile);
+
     // Prepare audio config if audio is loaded
     const audioConfig = EditorState.audio?.loaded ? {
         file: EditorState.audio.file,
@@ -3388,14 +3414,26 @@ function getExportData() {
         start_offset: 0
     } : null;
 
-    // Prepare export data
-    return prepareExportData(
+    console.log('[Editor] Audio config:', audioConfig ? { file: audioConfig.file, path: audioConfig.path, dur: audioConfig.duration } : 'none');
+    console.log('[Editor] Captions enabled:', EditorState.captionsEnabled, '| entries:', EditorState.captionData?.captions?.length || 0);
+    console.log('[Editor] BgMusic:', EditorState.bgMusic ? { file: EditorState.bgMusic.file, vol: EditorState.bgMusic.volume } : 'none');
+
+    // Prepare export data with selected profile and bgMusic
+    const profile = EXPORT_PROFILES[EditorState.selectedExportProfile] || EXPORT_PROFILES.yt_shorts;
+    console.log('[Editor] Using profile:', profile.id, profile.width + 'x' + profile.height);
+
+    const data = prepareExportData(
         EditorState.project,
         EditorState.scenes,
         '',
         audioConfig,
-        EditorState.captionsEnabled ? EditorState.captionData : null
+        EditorState.captionsEnabled ? EditorState.captionData : null,
+        profile,
+        EditorState.bgMusic
     );
+
+    console.log('[Editor] Export data prepared:', data.scenes?.length, 'scenes,', data.timeline?.total_duration + 's total');
+    return data;
 }
 
 /**
@@ -3428,22 +3466,48 @@ function previewJson() {
 }
 
 /**
- * Export MP4 - Send to backend for processing
+ * Export MP4 - Show profile selector, then process
  */
 async function exportMp4() {
+    // Show profile selector step
+    const modal = document.getElementById('export-progress-modal');
+    const stepProfile = document.getElementById('export-step-profile');
+    const stepProgress = document.getElementById('export-step-progress');
+    if (modal && stepProfile && stepProgress) {
+        stepProfile.style.display = '';
+        stepProgress.style.display = 'none';
+        modal.classList.add('active');
+    }
+    return; // Wait for user to click "Export" button
+}
+
+/**
+ * Actually start the export after profile is selected
+ */
+async function startExportWithProfile() {
+    console.log('[Editor] startExportWithProfile() — preparing export data');
     const exportData = getExportData();
 
     // Validate export data
     const validation = validateExportData(exportData);
 
     if (!validation.valid) {
+        console.error('[Editor] Export validation failed:', validation.errors);
         showToast(`Export errors: ${validation.errors.join(', ')}`, 'error');
         return;
     }
 
     if (validation.warnings.length > 0) {
-        console.warn('Export warnings:', validation.warnings);
+        console.warn('[Editor] Export warnings:', validation.warnings);
     }
+
+    console.log('[Editor] Validation passed. Switching to progress UI...');
+
+    // Switch to progress step
+    const stepProfile = document.getElementById('export-step-profile');
+    const stepProgress = document.getElementById('export-step-progress');
+    if (stepProfile) stepProfile.style.display = 'none';
+    if (stepProgress) stepProgress.style.display = '';
 
     // Show progress modal
     showExportProgress();
@@ -3451,31 +3515,35 @@ async function exportMp4() {
     // Track current job for download
     let currentJobId = null;
 
+    console.log('[Editor] Calling exportAPI.startExport()...');
+
     // Start export
     const jobId = await exportAPI.startExport(
         exportData,
         // Progress callback
         (progress, message) => {
+            console.log(`[Editor] Export progress: ${progress}% — ${message}`);
             updateExportProgress(progress, message);
         },
         // Complete callback
         (success, result) => {
             if (success) {
+                console.log('[Editor] Export completed! Job:', result.jobId, 'Download:', result.downloadUrl);
                 currentJobId = result.jobId;
                 showExportComplete(result.downloadUrl);
             } else {
+                console.error('[Editor] Export failed:', result.error);
                 showExportError(result.error);
             }
         }
     );
 
     if (!jobId) {
-        // Export failed to start - error already shown via callback
+        console.warn('[Editor] Export failed to start (no jobId returned)');
         return;
     }
 
-    // Cancel/Close button handler is set up in setupExportProgressModal()
-    // Download button handler is set up in setupExportProgressModal()
+    console.log('[Editor] Export job started:', jobId);
 }
 
 /**
@@ -3610,6 +3678,149 @@ function setupExportProgressModal() {
         }
     });
 }
+
+/**
+ * Setup export profile selector
+ */
+function setupExportProfileSelector() {
+    const grid = document.getElementById('export-profile-grid');
+    if (!grid) return;
+
+    // Profile card click
+    grid.querySelectorAll('.export-profile-card').forEach(card => {
+        card.addEventListener('click', () => {
+            grid.querySelectorAll('.export-profile-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            EditorState.selectedExportProfile = card.dataset.profile;
+        });
+    });
+
+    // Start export button
+    document.getElementById('start-export-btn')?.addEventListener('click', () => {
+        startExportWithProfile();
+    });
+
+    // Close button
+    document.getElementById('close-export-profile')?.addEventListener('click', () => {
+        hideExportProgress();
+    });
+}
+
+// ---- Background Music ----
+
+function showMusicPicker() {
+    const dialog = document.getElementById('music-picker-dialog');
+    if (!dialog) return;
+    dialog.classList.remove('hidden');
+    dialog.style.display = 'flex';
+
+    // Fetch music library
+    fetch('/api/music/library')
+        .then(r => r.ok ? r.json() : [])
+        .then(files => renderMusicList(files))
+        .catch(() => renderMusicList([]));
+}
+
+// Expose for inline onclick
+window.editorCloseMusicPicker = function() {
+    const dialog = document.getElementById('music-picker-dialog');
+    if (dialog) { dialog.classList.add('hidden'); dialog.style.display = ''; }
+};
+
+window.editorUploadMusic = async function(input) {
+    if (!input.files?.length) return;
+    const file = input.files[0];
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+        const res = await fetch('/api/music/upload', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        showToast('Music uploaded', 'success');
+        // Refresh list
+        const files = await fetch('/api/music/library').then(r => r.json()).catch(() => []);
+        renderMusicList(files);
+    } catch (e) {
+        showToast('Upload failed: ' + e.message, 'error');
+    }
+    input.value = '';
+};
+
+function renderMusicList(files) {
+    const list = document.getElementById('music-picker-list');
+    if (!list) return;
+    if (!files.length) {
+        list.innerHTML = '<div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:12px"><p>No music files yet</p><p style="font-size:11px;opacity:0.6;margin-top:8px">Place .mp3/.wav/.ogg files in output/music/</p></div>';
+        return;
+    }
+    list.innerHTML = files.map(f => `
+        <div class="music-picker-item" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;transition:background 0.12s" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''" onclick="selectBgMusic('${f.filename}', '${f.path}', ${f.duration || 0})">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-secondary)" stroke-width="1.5"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><path d="M8 17.5V5l12-2v12.5"/></svg>
+            <div style="flex:1;min-width:0">
+                <div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.filename}</div>
+                <div style="font-size:10px;color:var(--text-muted)">${f.duration ? formatTimecode(f.duration) : ''} · ${f.size_mb || '?'}MB</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.selectBgMusic = function(filename, path, duration) {
+    EditorState.bgMusic = {
+        file: filename,
+        path: path,
+        duration: duration,
+        volume: 0.15,
+        duckingEnabled: true,
+        duckingLevel: 0.08,
+        fadeIn: 2.0,
+        fadeOut: 3.0,
+        loop: true
+    };
+
+    // Create audio element
+    if (EditorState.bgMusicElement) {
+        EditorState.bgMusicElement.pause();
+        EditorState.bgMusicElement = null;
+    }
+    const audio = new Audio(path);
+    audio.volume = EditorState.bgMusic.volume;
+    audio.loop = true;
+    EditorState.bgMusicElement = audio;
+
+    renderBgMusicTrack();
+    window.editorCloseMusicPicker();
+    showToast('Background music added', 'success');
+};
+
+function renderBgMusicTrack() {
+    const track = document.getElementById('bgmusic-track');
+    if (!track) return;
+    const m = EditorState.bgMusic;
+    if (!m) {
+        track.innerHTML = '<span class="bgmusic-placeholder">Background music</span>';
+        return;
+    }
+    const totalDur = EditorState.project?.totalDuration || 60;
+    const pps = EditorState.pixelsPerSecond * EditorState.zoomLevel;
+    const width = totalDur * pps;
+    track.innerHTML = `
+        <div class="bgmusic-clip" style="width:${width}px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:0.5"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><path d="M8 17.5V5l12-2v12.5"/></svg>
+            <span class="bgmusic-clip-label">${m.file}</span>
+            <button class="bgmusic-remove" onclick="removeBgMusic()" title="Remove">&times;</button>
+        </div>
+    `;
+}
+
+window.removeBgMusic = function() {
+    if (EditorState.bgMusicElement) {
+        EditorState.bgMusicElement.pause();
+        EditorState.bgMusicElement = null;
+    }
+    EditorState.bgMusic = null;
+    renderBgMusicTrack();
+    showToast('Background music removed', 'info');
+};
 
 /**
  * Check if there are unsaved changes (edits since last save/load)

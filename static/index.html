@@ -5,7 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ScriptToScene Studio</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f1520'/><rect x='4' y='4' width='24' height='24' rx='3' fill='none' stroke='%234ECDC4' stroke-width='2'/><path d='M10 4v24' fill='none' stroke='%234ECDC4' stroke-width='2'/><circle cx='18' cy='16' r='4' fill='none' stroke='%234ECDC4' stroke-width='2'/></svg>">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f1520'/><rect x='4' y='4' width='24' height='24' rx='3' fill='none' stroke='%234ECDC4' stroke-width='2'/><path d='M10 4v24' fill='none' stroke='%234ECDC4' stroke-width='2'/><circle cx='18' cy='16' r='4' fill='none' stroke='%234ECDC4' stroke-width='2'/></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -26,39 +27,50 @@
       }
     }
   </script>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 
 <body>
 
   <!-- Toast -->
-  <div id="toast-wrap" style="position:fixed;top:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px"></div>
+  <div id="toast-wrap"
+    style="position:fixed;top:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px"></div>
 
   <!-- Confirm Dialog -->
   <div id="confirm-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
     <div class="card w-full max-w-sm p-6" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1)">
       <div class="flex items-center gap-3 mb-4">
-        <div style="width:40px;height:40px;min-width:40px;border-radius:10px;background:rgba(255,107,107,0.12);display:flex;align-items:center;justify-content:center">
-          <svg width="20" height="20" fill="none" stroke="var(--coral)" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-            <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6"/>
-            <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+        <div
+          style="width:40px;height:40px;min-width:40px;border-radius:10px;background:rgba(255,107,107,0.12);display:flex;align-items:center;justify-content:center">
+          <svg width="20" height="20" fill="none" stroke="var(--coral)" stroke-width="2" stroke-linecap="round"
+            viewBox="0 0 24 24">
+            <path d="M3 6h18" />
+            <path d="M8 6V4h8v2" />
+            <path d="M5 6v14a2 2 0 002 2h10a2 2 0 002-2V6" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
           </svg>
         </div>
         <div>
-          <h3 id="confirm-title" class="font-display text-base font-semibold" style="color:var(--text)">Move to Trash?</h3>
-          <p id="confirm-desc" class="text-xs mt-0.5" style="color:var(--text-secondary)">This action can be undone from the TRASH folder.</p>
+          <h3 id="confirm-title" class="font-display text-base font-semibold" style="color:var(--text)">Move to Trash?
+          </h3>
+          <p id="confirm-desc" class="text-xs mt-0.5" style="color:var(--text-secondary)">This action can be undone from
+            the TRASH folder.</p>
         </div>
       </div>
-      <div id="confirm-detail" class="mb-5 p-3 rounded-lg" style="background:var(--bg-darkest);border:1px solid var(--border);display:none">
+      <div id="confirm-detail" class="mb-5 p-3 rounded-lg"
+        style="background:var(--bg-darkest);border:1px solid var(--border);display:none">
         <p id="confirm-message" class="text-sm" style="color:var(--text-secondary);line-height:1.5"></p>
       </div>
       <div class="flex gap-2.5">
         <button id="confirm-cancel" class="flex-1 py-2.5 rounded-lg font-medium text-sm hover-secondary"
           style="border:1.5px solid var(--border);color:var(--text-secondary);background:transparent;cursor:pointer">Cancel</button>
         <button id="confirm-ok" class="flex-1 py-2.5 rounded-lg font-semibold text-sm hover-lift-coral"
-          style="border:none;background:linear-gradient(135deg,#FF6B6B,#E02D2D);color:white;cursor:pointer">Move to Trash</button>
+          style="border:none;background:linear-gradient(135deg,#FF6B6B,#E02D2D);color:white;cursor:pointer">Move to
+          Trash</button>
       </div>
     </div>
   </div>
@@ -66,11 +78,15 @@
   <!-- Scenes Segmenter Picker Modal -->
   <div id="scenes-seg-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
-    <div class="card w-full max-w-md p-5" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
+    <div class="card w-full max-w-md p-5"
+      style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-display text-base font-semibold" style="color:var(--text)">Pick Segmentation</h3>
-        <button onclick="scenesCloseSegPicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <button onclick="scenesCloseSegPicker()"
+          style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
       </div>
       <div id="scenes-seg-picker-list" style="overflow-y:auto;flex:1"></div>
@@ -80,11 +96,15 @@
   <!-- Assets Scene Picker Modal -->
   <div id="assets-scene-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
-    <div class="card w-full max-w-md p-5" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
+    <div class="card w-full max-w-md p-5"
+      style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-display text-base font-semibold" style="color:var(--text)">Pick Scene Project</h3>
-        <button onclick="assetsCloseScenePicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <button onclick="assetsCloseScenePicker()"
+          style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
       </div>
       <div id="assets-scene-picker-list" style="overflow-y:auto;flex:1"></div>
@@ -92,69 +112,111 @@
   </div>
 
   <!-- Alignment Fullscreen Karaoke Overlay -->
-  <div id="aln-fs-overlay" style="position:fixed;inset:0;z-index:70;background:rgba(6,9,14,0.96);backdrop-filter:blur(30px);display:none;flex-direction:column;opacity:0;transition:opacity 0.3s">
-    <button onclick="alnCloseKaraoke()" style="position:absolute;top:16px;right:20px;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:rgba(22,29,42,0.6);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:2" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  <div id="aln-fs-overlay"
+    style="position:fixed;inset:0;z-index:70;background:rgba(6,9,14,0.96);backdrop-filter:blur(30px);display:none;flex-direction:column;opacity:0;transition:opacity 0.3s">
+    <button onclick="alnCloseKaraoke()"
+      style="position:absolute;top:16px;right:20px;width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:rgba(22,29,42,0.6);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;z-index:2"
+      onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        viewBox="0 0 24 24">
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
     </button>
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:900px;width:100%;margin:0 auto;padding:60px 32px 24px;min-height:0">
-      <div id="aln-fs-info" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:24px;text-align:center"></div>
-      <div id="aln-fs-karaoke" style="flex:1;width:100%;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px 2px;line-height:2.2;align-content:flex-start;justify-content:center;padding:20px 0;min-height:0"></div>
+    <div
+      style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:900px;width:100%;margin:0 auto;padding:60px 32px 24px;min-height:0">
+      <div id="aln-fs-info"
+        style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);margin-bottom:24px;text-align:center">
+      </div>
+      <div id="aln-fs-karaoke"
+        style="flex:1;width:100%;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px 2px;line-height:2.2;align-content:flex-start;justify-content:center;padding:20px 0;min-height:0">
+      </div>
       <div style="display:flex;align-items:center;gap:16px;padding-top:20px;width:100%">
-        <button id="aln-fs-play-btn" onclick="alnTogglePlay()" style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#4ECDC4,#2FB8AE);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 3px 12px rgba(78,205,196,0.3);flex-shrink:0">
-          <svg class="aln-fs-icon-play" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="margin-left:2px"><path d="M8 5v14l11-7z"/></svg>
-          <svg class="aln-fs-icon-pause" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        <button id="aln-fs-play-btn" onclick="alnTogglePlay()"
+          style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#4ECDC4,#2FB8AE);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 3px 12px rgba(78,205,196,0.3);flex-shrink:0">
+          <svg class="aln-fs-icon-play" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"
+            style="margin-left:2px">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg class="aln-fs-icon-pause" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"
+            style="display:none">
+            <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+          </svg>
         </button>
         <div style="flex:1;position:relative;height:24px;display:flex;align-items:center">
-          <input type="range" id="aln-fs-seek" min="0" max="100" value="0" step="0.1" style="width:100%;height:100%;opacity:0;cursor:pointer;position:absolute;z-index:2">
+          <input type="range" id="aln-fs-seek" min="0" max="100" value="0" step="0.1"
+            style="width:100%;height:100%;opacity:0;cursor:pointer;position:absolute;z-index:2">
           <div style="width:100%;height:4px;background:var(--border);border-radius:2px;position:relative">
-            <div id="aln-fs-seek-fill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#2FB8AE);border-radius:inherit;transition:width 0.1s linear"></div>
+            <div id="aln-fs-seek-fill"
+              style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#2FB8AE);border-radius:inherit;transition:width 0.1s linear">
+            </div>
           </div>
         </div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);min-width:80px;text-align:center;flex-shrink:0">
+        <div
+          style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);min-width:80px;text-align:center;flex-shrink:0">
           <span id="aln-fs-time-cur">0:00</span> / <span id="aln-fs-time-total">0:00</span>
         </div>
       </div>
     </div>
-    <div style="font-size:10px;color:var(--text-muted);opacity:0.5;text-align:center;padding:8px 0 16px;font-family:'JetBrains Mono',monospace">Esc to exit</div>
+    <div
+      style="font-size:10px;color:var(--text-muted);opacity:0.5;text-align:center;padding:8px 0 16px;font-family:'JetBrains Mono',monospace">
+      Esc to exit</div>
   </div>
 
   <!-- TTS Blend Voice Picker Modal -->
   <div id="tts-blend-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(10,14,19,0.85);backdrop-filter:blur(8px);display:none">
-    <div class="card w-full max-w-md" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column;overflow:hidden">
-      <div style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <div class="card w-full max-w-md"
+      style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column;overflow:hidden">
+      <div
+        style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
         <span id="tts-blend-picker-title" style="font-size:13px;font-weight:600;color:var(--text)">Select Voice A</span>
-        <button onclick="ttsCloseBlendPicker()" style="width:28px;height:28px;border-radius:7px;border:none;background:rgba(255,107,107,0.1);color:var(--coral);cursor:pointer;display:flex;align-items:center;justify-content:center">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <button onclick="ttsCloseBlendPicker()"
+          style="width:28px;height:28px;border-radius:7px;border:none;background:rgba(255,107,107,0.1);color:var(--coral);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            viewBox="0 0 24 24">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
       </div>
       <div id="tts-blend-picker-tabs" style="padding:8px 18px;display:flex;flex-wrap:wrap;gap:4px"></div>
-      <div id="tts-blend-picker-grid" style="padding:8px 18px 16px;overflow-y:auto;flex:1;display:flex;flex-wrap:wrap;gap:6px"></div>
+      <div id="tts-blend-picker-grid"
+        style="padding:8px 18px 16px;overflow-y:auto;flex:1;display:flex;flex-wrap:wrap;gap:6px"></div>
     </div>
   </div>
 
   <!-- TTS Picker Modal (for Alignment) -->
   <div id="align-tts-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
-    <div class="card w-full max-w-lg" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column;overflow:hidden">
-      <div style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <div class="card w-full max-w-lg"
+      style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column;overflow:hidden">
+      <div
+        style="padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:13px;font-weight:600;color:var(--text)">Pick TTS Generation</span>
-        <button onclick="alignCloseTTSPicker()" style="width:28px;height:28px;border-radius:7px;border:none;background:rgba(255,107,107,0.1);color:var(--coral);cursor:pointer;display:flex;align-items:center;justify-content:center">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <button onclick="alignCloseTTSPicker()"
+          style="width:28px;height:28px;border-radius:7px;border:none;background:rgba(255,107,107,0.1);color:var(--coral);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            viewBox="0 0 24 24">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
       </div>
-      <div id="align-tts-picker-list" style="padding:12px 18px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px"></div>
+      <div id="align-tts-picker-list"
+        style="padding:12px 18px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px"></div>
     </div>
   </div>
 
   <!-- Segmenter Picker Modal -->
   <div id="seg-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-5" role="dialog"
     aria-modal="true" style="background:rgba(0,0,0,0.7);backdrop-filter:blur(16px)">
-    <div class="card w-full max-w-md p-5" style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
+    <div class="card w-full max-w-md p-5"
+      style="animation: modal-in 0.35s cubic-bezier(0.34,1.56,0.64,1);max-height:70vh;display:flex;flex-direction:column">
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-display text-base font-semibold" style="color:var(--text)">Pick Alignment</h3>
-        <button onclick="segClosePickerModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <button onclick="segClosePickerModal()"
+          style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
       </div>
       <div id="seg-picker-list" style="overflow-y:auto;flex:1"></div>
@@ -176,7 +238,8 @@
         </svg>
       </div>
       <div class="brand-text">
-        <h1 class="font-display text-base font-bold tracking-tight" style="color:var(--text);line-height:1.1">ScriptToScene</h1>
+        <h1 class="font-display text-base font-bold tracking-tight" style="color:var(--text);line-height:1.1">
+          ScriptToScene</h1>
         <p class="text-[9px] font-bold tracking-[0.2em] uppercase" style="color:var(--accent);margin-top:1px">Studio</p>
       </div>
     </div>
@@ -186,10 +249,11 @@
       <button class="nav-item" onclick="switchPage('pipeline')" data-page="pipeline" title="Pipeline Dashboard">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
-          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
         </svg>
         <span class="nav-label">PIPELINE</span>
       </button>
+      <div style="height:1px;background:var(--border);margin:8px 16px;"></div>
       <button class="nav-item active" onclick="switchPage('tts')" data-page="tts" title="Text to Speech">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
@@ -211,8 +275,11 @@
       <button class="nav-item" onclick="switchPage('segmenter')" data-page="segmenter" title="Scene Segmenter">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
-          <path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h6" />
-          <path d="M18 10v8" /><path d="M15 13l3-3 3 3" />
+          <path d="M4 6h16" />
+          <path d="M4 12h10" />
+          <path d="M4 18h6" />
+          <path d="M18 10v8" />
+          <path d="M15 13l3-3 3 3" />
         </svg>
         <span class="nav-label">SEGMENTER</span>
       </button>
@@ -235,10 +302,16 @@
         <span class="nav-label">ASSETS</span>
       </button>
       <button class="nav-item" onclick="switchPage('editor')" data-page="editor" title="Timeline Editor">
-        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-          viewBox="0 0 24 24">
-          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-          <path d="M7 2v20"/><path d="M17 2v20"/><path d="M2 12h20"/><path d="M2 7h5"/><path d="M2 17h5"/><path d="M17 17h5"/><path d="M17 7h5"/>
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" viewBox="0 0 24 24">
+          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" />
+          <path d="M7 2v20" />
+          <path d="M17 2v20" />
+          <path d="M2 12h20" />
+          <path d="M2 7h5" />
+          <path d="M2 17h5" />
+          <path d="M17 17h5" />
+          <path d="M17 7h5" />
         </svg>
         <span class="nav-label">EDITOR</span>
       </button>
@@ -246,10 +319,13 @@
 
     <!-- Bottom sticky: Settings + Collapse -->
     <div style="border-top:1px solid var(--border);padding:8px 12px;display:flex;flex-direction:column;gap:2px">
-      <button class="nav-item" onclick="switchPage('settings')" data-page="settings" title="Settings" style="margin:0;width:100%">
+      <button class="nav-item" onclick="switchPage('settings')" data-page="settings" title="Settings"
+        style="margin:0;width:100%">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
         </svg>
         <span class="nav-label">SETTINGS</span>
       </button>
@@ -267,43 +343,57 @@
   <div id="mobile-nav" style="display:none">
     <button onclick="switchPage('pipeline')" data-page="pipeline">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
       </svg>
       PIPELINE
     </button>
+    <div style="width:1px;background:var(--border);margin:12px 0;"></div>
     <button class="active" onclick="switchPage('tts')" data-page="tts">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+        <path d="M19 10v2a7 7 0 01-14 0v-2" />
+        <line x1="12" y1="19" x2="12" y2="23" />
+        <line x1="8" y1="23" x2="16" y2="23" />
       </svg>
       TTS
     </button>
     <button onclick="switchPage('timing')" data-page="timing">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-        <path d="M4 7h16M4 12h16M4 17h10" /><circle cx="19" cy="17" r="2" />
+        <path d="M4 7h16M4 12h16M4 17h10" />
+        <circle cx="19" cy="17" r="2" />
       </svg>
       ALIGNMENT
     </button>
     <button onclick="switchPage('segmenter')" data-page="segmenter">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-        <path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h6" /><path d="M18 10v8" /><path d="M15 13l3-3 3 3" />
+        <path d="M4 6h16" />
+        <path d="M4 12h10" />
+        <path d="M4 18h6" />
+        <path d="M18 10v8" />
+        <path d="M15 13l3-3 3 3" />
       </svg>
       SEGMENTER
     </button>
     <button onclick="switchPage('scenes')" data-page="scenes">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-        <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8" /><path d="M12 17v4" />
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <path d="M8 21h8" />
+        <path d="M12 17v4" />
       </svg>
       SCENES
     </button>
     <button onclick="switchPage('assets')" data-page="assets">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="M21 15l-5-5L5 21" />
       </svg>
       ASSETS
     </button>
     <button onclick="switchPage('editor')" data-page="editor">
       <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-        <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+        <path
+          d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
       </svg>
       EDITOR
     </button>
@@ -322,17 +412,21 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Pipeline</h2>
-            <p class="text-sm mt-1" style="color:var(--text-secondary)">Run the full TTS → Timing → Segment → Scenes pipeline</p>
+            <p class="text-sm mt-1" style="color:var(--text-secondary)">Run the full TTS → Timing → Segment → Scenes
+              pipeline</p>
           </div>
         </div>
 
         <!-- Input -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Story Text</label>
-          <textarea id="pipeline-text" class="input-field" rows="6" placeholder="Enter your story text..." style="width:100%;resize:vertical;font-family:inherit;font-size:13px;line-height:1.6"></textarea>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
+            style="color:var(--text-muted)">Story Text</label>
+          <textarea id="pipeline-text" class="input-field" rows="6" placeholder="Enter your story text..."
+            style="width:100%;resize:vertical;font-family:inherit;font-size:13px;line-height:1.6"></textarea>
           <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
             <div>
-              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Voice</label>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1"
+                style="color:var(--text-muted)">Voice</label>
               <select id="pipeline-voice" class="input-field" style="width:140px;font-size:12px">
                 <option value="af_heart">af_heart</option>
                 <option value="af_bella">af_bella</option>
@@ -342,11 +436,14 @@
               </select>
             </div>
             <div>
-              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Speed</label>
-              <input id="pipeline-speed" type="number" class="input-field" value="1.0" min="0.5" max="2.0" step="0.1" style="width:80px;font-size:12px">
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1"
+                style="color:var(--text-muted)">Speed</label>
+              <input id="pipeline-speed" type="number" class="input-field" value="1.0" min="0.5" max="2.0" step="0.1"
+                style="width:80px;font-size:12px">
             </div>
             <div>
-              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Style</label>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1"
+                style="color:var(--text-muted)">Style</label>
               <select id="pipeline-style" class="input-field" style="width:140px;font-size:12px">
                 <option value="cinematic">Cinematic</option>
                 <option value="dark_horror">Dark Horror</option>
@@ -360,25 +457,32 @@
               </select>
             </div>
           </div>
-          <button id="pipeline-run-btn" class="action-btn hover-accent" style="margin-top:16px;padding:10px 24px;font-size:13px;font-weight:600" onclick="pipelineStart()">Run Pipeline</button>
+          <button id="pipeline-run-btn" class="action-btn hover-accent"
+            style="margin-top:16px;padding:10px 24px;font-size:13px;font-weight:600" onclick="pipelineStart()">Run
+            Pipeline</button>
         </section>
 
         <!-- Progress -->
         <section id="pipeline-progress" class="card p-5 mb-4" style="display:none">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-4" style="color:var(--text-muted)">Progress</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-4"
+            style="color:var(--text-muted)">Progress</label>
           <div id="pipeline-steps" style="margin-bottom:16px"></div>
           <div id="pipeline-current-step" style="min-height:24px"></div>
         </section>
 
         <!-- Log -->
         <section id="pipeline-log-section" class="card p-5 mb-4" style="display:none">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Log</label>
-          <div id="pipeline-log" class="font-mono" style="max-height:200px;overflow-y:auto;font-size:11px;line-height:1.6;padding:8px 12px;background:var(--bg-darkest);border-radius:8px;border:1px solid var(--border)"></div>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
+            style="color:var(--text-muted)">Log</label>
+          <div id="pipeline-log" class="font-mono"
+            style="max-height:200px;overflow-y:auto;font-size:11px;line-height:1.6;padding:8px 12px;background:var(--bg-darkest);border-radius:8px;border:1px solid var(--border)">
+          </div>
         </section>
 
         <!-- History -->
         <section class="card p-5">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Recent Jobs</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
+            style="color:var(--text-muted)">Recent Jobs</label>
           <div id="pipeline-jobs" style="max-height:300px;overflow-y:auto">
             <p style="text-align:center;color:var(--text-muted);font-size:11px;padding:24px 0">Loading...</p>
           </div>
@@ -397,18 +501,24 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Text to Speech</h2>
-            <p class="text-sm mt-1" style="color:var(--text-secondary)">Kokoro TTS with 50+ voices and voice blending</p>
+            <p class="text-sm mt-1" style="color:var(--text-secondary)">Kokoro TTS with 50+ voices and voice blending
+            </p>
           </div>
           <div id="tts-model-status" style="font-size:11px;font-family:'JetBrains Mono',monospace"></div>
         </div>
 
         <!-- Voice Selection -->
         <section class="card p-5 mb-4">
-          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="ttsToggleVoiceSection()">
-            <label id="tts-voice-label" class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted);cursor:pointer;pointer-events:none">Voice</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer"
+            onclick="ttsToggleVoiceSection()">
+            <label id="tts-voice-label" class="block text-[10px] font-bold uppercase tracking-[0.15em]"
+              style="color:var(--text-muted);cursor:pointer;pointer-events:none">Voice</label>
             <div style="display:flex;align-items:center;gap:6px">
               <span id="tts-voice-summary" style="font-size:11px;color:var(--text-secondary)"></span>
-              <svg id="tts-voice-chevron" width="14" height="14" fill="none" stroke="var(--text-muted)" stroke-width="2" viewBox="0 0 24 24" style="transition:transform 0.2s"><path d="M6 9l6 6 6-6"/></svg>
+              <svg id="tts-voice-chevron" width="14" height="14" fill="none" stroke="var(--text-muted)" stroke-width="2"
+                viewBox="0 0 24 24" style="transition:transform 0.2s">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
             </div>
           </div>
           <div id="tts-voice-grid" style="display:none;margin-top:10px"></div>
@@ -417,7 +527,8 @@
         <!-- Multi-Voice Mode Toggle -->
         <section class="card p-5 mb-4" id="tts-multivoice-section">
           <div style="display:flex;align-items:center;justify-content:space-between">
-            <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Voice Mode</label>
+            <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Voice
+              Mode</label>
             <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden">
               <button id="tts-mode-single" onclick="ttsSetVoiceMode('single')" class="text-xs px-3 py-1.5 font-medium"
                 style="background:none;border:none;cursor:pointer;color:var(--accent)">Single Voice</button>
@@ -428,10 +539,13 @@
           <!-- Multi-voice segment list (hidden by default) -->
           <div id="tts-mv-panel" style="display:none;margin-top:12px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <span class="text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Segments</span>
+              <span class="text-[10px] font-bold uppercase tracking-[0.15em]"
+                style="color:var(--text-muted)">Segments</span>
               <div style="display:flex;gap:4px">
-                <button onclick="ttsAutoDetectRoles()" class="action-btn" style="padding:3px 8px;font-size:9px" title="Split text into narrator/dialogue segments">Auto-detect</button>
-                <button onclick="ttsAddMvSegment()" class="action-btn" style="padding:3px 8px;font-size:9px" title="Add segment">+ Add</button>
+                <button onclick="ttsAutoDetectRoles()" class="action-btn" style="padding:3px 8px;font-size:9px"
+                  title="Split text into narrator/dialogue segments">Auto-detect</button>
+                <button onclick="ttsAddMvSegment()" class="action-btn" style="padding:3px 8px;font-size:9px"
+                  title="Add segment">+ Add</button>
               </div>
             </div>
             <div id="tts-mv-segments"></div>
@@ -440,24 +554,30 @@
 
         <!-- Text Input -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Prompt</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5"
+            style="color:var(--text-muted)">Prompt</label>
           <textarea id="tts-prompt" class="input-field" rows="4" oninput="ttsUpdateCounts()"
             placeholder="Type or paste something to speak aloud..."
             style="width:100%;font-size:13px;line-height:1.7;resize:none;padding:12px 14px;font-family:inherit"></textarea>
           <div class="flex items-center justify-between mt-2">
             <div class="flex items-center gap-2.5">
-              <p class="font-mono text-xs" style="color:var(--text-muted)"><span id="tts-text-count">0 words ~ 0 tokens</span></p>
-              <button id="tts-normalize-btn" onclick="ttsNormalize()" title="Normalize text for TTS" class="hover-accent"
+              <p class="font-mono text-xs" style="color:var(--text-muted)"><span id="tts-text-count">0 words ~ 0
+                  tokens</span></p>
+              <button id="tts-normalize-btn" onclick="ttsNormalize()" title="Normalize text for TTS"
+                class="hover-accent"
                 style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">Format</button>
               <button onclick="ttsCopyPrompt()" title="Copy plain text (without brackets)" class="hover-accent"
                 style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">Copy</button>
               <button onclick="ttsRandomStory()" title="Load a random story excerpt" class="hover-accent"
-                style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">&#x1F3B2; Random</button>
+                style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">&#x1F3B2;
+                Random</button>
             </div>
             <div class="flex items-center gap-1" style="color:var(--text-muted)">
-              <kbd style="padding:2px 5px;border-radius:3px;font-size:9px;border:1px solid var(--border);font-family:'JetBrains Mono',monospace">Ctrl</kbd>
+              <kbd
+                style="padding:2px 5px;border-radius:3px;font-size:9px;border:1px solid var(--border);font-family:'JetBrains Mono',monospace">Ctrl</kbd>
               <span style="font-size:9px">+</span>
-              <kbd style="padding:2px 5px;border-radius:3px;font-size:9px;border:1px solid var(--border);font-family:'JetBrains Mono',monospace">Enter</kbd>
+              <kbd
+                style="padding:2px 5px;border-radius:3px;font-size:9px;border:1px solid var(--border);font-family:'JetBrains Mono',monospace">Enter</kbd>
             </div>
           </div>
         </section>
@@ -466,12 +586,14 @@
         <section class="card p-5 mb-4">
           <div class="flex items-center gap-4 flex-wrap">
             <div class="flex items-center gap-2">
-              <label class="text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Speed</label>
+              <label class="text-[10px] font-bold uppercase tracking-[0.15em]"
+                style="color:var(--text-muted)">Speed</label>
               <input id="tts-speed" type="number" min="0.5" max="2.0" step="0.1" value="1.0"
                 onchange="localStorage.setItem('sts-tts-speed',this.value)"
                 style="width:60px;background:var(--bg-darkest);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:var(--text);font-family:'JetBrains Mono',monospace;text-align:center">
             </div>
-            <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto">
+            <div
+              style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto">
               <button id="tts-mode-gen" onclick="ttsSetGenMode('generate')" class="text-xs px-3 py-1.5 font-medium"
                 style="background:none;border:none;cursor:pointer;color:var(--accent)">Generate</button>
               <button id="tts-mode-listen" onclick="ttsSetGenMode('listen')" class="text-xs px-3 py-1.5 font-medium"
@@ -484,23 +606,35 @@
         <div style="display:flex;gap:8px;margin-bottom:4px">
           <button id="tts-gen-btn" onclick="ttsHandleAction()" class="gen-btn flex-1"
             style="padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;letter-spacing:0.02em;color:white;cursor:pointer;transition:all 0.3s;border:none;position:relative;overflow:hidden">
-            <span id="tts-gen-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
+            <span id="tts-gen-spinner"
+              style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
             <span id="tts-gen-btn-label">Generate</span>
           </button>
-          <button id="tts-abort-btn" onclick="ttsAbortGeneration()" style="display:none;padding:14px 16px;border-radius:12px;font-size:12px;font-weight:600;background:rgba(255,107,107,0.15);color:var(--coral);border:1.5px solid rgba(255,107,107,0.3);cursor:pointer">Abort</button>
+          <button id="tts-abort-btn" onclick="ttsAbortGeneration()"
+            style="display:none;padding:14px 16px;border-radius:12px;font-size:12px;font-weight:600;background:rgba(255,107,107,0.15);color:var(--coral);border:1.5px solid rgba(255,107,107,0.3);cursor:pointer">Abort</button>
         </div>
-        <div id="tts-progress" style="display:none;font-size:11px;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;margin-top:6px;margin-bottom:12px"></div>
+        <div id="tts-progress"
+          style="display:none;font-size:11px;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;margin-top:6px;margin-bottom:12px">
+        </div>
 
         <!-- Now Playing -->
         <div id="tts-now-playing" style="display:none;margin-top:16px" class="card p-4">
           <div class="flex items-center gap-3 mb-3">
-            <button id="tts-play-btn" onclick="ttsTogglePlayback()" style="width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(78,205,196,0.12);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--accent)">
-              <svg id="tts-icon-play" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-              <svg id="tts-icon-pause" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+            <button id="tts-play-btn" onclick="ttsTogglePlayback()"
+              style="width:36px;height:36px;min-width:36px;border-radius:10px;background:rgba(78,205,196,0.12);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--accent)">
+              <svg id="tts-icon-play" width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              <svg id="tts-icon-pause" width="16" height="16" fill="currentColor" viewBox="0 0 24 24"
+                style="display:none">
+                <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+              </svg>
             </button>
             <div class="flex-1 min-w-0">
-              <p id="tts-np-text" class="text-xs" style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
-              <div class="flex items-center gap-2 mt-0.5" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
+              <p id="tts-np-text" class="text-xs"
+                style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+              <div class="flex items-center gap-2 mt-0.5"
+                style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
                 <span id="tts-np-voice"></span>
                 <span style="opacity:0.3">/</span>
                 <span id="tts-np-duration"></span>
@@ -508,8 +642,10 @@
               </div>
             </div>
           </div>
-          <div id="tts-seek-bar" onclick="ttsSeekAudio(event)" style="height:6px;background:var(--bg-darkest);border-radius:3px;cursor:pointer;overflow:hidden">
-            <div id="tts-seek-fill" style="height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 0.1s"></div>
+          <div id="tts-seek-bar" onclick="ttsSeekAudio(event)"
+            style="height:6px;background:var(--bg-darkest);border-radius:3px;cursor:pointer;overflow:hidden">
+            <div id="tts-seek-fill"
+              style="height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 0.1s"></div>
           </div>
           <audio id="tts-audio-el"></audio>
         </div>
@@ -520,7 +656,8 @@
             <h3 class="font-display text-lg font-bold" style="color:var(--text)">History</h3>
             <div style="display:flex;align-items:center;gap:8px">
               <span id="tts-history-count" class="font-mono text-xs" style="color:var(--text-muted)">0 files</span>
-              <button onclick="ttsDeleteAll()" class="action-btn hover-coral-border" style="padding:3px 10px;font-size:10px">Delete All</button>
+              <button onclick="ttsDeleteAll()" class="action-btn hover-coral-border"
+                style="padding:3px 10px;font-size:10px">Delete All</button>
             </div>
           </div>
           <div id="tts-history-list"></div>
@@ -543,39 +680,52 @@
 
         <!-- TTS Source -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">From TTS</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5"
+            style="color:var(--text-muted)">From TTS</label>
           <div style="display:flex;gap:8px">
-            <button onclick="alignUseTTS()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
-            <button onclick="alignPickTTS()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
+            <button onclick="alignUseTTS()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use
+              Current Result</button>
+            <button onclick="alignPickTTS()" class="action-btn hover-accent"
+              style="padding:6px 14px;font-size:11px">Pick from History</button>
           </div>
-          <p id="align-tts-source" style="display:none;font-size:11px;color:var(--accent);margin-top:8px;font-family:'JetBrains Mono',monospace"></p>
+          <p id="align-tts-source"
+            style="display:none;font-size:11px;color:var(--accent);margin-top:8px;font-family:'JetBrains Mono',monospace">
+          </p>
         </section>
 
         <!-- Upload audio -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Audio File</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5"
+            style="color:var(--text-muted)">Audio File</label>
           <div id="align-drop-zone"
             style="border:2px dashed var(--border);border-radius:10px;padding:32px 16px;text-align:center;cursor:pointer;transition:all 0.2s"
             onclick="document.getElementById('align-file-input').click()"
             ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(78,205,196,0.04)'"
             ondragleave="this.style.borderColor='var(--border)';this.style.background='transparent'"
             ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='transparent';handleAlignFileDrop(event)">
-            <svg width="28" height="28" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 8px">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            <svg width="28" height="28" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24"
+              style="margin:0 auto 8px">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <p id="align-file-label" style="font-size:13px;color:var(--text-muted)">Drop a WAV/MP3 file here or click to browse</p>
+            <p id="align-file-label" style="font-size:13px;color:var(--text-muted)">Drop a WAV/MP3 file here or click to
+              browse</p>
             <p id="align-file-info" style="font-size:11px;color:var(--text-secondary);margin-top:4px;display:none"></p>
           </div>
-          <input type="file" id="align-file-input" accept=".wav,.mp3,.flac,.ogg" style="display:none" onchange="handleAlignFileSelect(this)">
+          <input type="file" id="align-file-input" accept=".wav,.mp3,.flac,.ogg" style="display:none"
+            onchange="handleAlignFileSelect(this)">
         </section>
 
         <!-- Transcript text -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Transcript</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5"
+            style="color:var(--text-muted)">Transcript</label>
           <textarea id="align-text-input" class="input-field" rows="5"
             placeholder="Paste the transcript text that matches the audio..."
             style="width:100%;font-size:13px;line-height:1.7;resize:vertical;padding:12px 14px;font-family:inherit"></textarea>
-          <div class="flex justify-between mt-2" style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
+          <div class="flex justify-between mt-2"
+            style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">
             <span id="align-text-count">0 words</span>
             <span>English only</span>
           </div>
@@ -584,7 +734,8 @@
         <!-- Align button -->
         <button id="align-run-btn" onclick="handleRunAlignment()" class="gen-btn w-full"
           style="padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;letter-spacing:0.02em;color:white;cursor:pointer;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);border:none;position:relative;overflow:hidden">
-          <span id="align-btn-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
+          <span id="align-btn-spinner"
+            style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
           <span id="align-btn-label">Run Alignment</span>
         </button>
 
@@ -592,20 +743,30 @@
         <div id="align-results" style="display:none;margin-top:20px">
           <section class="card p-5">
             <div class="flex items-center justify-between mb-3">
-              <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Results</label>
+              <label class="block text-[10px] font-bold uppercase tracking-[0.15em]"
+                style="color:var(--text-muted)">Results</label>
               <div style="display:flex;gap:6px">
-                <button onclick="alnOpenKaraoke()" title="Fullscreen karaoke" class="action-btn hover-accent" style="display:flex;align-items:center;gap:4px;padding:4px 10px">
-                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+                <button onclick="alnOpenKaraoke()" title="Fullscreen karaoke" class="action-btn hover-accent"
+                  style="display:flex;align-items:center;gap:4px;padding:4px 10px">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    viewBox="0 0 24 24">
+                    <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" />
+                  </svg>
                   Karaoke
                 </button>
                 <button onclick="copyAlignJSON()" title="Copy JSON" class="action-btn hover-accent">Copy JSON</button>
-                <button onclick="downloadAlignJSON()" title="Download JSON" class="action-btn hover-accent">Download</button>
-                <button onclick="deleteAlignResult()" title="Move to Trash" class="action-btn hover-coral-border">Delete</button>
+                <button onclick="downloadAlignJSON()" title="Download JSON"
+                  class="action-btn hover-accent">Download</button>
+                <button onclick="deleteAlignResult()" title="Move to Trash"
+                  class="action-btn hover-coral-border">Delete</button>
               </div>
             </div>
-            <div id="align-results-stats" class="font-mono" style="font-size:11px;color:var(--text-secondary);margin-bottom:10px"></div>
+            <div id="align-results-stats" class="font-mono"
+              style="font-size:11px;color:var(--text-secondary);margin-bottom:10px"></div>
             <div id="align-timeline" style="margin-bottom:12px"></div>
-            <div id="align-results-words" style="display:flex;flex-wrap:wrap;gap:3px 4px;line-height:2;max-height:300px;overflow-y:auto;padding-right:4px"></div>
+            <div id="align-results-words"
+              style="display:flex;flex-wrap:wrap;gap:3px 4px;line-height:2;max-height:300px;overflow-y:auto;padding-right:4px">
+            </div>
           </section>
         </div>
 
@@ -630,50 +791,64 @@
         <!-- Header -->
         <div class="mb-6">
           <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Segmenter</h2>
-          <p class="text-sm mt-1" style="color:var(--text-secondary)">Split alignment into timed segments for scene generation</p>
+          <p class="text-sm mt-1" style="color:var(--text-secondary)">Split alignment into timed segments for scene
+            generation</p>
         </div>
 
         <!-- Alignment Source -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Alignment Source</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5"
+            style="color:var(--text-muted)">Alignment Source</label>
           <div class="flex gap-3 mb-3 flex-wrap">
-            <button onclick="segUseCurrentResult()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
-            <button onclick="segPickHistory()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
+            <button onclick="segUseCurrentResult()" class="action-btn hover-accent"
+              style="padding:6px 14px;font-size:11px">Use Current Result</button>
+            <button onclick="segPickHistory()" class="action-btn hover-accent"
+              style="padding:6px 14px;font-size:11px">Pick from History</button>
             <label class="action-btn hover-accent" style="padding:6px 14px;font-size:11px;cursor:pointer">
               Upload JSON
               <input type="file" accept=".json" style="display:none" onchange="segHandleUpload(this)">
             </label>
           </div>
-          <div id="seg-source-info" class="font-mono" style="font-size:12px;color:var(--text-muted)">No alignment selected</div>
+          <div id="seg-source-info" class="font-mono" style="font-size:12px;color:var(--text-muted)">No alignment
+            selected</div>
         </section>
 
         <!-- Config -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Segment Config</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
+            style="color:var(--text-muted)">Segment Config</label>
           <div class="grid grid-cols-2 gap-x-6 gap-y-3" style="max-width:500px">
             <div>
               <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
-                <span>Target Min</span><span id="seg-val-target_min" class="font-mono" style="color:var(--accent)">1.5s</span>
+                <span>Target Min</span><span id="seg-val-target_min" class="font-mono"
+                  style="color:var(--accent)">1.5s</span>
               </div>
-              <input type="range" min="0.5" max="3.0" step="0.1" value="1.5" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('target_min', this.value)">
+              <input type="range" min="0.5" max="3.0" step="0.1" value="1.5"
+                style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('target_min', this.value)">
             </div>
             <div>
               <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
-                <span>Target Max</span><span id="seg-val-target_max" class="font-mono" style="color:var(--accent)">3.0s</span>
+                <span>Target Max</span><span id="seg-val-target_max" class="font-mono"
+                  style="color:var(--accent)">3.0s</span>
               </div>
-              <input type="range" min="2.0" max="6.0" step="0.1" value="3.0" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('target_max', this.value)">
+              <input type="range" min="2.0" max="6.0" step="0.1" value="3.0"
+                style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('target_max', this.value)">
             </div>
             <div>
               <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
-                <span>Hard Max</span><span id="seg-val-hard_max" class="font-mono" style="color:var(--accent)">4.0s</span>
+                <span>Hard Max</span><span id="seg-val-hard_max" class="font-mono"
+                  style="color:var(--accent)">4.0s</span>
               </div>
-              <input type="range" min="3.0" max="8.0" step="0.1" value="4.0" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('hard_max', this.value)">
+              <input type="range" min="3.0" max="8.0" step="0.1" value="4.0"
+                style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('hard_max', this.value)">
             </div>
             <div>
               <div class="flex justify-between" style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">
-                <span>Gap Filler</span><span id="seg-val-gap_filler" class="font-mono" style="color:var(--accent)">0.3s</span>
+                <span>Gap Filler</span><span id="seg-val-gap_filler" class="font-mono"
+                  style="color:var(--accent)">0.3s</span>
               </div>
-              <input type="range" min="0.1" max="1.0" step="0.05" value="0.3" style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('gap_filler', this.value)">
+              <input type="range" min="0.1" max="1.0" step="0.05" value="0.3"
+                style="width:100%;accent-color:var(--accent)" oninput="segUpdateConfig('gap_filler', this.value)">
             </div>
           </div>
         </section>
@@ -681,7 +856,8 @@
         <!-- Run Button -->
         <button id="seg-run-btn" onclick="handleRunSegmenter()" class="gen-btn w-full"
           style="padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;letter-spacing:0.02em;color:white;cursor:pointer;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);border:none;position:relative;overflow:hidden">
-          <span id="seg-btn-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
+          <span id="seg-btn-spinner"
+            style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
           <span id="seg-btn-label">Run Segmenter</span>
         </button>
 
@@ -689,15 +865,19 @@
         <div id="seg-results" style="display:none;margin-top:20px">
           <section class="card p-5">
             <div class="flex items-center justify-between mb-3">
-              <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Results</label>
+              <label class="block text-[10px] font-bold uppercase tracking-[0.15em]"
+                style="color:var(--text-muted)">Results</label>
               <div style="display:flex;gap:6px">
                 <button onclick="copySegJSON()" class="action-btn hover-accent">Copy JSON</button>
                 <button onclick="downloadSegJSON()" class="action-btn hover-accent">Download</button>
               </div>
             </div>
-            <div id="seg-stats" class="font-mono" style="font-size:11px;color:var(--text-secondary);margin-bottom:12px"></div>
+            <div id="seg-stats" class="font-mono" style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">
+            </div>
             <div id="seg-timeline" style="margin-bottom:16px"></div>
-            <div id="seg-list" style="display:flex;flex-direction:column;gap:6px;max-height:600px;overflow-y:auto;padding-right:4px"></div>
+            <div id="seg-list"
+              style="display:flex;flex-direction:column;gap:6px;max-height:600px;overflow-y:auto;padding-right:4px">
+            </div>
           </section>
         </div>
 
@@ -722,31 +902,40 @@
         <!-- Header -->
         <div class="mb-6">
           <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Scene Generator</h2>
-          <p class="text-sm mt-1" style="color:var(--text-secondary)">Transform word-level timestamps into AI-powered visual scene scripts</p>
+          <p class="text-sm mt-1" style="color:var(--text-secondary)">Transform word-level timestamps into AI-powered
+            visual scene scripts</p>
         </div>
 
         <!-- Segmentation Source -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Segmentation Source</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5"
+            style="color:var(--text-muted)">Segmentation Source</label>
           <div class="flex gap-3 mb-3 flex-wrap">
-            <button onclick="scenesUseCurrentSegment()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
-            <button onclick="scenesPickSegHistory()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
+            <button onclick="scenesUseCurrentSegment()" class="action-btn hover-accent"
+              style="padding:6px 14px;font-size:11px">Use Current Result</button>
+            <button onclick="scenesPickSegHistory()" class="action-btn hover-accent"
+              style="padding:6px 14px;font-size:11px">Pick from History</button>
             <label class="action-btn hover-accent" style="padding:6px 14px;font-size:11px;cursor:pointer">
               Upload JSON
               <input type="file" accept=".json" style="display:none" onchange="scenesHandleUpload(this)">
             </label>
           </div>
-          <div id="scenes-source-info" class="font-mono" style="font-size:12px;color:var(--text-muted)">No segmentation selected</div>
-          <div id="scenes-json-preview" style="display:none;margin-top:10px;max-height:250px;overflow-y:auto;background:var(--bg-darkest);border-radius:8px;padding:12px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);white-space:pre-wrap"></div>
+          <div id="scenes-source-info" class="font-mono" style="font-size:12px;color:var(--text-muted)">No segmentation
+            selected</div>
+          <div id="scenes-json-preview"
+            style="display:none;margin-top:10px;max-height:250px;overflow-y:auto;background:var(--bg-darkest);border-radius:8px;padding:12px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary);white-space:pre-wrap">
+          </div>
         </section>
 
         <!-- Settings -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5" style="color:var(--text-muted)">Generation Settings</label>
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2.5"
+            style="color:var(--text-muted)">Generation Settings</label>
           <!-- Style Template Picker -->
           <div style="margin-bottom:12px">
             <label class="block text-xs mb-2" style="color:var(--text-secondary)">Style Template</label>
-            <div id="scenes-style-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
+            <div id="scenes-style-grid"
+              style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
               <!-- Populated by JS from /api/scenes/templates -->
             </div>
             <input type="hidden" id="scenes-style" value="cinematic">
@@ -754,7 +943,8 @@
           <!-- Aspect Ratio -->
           <div>
             <label class="block text-xs mb-1" style="color:var(--text-secondary)">Aspect Ratio</label>
-            <select id="scenes-aspect" class="input-field" style="width:100%;padding:8px 12px;font-size:12px;font-family:inherit">
+            <select id="scenes-aspect" class="input-field"
+              style="width:100%;padding:8px 12px;font-size:12px;font-family:inherit">
               <option value="9:16">9:16 (Vertical / Reels)</option>
               <option value="16:9">16:9 (Landscape)</option>
               <option value="1:1">1:1 (Square)</option>
@@ -766,23 +956,32 @@
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
               <label class="block text-xs" style="color:var(--text-secondary)">Send to Webhook</label>
               <label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer">
-                <input type="checkbox" id="scenes-webhook-toggle" checked onchange="scenesToggleWebhook()" style="opacity:0;width:0;height:0">
-                <span style="position:absolute;inset:0;background:var(--bg-darkest);border:1px solid var(--border);border-radius:10px;transition:all 0.2s"></span>
-                <span id="scenes-webhook-dot" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:var(--accent);border-radius:50%;transition:all 0.2s;transform:translateX(16px)"></span>
+                <input type="checkbox" id="scenes-webhook-toggle" checked onchange="scenesToggleWebhook()"
+                  style="opacity:0;width:0;height:0">
+                <span
+                  style="position:absolute;inset:0;background:var(--bg-darkest);border:1px solid var(--border);border-radius:10px;transition:all 0.2s"></span>
+                <span id="scenes-webhook-dot"
+                  style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:var(--accent);border-radius:50%;transition:all 0.2s;transform:translateX(16px)"></span>
               </label>
             </div>
             <div id="scenes-webhook-url-row" style="display:flex;gap:8px;align-items:center">
-              <input type="text" id="scenes-webhook-url" class="input-field font-mono" style="flex:1;padding:8px 12px;font-size:11px" placeholder="Webhook URL..." oninput="localStorage.setItem('sts-scenes-webhook-url',this.value)">
-              <button onclick="scenesResetWebhookUrl()" class="action-btn hover-accent" style="padding:6px 10px;font-size:10px;white-space:nowrap">Reset</button>
+              <input type="text" id="scenes-webhook-url" class="input-field font-mono"
+                style="flex:1;padding:8px 12px;font-size:11px" placeholder="Webhook URL..."
+                oninput="localStorage.setItem('sts-scenes-webhook-url',this.value)">
+              <button onclick="scenesResetWebhookUrl()" class="action-btn hover-accent"
+                style="padding:6px 10px;font-size:10px;white-space:nowrap">Reset</button>
             </div>
-            <p id="scenes-webhook-off-msg" style="display:none;font-size:11px;color:var(--text-muted);font-style:italic">Webhook disabled — will only preview the payload without sending</p>
+            <p id="scenes-webhook-off-msg"
+              style="display:none;font-size:11px;color:var(--text-muted);font-style:italic">Webhook disabled — will only
+              preview the payload without sending</p>
           </div>
         </section>
 
         <!-- Generate / Preview Button -->
         <button id="scenes-generate-btn" onclick="handleGenerateScenes()" class="gen-btn w-full"
           style="padding:14px 24px;border-radius:12px;font-size:14px;font-weight:700;font-family:'JetBrains Mono','Fira Code',monospace;letter-spacing:0.02em;color:white;cursor:pointer;transition:all 0.3s cubic-bezier(0.16,1,0.3,1);border:none;position:relative;overflow:hidden">
-          <span id="scenes-btn-spinner" style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
+          <span id="scenes-btn-spinner"
+            style="display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span>
           <span id="scenes-btn-label">Generate Scene Script</span>
         </button>
 
@@ -790,20 +989,30 @@
         <div id="scenes-payload-preview" style="display:none;margin-top:16px">
           <div style="border:1px solid var(--border);border-radius:12px;background:var(--bg-darkest);overflow:hidden">
             <!-- Header -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
+            <div
+              style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
               <span class="font-mono text-xs" style="color:var(--accent)">Webhook Payload Preview</span>
               <div style="display:flex;gap:6px">
-                <button onclick="scenesPayloadCopy()" class="action-btn hover-accent" style="padding:4px 10px;font-size:10px">Copy</button>
-                <button onclick="scenesTogglePayloadPreview()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
+                <button onclick="scenesPayloadCopy()" class="action-btn hover-accent"
+                  style="padding:4px 10px;font-size:10px">Copy</button>
+                <button onclick="scenesTogglePayloadPreview()"
+                  style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
               </div>
             </div>
             <!-- JSON Content -->
-            <pre id="scenes-payload-preview-content" class="font-mono" style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.6;margin:0;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
+            <pre id="scenes-payload-preview-content" class="font-mono"
+              style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.6;margin:0;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
             <!-- Webhook URL + Send -->
             <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">
-              <input type="text" id="scenes-preview-webhook-url" class="input-field font-mono" style="flex:1;padding:8px 12px;font-size:11px;border-radius:8px" placeholder="Webhook URL...">
-              <button id="scenes-send-preview-btn" onclick="scenesSendPreviewToWebhook()" style="padding:8px 20px;border-radius:8px;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;border:none;cursor:pointer;color:white;background:linear-gradient(135deg,var(--accent),#3BA89F);box-shadow:0 2px 12px rgba(78,205,196,0.25);transition:all 0.2s;white-space:nowrap">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:4px"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              <input type="text" id="scenes-preview-webhook-url" class="input-field font-mono"
+                style="flex:1;padding:8px 12px;font-size:11px;border-radius:8px" placeholder="Webhook URL...">
+              <button id="scenes-send-preview-btn" onclick="scenesSendPreviewToWebhook()"
+                style="padding:8px 20px;border-radius:8px;font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;border:none;cursor:pointer;color:white;background:linear-gradient(135deg,var(--accent),#3BA89F);box-shadow:0 2px 12px rgba(78,205,196,0.25);transition:all 0.2s;white-space:nowrap">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                  style="vertical-align:-2px;margin-right:4px">
+                  <path d="M22 2L11 13" />
+                  <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                </svg>
                 Send
               </button>
             </div>
@@ -813,27 +1022,36 @@
         <!-- Results -->
         <div id="scenes-results" style="display:none;margin-top:20px">
           <div class="flex items-center justify-between mb-3">
-            <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Generated Scenes</label>
+            <label class="block text-[10px] font-bold uppercase tracking-[0.15em]"
+              style="color:var(--text-muted)">Generated Scenes</label>
             <div style="display:flex;gap:6px">
-              <button onclick="toggleScenesPreview()" id="scenes-preview-btn" class="action-btn hover-accent" style="border-color:#A78BFA;color:#A78BFA">Preview Script</button>
+              <button onclick="toggleScenesPreview()" id="scenes-preview-btn" class="action-btn hover-accent"
+                style="border-color:#A78BFA;color:#A78BFA">Preview Script</button>
               <button onclick="copyScenesJSON()" class="action-btn hover-accent">Copy JSON</button>
               <button onclick="downloadScenesJSON()" class="action-btn hover-accent">Download</button>
-              <button onclick="sendToAssets()" class="action-btn hover-accent" style="border-color:var(--accent);color:var(--accent)">Send to Assets</button>
-              <button onclick="sendToEditor()" class="action-btn hover-accent" style="border-color:var(--accent);color:var(--accent)">Send to Editor</button>
+              <button onclick="sendToAssets()" class="action-btn hover-accent"
+                style="border-color:var(--accent);color:var(--accent)">Send to Assets</button>
+              <button onclick="sendToEditor()" class="action-btn hover-accent"
+                style="border-color:var(--accent);color:var(--accent)">Send to Editor</button>
             </div>
           </div>
-          <div id="scenes-stats" class="font-mono" style="font-size:11px;color:var(--text-secondary);margin-bottom:10px"></div>
+          <div id="scenes-stats" class="font-mono"
+            style="font-size:11px;color:var(--text-secondary);margin-bottom:10px"></div>
 
           <!-- Timeline + Audio Player -->
           <div id="scenes-timeline" style="margin-bottom:16px"></div>
 
           <!-- Script Preview Panel -->
-          <div id="scenes-script-preview" style="display:none;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;background:var(--bg-darkest);overflow:hidden">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
+          <div id="scenes-script-preview"
+            style="display:none;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;background:var(--bg-darkest);overflow:hidden">
+            <div
+              style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)">
               <span class="font-mono text-xs" style="color:var(--text-muted)">Generated Scene Script</span>
-              <button onclick="toggleScenesPreview()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
+              <button onclick="toggleScenesPreview()"
+                style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px">&times;</button>
             </div>
-            <pre id="scenes-script-preview-content" class="font-mono" style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.7;margin:0;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
+            <pre id="scenes-script-preview-content" class="font-mono"
+              style="padding:14px;font-size:11px;color:var(--text-secondary);line-height:1.7;margin:0;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-word"></pre>
           </div>
 
           <div id="scenes-list" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -860,13 +1078,15 @@
         <!-- Header -->
         <div class="mb-6">
           <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Asset Manager</h2>
-          <p class="text-sm mt-1" style="color:var(--text-secondary)">Generate and manage visual assets for each scene</p>
+          <p class="text-sm mt-1" style="color:var(--text-secondary)">Generate and manage visual assets for each scene
+          </p>
         </div>
 
         <!-- AI Analysis Bar (shown when scenes loaded) -->
         <section id="assets-analysis-bar" class="card mb-4" style="display:none;overflow:hidden">
           <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center">
-            <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--accent);margin-right:4px">Analysis</span>
+            <span
+              style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--accent);margin-right:4px">Analysis</span>
             <div id="assets-analysis-chips" style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center"></div>
           </div>
         </section>
@@ -875,14 +1095,19 @@
         <section class="card p-4 mb-4">
           <div class="flex items-center justify-between flex-wrap gap-3">
             <div class="flex items-center gap-3 flex-wrap">
-              <span id="assets-source-label" class="font-mono text-xs" style="color:var(--text-muted)">No scenes loaded</span>
+              <span id="assets-source-label" class="font-mono text-xs" style="color:var(--text-muted)">No scenes
+                loaded</span>
               <div id="assets-type-mix" style="display:none"></div>
             </div>
             <div style="display:flex;gap:6px">
-              <button onclick="loadScenesForAssets()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Use Current Result</button>
-              <button onclick="assetsPickSceneHistory()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Pick from History</button>
-              <button onclick="importAssetsJSON()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Import JSON</button>
-              <input type="file" id="assets-json-input" accept=".json" style="display:none" onchange="handleAssetsJSONImport(this)">
+              <button onclick="loadScenesForAssets()" class="action-btn hover-accent"
+                style="padding:6px 14px;font-size:11px">Use Current Result</button>
+              <button onclick="assetsPickSceneHistory()" class="action-btn hover-accent"
+                style="padding:6px 14px;font-size:11px">Pick from History</button>
+              <button onclick="importAssetsJSON()" class="action-btn hover-accent"
+                style="padding:6px 14px;font-size:11px">Import JSON</button>
+              <input type="file" id="assets-json-input" accept=".json" style="display:none"
+                onchange="handleAssetsJSONImport(this)">
             </div>
           </div>
         </section>
@@ -892,62 +1117,94 @@
           <!-- Provider + Arguments -->
           <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
             <div>
-              <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style="color:var(--text-muted)">Provider</label>
-              <select id="assets-provider" class="input-field" style="padding:8px 12px;font-size:12px;font-family:inherit" onchange="assetsProviderChanged()">
+              <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2"
+                style="color:var(--text-muted)">Provider</label>
+              <select id="assets-provider" class="input-field"
+                style="padding:8px 12px;font-size:12px;font-family:inherit" onchange="assetsProviderChanged()">
                 <option value="midjourney">Midjourney</option>
                 <option value="meta-ai">Meta AI (Imagine)</option>
               </select>
             </div>
             <div id="assets-args-wrap">
-              <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2" style="color:var(--text-muted)">Arguments</label>
-              <input type="text" id="assets-arguments" class="input-field font-mono" style="padding:8px 12px;font-size:11px;width:200px" value="-v 7 -ar 9:16" placeholder="-v 7 -ar 9:16">
+              <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-2"
+                style="color:var(--text-muted)">Arguments</label>
+              <input type="text" id="assets-arguments" class="input-field font-mono"
+                style="padding:8px 12px;font-size:11px;width:200px" value="-v 7 -ar 9:16" placeholder="-v 7 -ar 9:16">
             </div>
           </div>
           <!-- Grabber + Progress -->
           <div style="padding-top:14px;border-top:1px solid var(--border)">
             <div class="flex gap-3 items-center flex-wrap">
-              <button id="assets-grabber-btn" onclick="assetsStartGrabber()" class="gen-btn" style="padding:10px 20px;border-radius:10px;font-size:12px;font-weight:600;color:white;border:none;cursor:pointer;white-space:nowrap">
-                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:6px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <button id="assets-grabber-btn" onclick="assetsStartGrabber()" class="gen-btn"
+                style="padding:10px 20px;border-radius:10px;font-size:12px;font-weight:600;color:white;border:none;cursor:pointer;white-space:nowrap">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                  style="vertical-align:-2px;margin-right:6px">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
                 Assets Grabber
               </button>
               <span id="assets-progress" class="font-mono text-xs" style="color:var(--text-muted)">0 / 0 complete</span>
-              <button id="assets-redownload-btn" onclick="assetsRedownload()" class="action-btn" style="padding:6px 14px;font-size:11px;margin-left:auto;color:var(--text-muted)" title="Retry failed/pending downloads">Retry Downloads</button>
-              <button onclick="downloadAllAssets()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Download All</button>
+              <button id="assets-redownload-btn" onclick="assetsRedownload()" class="action-btn"
+                style="padding:6px 14px;font-size:11px;margin-left:auto;color:var(--text-muted)"
+                title="Retry failed/pending downloads">Retry Downloads</button>
+              <button onclick="downloadAllAssets()" class="action-btn hover-accent"
+                style="padding:6px 14px;font-size:11px">Download All</button>
             </div>
             <!-- Status message -->
-            <div id="assets-grabber-status" style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--bg-darkest);border:1px solid var(--border)">
-              <span id="assets-grabber-status-text" class="font-mono text-xs" style="color:var(--text-secondary)"></span>
+            <div id="assets-grabber-status"
+              style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--bg-darkest);border:1px solid var(--border)">
+              <span id="assets-grabber-status-text" class="font-mono text-xs"
+                style="color:var(--text-secondary)"></span>
             </div>
             <!-- Progress bar -->
             <div id="assets-progress-bar-wrap" style="display:none;margin-top:10px">
               <div style="height:3px;background:var(--bg-darkest);border-radius:2px;overflow:hidden">
-                <div id="assets-progress-bar" style="height:100%;background:linear-gradient(90deg,var(--accent),#3BA89F);border-radius:2px;transition:width 0.4s ease;width:0%"></div>
+                <div id="assets-progress-bar"
+                  style="height:100%;background:linear-gradient(90deg,var(--accent),#3BA89F);border-radius:2px;transition:width 0.4s ease;width:0%">
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         <!-- Asset Grid -->
-        <div id="assets-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px"></div>
+        <div id="assets-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px">
+        </div>
 
         <!-- Empty State -->
         <div id="assets-empty" style="text-align:center;padding:64px 0;color:var(--text-muted);font-size:13px">
-          <svg width="48" height="48" fill="none" stroke="var(--text-muted)" stroke-width="1.2" viewBox="0 0 24 24" style="margin:0 auto 16px;opacity:0.4">
-            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+          <svg width="48" height="48" fill="none" stroke="var(--text-muted)" stroke-width="1.2" viewBox="0 0 24 24"
+            style="margin:0 auto 16px;opacity:0.4">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="M21 15l-5-5L5 21" />
           </svg>
           <p style="margin-bottom:4px">No scenes loaded</p>
-          <p style="font-size:11px;color:var(--text-muted);opacity:0.7">Generate scenes first, then load them here to create images</p>
+          <p style="font-size:11px;color:var(--text-muted);opacity:0.7">Generate scenes first, then load them here to
+            create images</p>
         </div>
 
         <!-- Assets History -->
         <section class="card mt-6" style="overflow:hidden">
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div
+            style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
             <div style="display:flex;align-items:center;gap:8px">
-              <svg width="16" height="16" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+              <svg width="16" height="16" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M12 8v4l3 3" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
               <span style="font-size:12px;font-weight:600;color:var(--text)">Recent Projects</span>
             </div>
-            <button onclick="loadAssetsHistory()" class="action-btn" style="font-size:10px;padding:4px 10px;color:var(--text-muted)" title="Refresh">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            <button onclick="loadAssetsHistory()" class="action-btn"
+              style="font-size:10px;padding:4px 10px;color:var(--text-muted)" title="Refresh">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                style="vertical-align:-1px">
+                <path d="M23 4v6h-6" />
+                <path d="M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+              </svg>
             </button>
           </div>
           <div id="assets-history-list" style="max-height:400px;overflow-y:auto">
@@ -962,14 +1219,19 @@
     <!-- PAGE: EDITOR (Timeline Editor)                             -->
     <!-- ========================================================== -->
     <div id="page-editor" class="page" style="height:100vh;overflow:hidden">
-      <div id="editor-loading" style="position:fixed;top:0;left:var(--sidebar-w,56px);right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;z-index:10">
+      <div id="editor-loading"
+        style="position:fixed;top:0;left:var(--sidebar-w,56px);right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;z-index:10">
         <div style="text-align:center">
-          <div style="width:36px;height:36px;border:2.5px solid rgba(255,255,255,0.08);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
+          <div
+            style="width:36px;height:36px;border:2.5px solid rgba(255,255,255,0.08);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px">
+          </div>
           <p style="color:var(--text-secondary)">Loading Timeline Editor...</p>
-          <p style="font-size:11px;margin-top:4px;color:var(--text-muted);opacity:0.7">Make sure the editor server is running</p>
+          <p style="font-size:11px;margin-top:4px;color:var(--text-muted);opacity:0.7">Make sure the editor server is
+            running</p>
         </div>
       </div>
-      <iframe id="editor-iframe" style="display:none;width:100%;height:100%;border:none" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+      <iframe id="editor-iframe" style="display:none;width:100%;height:100%;border:none"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
     </div>
 
     <!-- ========================================================== -->
@@ -984,23 +1246,30 @@
 
         <!-- TTS Text Processing -->
         <section class="card p-5 mb-4">
-          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Text Processing</label>
+          <label
+            style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Text
+            Processing</label>
 
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest);margin-bottom:6px">
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest);margin-bottom:6px">
             <div style="flex:1;min-width:0">
               <span style="font-size:13px;color:var(--text);font-weight:500">Text Normalization</span>
-              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Convert numbers, symbols, abbreviations to spoken words before TTS</p>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Convert numbers, symbols, abbreviations
+                to spoken words before TTS</p>
             </div>
             <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
-              <input type="checkbox" id="setting-normalize" checked onchange="settingsToggle('normalize', this.checked)">
+              <input type="checkbox" id="setting-normalize" checked
+                onchange="settingsToggle('normalize', this.checked)">
               <span class="sts-toggle-slider"></span>
             </label>
           </div>
 
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest)">
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest)">
             <div style="flex:1;min-width:0">
               <span style="font-size:13px;color:var(--text);font-weight:500">Markdown Cleanup</span>
-              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Strip markdown formatting, URLs, and brackets before generation</p>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Strip markdown formatting, URLs, and
+                brackets before generation</p>
             </div>
             <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
               <input type="checkbox" id="setting-clean" checked onchange="settingsToggle('clean', this.checked)">
@@ -1011,18 +1280,28 @@
 
         <!-- Features Status -->
         <section class="card p-5 mb-4">
-          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Features</label>
+          <label
+            style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Features</label>
           <div id="settings-feature-status" style="display:flex;flex-direction:column;gap:6px"></div>
         </section>
 
         <!-- About -->
         <section class="card p-5">
-          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">About</label>
+          <label
+            style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">About</label>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Application</span><span class="font-mono" style="font-size:13px;color:var(--text)">ScriptToScene Studio</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">TTS Engine</span><span class="font-mono" style="font-size:13px;color:var(--text)">kokoro-onnx</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Sample Rate</span><span class="font-mono" style="font-size:13px;color:var(--text)">24,000 Hz</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text-muted)">Built by</span><span style="font-size:13px;font-weight:500;color:var(--accent)">Mr. Lacarte</span></div>
+            <div style="display:flex;justify-content:space-between"><span
+                style="font-size:13px;color:var(--text-muted)">Application</span><span class="font-mono"
+                style="font-size:13px;color:var(--text)">ScriptToScene Studio</span></div>
+            <div style="display:flex;justify-content:space-between"><span
+                style="font-size:13px;color:var(--text-muted)">TTS Engine</span><span class="font-mono"
+                style="font-size:13px;color:var(--text)">kokoro-onnx</span></div>
+            <div style="display:flex;justify-content:space-between"><span
+                style="font-size:13px;color:var(--text-muted)">Sample Rate</span><span class="font-mono"
+                style="font-size:13px;color:var(--text)">24,000 Hz</span></div>
+            <div style="display:flex;justify-content:space-between"><span
+                style="font-size:13px;color:var(--text-muted)">Built by</span><span
+                style="font-size:13px;font-weight:500;color:var(--accent)">Mr. Lacarte</span></div>
           </div>
         </section>
       </div>
@@ -1041,4 +1320,5 @@
   <script src="js/pipeline.js"></script>
   <script src="js/captions.js"></script>
 </body>
+
 </html>

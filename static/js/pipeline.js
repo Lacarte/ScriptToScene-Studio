@@ -115,9 +115,40 @@ function _plRenderProgress(globalStatus) {
   _plRenderLog();
 }
 
+function _plHighlightMenu(step, status) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('pipeline-running', 'pipeline-done-scenes'));
+  document.querySelectorAll('#mobile-nav button').forEach(el => el.classList.remove('pipeline-running', 'pipeline-done-scenes'));
+
+  if (status === 'running') {
+    const stepMap = {
+      'tts': 'tts',
+      'timing': 'timing',
+      'segment': 'segmenter',
+      'scenes': 'scenes'
+    };
+
+    const pageId = stepMap[step];
+    if (pageId) {
+      const navItem = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+      if (navItem) navItem.classList.add('pipeline-running');
+
+      const mobileNavItem = document.querySelector(`#mobile-nav button[data-page="${pageId}"]`);
+      if (mobileNavItem) mobileNavItem.classList.add('pipeline-running');
+    }
+  } else if (step === 'done') {
+    const navItem = document.querySelector(`.nav-item[data-page="scenes"]`);
+    if (navItem) navItem.classList.add('pipeline-done-scenes');
+
+    const mobileNavItem = document.querySelector(`#mobile-nav button[data-page="scenes"]`);
+    if (mobileNavItem) mobileNavItem.classList.add('pipeline-done-scenes');
+  }
+}
+
 function _plUpdateStep(event) {
   const step = event.step;
   const status = event.status;
+
+  _plHighlightMenu(step, status);
 
   if (step === 'done') {
     _plRenderProgress('done');

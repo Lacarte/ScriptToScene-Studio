@@ -182,7 +182,7 @@
 
     <!-- Navigation -->
     <div class="flex-1 py-3 flex flex-col gap-0.5">
-      <button class="nav-item active" onclick="switchPage('tts')" data-page="tts">
+      <button class="nav-item active" onclick="switchPage('tts')" data-page="tts" title="Text to Speech">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
@@ -192,7 +192,7 @@
         </svg>
         <span class="nav-label">TTS</span>
       </button>
-      <button class="nav-item" onclick="switchPage('timing')" data-page="timing">
+      <button class="nav-item" onclick="switchPage('timing')" data-page="timing" title="Force Alignment">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <path d="M4 7h16M4 12h16M4 17h10" />
@@ -200,7 +200,7 @@
         </svg>
         <span class="nav-label">ALIGNMENT</span>
       </button>
-      <button class="nav-item" onclick="switchPage('segmenter')" data-page="segmenter">
+      <button class="nav-item" onclick="switchPage('segmenter')" data-page="segmenter" title="Scene Segmenter">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h6" />
@@ -208,7 +208,7 @@
         </svg>
         <span class="nav-label">SEGMENTER</span>
       </button>
-      <button class="nav-item" onclick="switchPage('scenes')" data-page="scenes">
+      <button class="nav-item" onclick="switchPage('scenes')" data-page="scenes" title="Scene Generator">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -217,7 +217,7 @@
         </svg>
         <span class="nav-label">SCENES</span>
       </button>
-      <button class="nav-item" onclick="switchPage('assets')" data-page="assets">
+      <button class="nav-item" onclick="switchPage('assets')" data-page="assets" title="Asset Manager">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -226,14 +226,14 @@
         </svg>
         <span class="nav-label">ASSETS</span>
       </button>
-      <button class="nav-item" onclick="switchPage('editor')" data-page="editor">
+      <button class="nav-item" onclick="switchPage('editor')" data-page="editor" title="Timeline Editor">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
         </svg>
         <span class="nav-label">EDITOR</span>
       </button>
-      <button class="nav-item" onclick="switchPage('settings')" data-page="settings">
+      <button class="nav-item" onclick="switchPage('settings')" data-page="settings" title="Settings">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
           <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>

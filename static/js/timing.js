@@ -54,6 +54,7 @@ async function handleRunAlignment() {
     renderAlignResults(data);
     toast('Alignment complete');
     loadAlignHistory();
+    showContinueBar('align-results', 'segmenter', 'Continue to Segmenter \u2192', () => segUseCurrentResult());
   } catch (e) {
     toast(e.message || 'Alignment failed', 'error');
   } finally {

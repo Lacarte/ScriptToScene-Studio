@@ -237,6 +237,114 @@ def force_align():
                 pass
 
 
+@timing_bp.route("/api/timing/align-and-segment", methods=["POST"])
+def align_and_segment():
+    """Combined alignment + segmentation in one request.
+
+    Same inputs as /api/timing/align, plus optional segment_config JSON field.
+    Returns both alignment and segmentation results.
+    """
+    from studio.timing.segmenter import run_segmenter, save_output
+    from config import SEGMENTER_DIR
+
+    if not _check_alignment_available():
+        return jsonify({"error": "Force alignment not available"}), 503
+
+    if "audio" not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+    text = request.form.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "No transcript text provided"}), 400
+
+    audio_file = request.files["audio"]
+    original_name = audio_file.filename
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext not in (".wav", ".mp3", ".flac", ".ogg"):
+        return jsonify({"error": f"Unsupported format: {ext}"}), 400
+
+    safe_name = re.sub(r'[^a-zA-Z0-9]+', '-', os.path.splitext(original_name)[0][:40]).strip('-')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_name = f"{safe_name}_{timestamp}"
+    job_dir = os.path.join(ALIGN_DIR, folder_name)
+    os.makedirs(job_dir, exist_ok=True)
+
+    audio_path = os.path.join(job_dir, original_name)
+    audio_file.save(audio_path)
+
+    wav_path = audio_path
+    conv_path = None
+    try:
+        if ext != ".wav":
+            ffmpeg = _find_ffmpeg()
+            if not ffmpeg:
+                return jsonify({"error": "ffmpeg required for non-WAV files"}), 400
+            conv_path = os.path.join(job_dir, os.path.splitext(original_name)[0] + "_conv.wav")
+            result = subprocess.run(
+                [ffmpeg, "-nostdin", "-y", "-i", audio_path, "-ar", "24000", "-ac", "1", conv_path],
+                capture_output=True, timeout=60,
+            )
+            if result.returncode != 0:
+                return jsonify({"error": "Audio conversion failed"}), 500
+            wav_path = conv_path
+
+        # ── Alignment ──
+        start = time.perf_counter()
+        alignment = _run_alignment(wav_path, text)
+        align_elapsed = time.perf_counter() - start
+
+        if not alignment:
+            return jsonify({"error": "Alignment produced no results"}), 500
+
+        project_id = _generate_project_id()
+
+        align_data = {
+            "project_id": project_id,
+            "source_file": original_name,
+            "folder": folder_name,
+            "transcript": text,
+            "alignment": alignment,
+            "word_count": len(alignment),
+            "inference_time": round(align_elapsed, 3),
+            "timestamp": datetime.now().isoformat(),
+        }
+        with open(os.path.join(job_dir, "alignment.json"), "w") as f:
+            json.dump(align_data, f, indent=2)
+
+        # ── Segmentation ──
+        seg_config_str = request.form.get("segment_config", "")
+        seg_config = json.loads(seg_config_str) if seg_config_str else None
+
+        seg_metadata = {
+            "project_id": project_id,
+            "source_folder": folder_name,
+            "transcript": text,
+        }
+
+        seg_result = run_segmenter(alignment, seg_config, seg_metadata)
+
+        seg_folder = f"{folder_name}_{timestamp}"
+        out_path = os.path.join(SEGMENTER_DIR, seg_folder, "segmented.json")
+        save_output(seg_result, out_path)
+        seg_result["output_folder"] = seg_folder
+        seg_result["output_path"] = out_path
+
+        logger.success("Align+Segment  {} | {} words in {:.2f}s | {} segments",
+                       original_name, len(alignment), align_elapsed,
+                       seg_result["stats"]["segment_count"])
+
+        return jsonify({
+            "alignment": align_data,
+            "segmentation": seg_result,
+        })
+
+    finally:
+        if conv_path:
+            try:
+                os.unlink(conv_path)
+            except OSError:
+                pass
+
+
 @timing_bp.route("/api/timing/<folder>", methods=["DELETE"])
 def delete_alignment(folder):
     folder = os.path.basename(folder)

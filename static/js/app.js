@@ -119,6 +119,26 @@ document.addEventListener('DOMContentLoaded', () => {
   if (cleanEl) cleanEl.checked = STS_SETTINGS.clean;
 });
 
+// ---- Auto-Forward (Continue to Next Step) ----
+function showContinueBar(containerId, nextPage, label, setupFn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const existing = container.querySelector('.continue-bar');
+  if (existing) existing.remove();
+  const bar = document.createElement('div');
+  bar.className = 'continue-bar';
+  bar.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;margin-top:16px;background:rgba(78,205,196,0.06);border:1px solid rgba(78,205,196,0.2);border-radius:10px;animation:reveal 0.4s cubic-bezier(0.16,1,0.3,1)';
+  bar.innerHTML = `<svg width="16" height="16" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg><span style="font-size:13px;color:var(--text-secondary)">Ready for next step</span>`;
+  const btn = document.createElement('button');
+  btn.style.cssText = 'margin-left:auto;padding:8px 20px;background:var(--accent);color:var(--bg-darkest);border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:opacity 0.15s';
+  btn.textContent = label;
+  btn.onmouseenter = () => btn.style.opacity = '0.85';
+  btn.onmouseleave = () => btn.style.opacity = '1';
+  btn.onclick = () => { if (setupFn) setupFn(); switchPage(nextPage); };
+  bar.appendChild(btn);
+  container.appendChild(bar);
+}
+
 // ---- Time Ago ----
 function timeAgo(ts) {
   if (!ts) return '';

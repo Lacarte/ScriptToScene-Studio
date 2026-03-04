@@ -153,6 +153,7 @@ async function handleRunSegmenter() {
     renderSegResults(data);
     loadSegHistory();
     toast('Segmentation complete');
+    showContinueBar('seg-results', 'scenes', 'Continue to Scenes \u2192', () => scenesUseCurrentSegment());
   } catch (e) {
     toast(e.message || 'Segmentation failed', 'error');
   } finally {

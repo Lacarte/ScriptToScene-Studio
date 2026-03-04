@@ -810,6 +810,7 @@ async function ttsHandleGenerate() {
       ttsSetProgress('Done!');
       ttsPlayAudio(d);
       ttsLoadHistory();
+      showContinueBar('tts-now-playing', 'timing', 'Continue to Timing \u2192', () => alignUseTTS());
     }
   } catch (e) {
     toast(e.message || 'Generation failed', 'error');
@@ -840,6 +841,7 @@ async function ttsStreamChunkedProgress(jobId, totalChunks) {
         ttsSetProgress('Done!');
         if (d.metadata) ttsPlayAudio(d.metadata);
         ttsLoadHistory();
+        showContinueBar('tts-now-playing', 'timing', 'Continue to Timing \u2192', () => alignUseTTS());
         resolve();
       } else if (d.phase === 'error') {
         es.close();

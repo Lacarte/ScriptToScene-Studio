@@ -274,6 +274,7 @@ async function scenesSendPreviewToWebhook() {
     renderSceneResults(data);
     toast('Sent to webhook successfully');
     loadScenesHistory();
+    showContinueBar('scenes-results', 'assets', 'Continue to Assets \u2192', () => sendToAssets());
 
     // Collapse the preview after successful send
     $('#scenes-payload-preview').style.display = 'none';

@@ -12,7 +12,7 @@
 <body>
     <header class="app-header">
         <div class="header-left">
-            <a href="index.html" class="back-link" title="Back to Timeline Editor">
+            <a href="#" onclick="event.preventDefault();editorShowAssetPicker()" class="back-link" title="Import from Assets">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M19 12H5" />
                     <path d="M12 19l-7-7 7-7" />
@@ -411,6 +411,16 @@
                     <div class="track-content" id="video-track"></div>
                 </div>
 
+                <!-- Text Track -->
+                <div class="track" data-track="text">
+                    <div class="track-header">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                            <path d="M4 7V4h16v3"/><path d="M12 4v16"/><path d="M8 20h8"/>
+                        </svg>
+                    </div>
+                    <div class="track-content" id="text-track"></div>
+                </div>
+
                 <!-- Audio Track -->
                 <div class="track" data-track="audio">
                     <div class="track-header">
@@ -482,13 +492,289 @@
                 <line x1="9" y1="15" x2="15" y2="15" />
             </svg>
             <h2>No Timeline Data</h2>
-            <p>Stage a project from the Assets module to begin editing.</p>
-            <button onclick="window.parent.postMessage({type:'switch-page',page:'assets'},'*')" class="btn btn-stage" style="margin-top:12px;cursor:pointer">Go to Assets</button>
+            <p>Import a project from Asset Manager history to begin editing.</p>
+            <button onclick="editorShowAssetPicker()" class="btn btn-stage" style="margin-top:12px;cursor:pointer">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:6px">
+                    <rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                </svg>
+                Import from Assets
+            </button>
+        </div>
+    </div>
+
+    <!-- Asset History Picker Dialog -->
+    <div id="asset-picker-dialog" class="no-data-overlay hidden" style="background:rgba(0,0,0,0.75);backdrop-filter:blur(6px)">
+        <div style="width:420px;max-height:70vh;background:var(--bg-darker, #1a1a2e);border:1px solid var(--border, #2a2a3e);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border, #2a2a3e)">
+                <div>
+                    <h3 style="margin:0;font-size:14px;font-weight:600;color:var(--text, #e0e0e0)">Import from Assets</h3>
+                    <p style="margin:2px 0 0;font-size:11px;color:var(--text-muted, #666)">Select a project to load into the editor</p>
+                </div>
+                <button onclick="editorCloseAssetPicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted, #666);padding:4px;border-radius:4px;transition:color 0.15s" onmouseover="this.style.color='var(--text, #e0e0e0)'" onmouseout="this.style.color='var(--text-muted, #666)'">&times;</button>
+            </div>
+            <div id="asset-picker-list" style="flex:1;overflow-y:auto;padding:8px"></div>
+        </div>
+    </div>
+
+    <!-- TTS Audio Picker Dialog -->
+    <div id="tts-picker-dialog" class="no-data-overlay hidden" style="background:rgba(0,0,0,0.75);backdrop-filter:blur(6px)">
+        <div style="width:440px;max-height:70vh;background:var(--bg-darker, #1a1a2e);border:1px solid var(--border, #2a2a3e);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border, #2a2a3e)">
+                <div>
+                    <h3 style="margin:0;font-size:14px;font-weight:600;color:var(--text, #e0e0e0)">Add Audio from TTS</h3>
+                    <p style="margin:2px 0 0;font-size:11px;color:var(--text-muted, #666)">Select a TTS generation to use as audio track</p>
+                </div>
+                <button onclick="editorCloseTTSPicker()" style="background:none;border:none;cursor:pointer;color:var(--text-muted, #666);padding:4px;border-radius:4px;transition:color 0.15s;font-size:18px" onmouseover="this.style.color='var(--text, #e0e0e0)'" onmouseout="this.style.color='var(--text-muted, #666)'">&times;</button>
+            </div>
+            <div id="tts-picker-list" style="flex:1;overflow-y:auto;padding:8px"></div>
         </div>
     </div>
 
     <script type="module" src="js/video-editor.js"></script>
     <script>
+        // ---- Asset History Picker ----
+
+        function editorShowAssetPicker() {
+            const dialog = document.getElementById('asset-picker-dialog');
+            const list = document.getElementById('asset-picker-list');
+            dialog.classList.remove('hidden');
+            list.innerHTML = '<p style="text-align:center;color:var(--text-muted,#666);font-size:12px;padding:24px 0">Loading...</p>';
+
+            fetch('/api/assets/history')
+                .then(r => r.json())
+                .then(projects => {
+                    if (!projects || !projects.length) {
+                        list.innerHTML = '<p style="text-align:center;color:var(--text-muted,#666);font-size:12px;padding:24px 0">No asset projects yet. Generate assets first.</p>';
+                        return;
+                    }
+                    const statusColors = { done: '#4ECDC4', downloading: '#FFB347', error: '#FF6B6B', waiting: '#8B8B8B', grabbing: '#A78BFA' };
+                    list.innerHTML = projects.map(p => {
+                        const sc = statusColors[p.status] || '#8B8B8B';
+                        const files = p.disk_files || p.total_files || 0;
+                        const ready = p.ready_count || 0;
+                        const scenes = p.scene_count || 0;
+                        const time = _pickerTimeAgo(p.created_at || p.timestamp);
+                        return `
+                        <div style="cursor:pointer;padding:10px 14px;border-radius:8px;border:1px solid transparent;transition:all 0.15s;margin-bottom:4px"
+                             onclick="editorImportAssetProject('${_esc(p.project_id)}')"
+                             onmouseover="this.style.background='var(--bg-darkest,#111)';this.style.borderColor='var(--border,#2a2a3e)'"
+                             onmouseout="this.style.background='';this.style.borderColor='transparent'">
+                            <div style="display:flex;align-items:center;gap:10px">
+                                ${p.preview
+                                    ? '<div style="width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;border:1px solid var(--border,#2a2a3e)"><img src="' + _esc(p.preview) + '" style="width:100%;height:100%;object-fit:cover" /></div>'
+                                    : '<div style="width:40px;height:40px;border-radius:6px;flex-shrink:0;background:var(--bg-darkest,#111);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" fill="none" stroke="var(--text-muted,#666)" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>'}
+                                <div style="flex:1;min-width:0">
+                                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+                                        <span style="font-size:12px;font-weight:600;color:var(--text,#e0e0e0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(p.project_id)}</span>
+                                        <span style="width:6px;height:6px;border-radius:50%;background:${sc};flex-shrink:0"></span>
+                                    </div>
+                                    <div style="display:flex;gap:8px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-muted,#666)">
+                                        <span>${scenes} scene${scenes !== 1 ? 's' : ''}</span>
+                                        ${ready > 0 ? '<span style="color:#4ECDC4">' + ready + ' ready</span>' : ''}
+                                        ${files > 0 ? '<span>' + files + ' files</span>' : ''}
+                                        <span style="opacity:0.7">${time}</span>
+                                    </div>
+                                </div>
+                                <svg width="14" height="14" fill="none" stroke="var(--text-muted,#666)" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:0.4"><path d="M9 18l6-6-6-6"/></svg>
+                            </div>
+                        </div>`;
+                    }).join('');
+                })
+                .catch(() => {
+                    list.innerHTML = '<p style="text-align:center;color:#FF6B6B;font-size:11px;padding:24px 0">Failed to load asset history</p>';
+                });
+        }
+
+        function editorCloseAssetPicker() {
+            document.getElementById('asset-picker-dialog').classList.add('hidden');
+        }
+
+        async function editorImportAssetProject(projectId) {
+            const list = document.getElementById('asset-picker-list');
+            list.innerHTML = '<p style="text-align:center;color:var(--text-muted,#666);font-size:12px;padding:24px 0">Loading project...</p>';
+
+            try {
+                // Fetch asset project and scene data in parallel
+                const [assetRes, sceneRes] = await Promise.all([
+                    fetch('/api/assets/project/' + encodeURIComponent(projectId)).then(r => r.ok ? r.json() : null),
+                    fetch('/api/scenes/' + encodeURIComponent(projectId)).then(r => r.ok ? r.json() : null).catch(() => null),
+                ]);
+
+                if (!assetRes) throw new Error('Project not found');
+
+                // Build scenes from scene data or asset project
+                let scenes;
+                if (sceneRes && sceneRes.scenes && sceneRes.scenes.length) {
+                    scenes = sceneRes.scenes.map(s => {
+                        const sceneNum = String(s.index);
+                        const assetScene = assetRes.scenes?.[sceneNum] || {};
+                        const filesOnDisk = assetScene.files_on_disk || [];
+                        const firstImage = filesOnDisk.length > 0 ? filesOnDisk[0].url : '';
+                        return {
+                            type: s.type_of_scene || 'image',
+                            image_prompt: s.image_prompt || '',
+                            text_content: s.text_content || null,
+                            duration: s.duration || 3,
+                            image_url: firstImage,
+                            status: firstImage ? 'ready' : 'pending',
+                        };
+                    });
+                } else {
+                    // Build from asset project data
+                    const prompts = assetRes.prompts || {};
+                    scenes = Object.entries(assetRes.scenes)
+                        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                        .map(([num, info]) => {
+                            const filesOnDisk = info.files_on_disk || [];
+                            const firstImage = filesOnDisk.length > 0 ? filesOnDisk[0].url : '';
+                            return {
+                                type: 'image',
+                                image_prompt: prompts[num] || '',
+                                text_content: null,
+                                duration: 3,
+                                image_url: firstImage,
+                                status: firstImage ? 'ready' : 'pending',
+                            };
+                        });
+                }
+
+                if (!scenes.length) throw new Error('No scenes found in project');
+
+                // Build staged_timeline format
+                const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
+                const stagedTimeline = {
+                    project_id: projectId,
+                    project_name: projectId,
+                    total_duration: totalDuration,
+                    scene_count: scenes.length,
+                    staged_at: new Date().toISOString(),
+                    scenes: scenes.map((s, i) => ({
+                        scene_id: i + 1,
+                        type: s.type,
+                        image_prompt: s.image_prompt,
+                        text_content: s.text_content,
+                        duration: s.duration,
+                        timestamp: scenes.slice(0, i).reduce((t, x) => t + (x.duration || 0), 0),
+                        image_url: s.image_url,
+                        visual_fx: 'none',
+                    })),
+                };
+
+                // Include audio: try scene data first, then latest TTS generation
+                if (sceneRes?.audio?.url) {
+                    stagedTimeline.audio = { url: sceneRes.audio.url };
+                } else {
+                    try {
+                        const ttsItems = await fetch('/api/tts/generation').then(r => r.ok ? r.json() : []);
+                        if (ttsItems && ttsItems.length > 0) {
+                            const latest = ttsItems[0]; // sorted by timestamp desc
+                            const folder = latest.folder || latest.filename?.replace('.wav', '') || '';
+                            stagedTimeline.audio = {
+                                url: '/output/tts/' + folder + '/' + latest.filename,
+                                source_file: latest.filename,
+                                duration: latest.duration_seconds || 0
+                            };
+                        }
+                    } catch (_) { /* TTS not available, skip */ }
+                }
+
+                sessionStorage.setItem('staged_timeline', JSON.stringify(stagedTimeline));
+                location.reload();
+            } catch (e) {
+                list.innerHTML = '<p style="text-align:center;color:#FF6B6B;font-size:11px;padding:24px 0">' + _esc(e.message || 'Failed to load project') + '</p>';
+            }
+        }
+
+        function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        function _pickerTimeAgo(ts) {
+            if (!ts) return '';
+            const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+            if (diff < 60) return 'just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return Math.floor(diff / 86400) + 'd ago';
+        }
+
+        // Close dialog on backdrop click
+        document.getElementById('asset-picker-dialog')?.addEventListener('click', function(e) {
+            if (e.target === this) editorCloseAssetPicker();
+        });
+
+        // ---- TTS Audio Picker ----
+
+        function editorShowTTSPicker() {
+            const dialog = document.getElementById('tts-picker-dialog');
+            const list = document.getElementById('tts-picker-list');
+            dialog.classList.remove('hidden');
+            list.innerHTML = '<p style="text-align:center;color:var(--text-muted,#666);font-size:12px;padding:24px 0">Loading...</p>';
+
+            fetch('/api/tts/generation')
+                .then(r => r.json())
+                .then(items => {
+                    if (!items || !items.length) {
+                        list.innerHTML = '<p style="text-align:center;color:var(--text-muted,#666);font-size:12px;padding:24px 0">No TTS generations yet. Generate audio in the TTS module first.</p>';
+                        return;
+                    }
+                    list.innerHTML = items.map(item => {
+                        const dur = item.duration_seconds ? item.duration_seconds.toFixed(1) + 's' : '—';
+                        const voice = item.voice || 'unknown';
+                        const time = _pickerTimeAgo(item.timestamp);
+                        const prompt = item.prompt || '';
+                        const truncPrompt = prompt.length > 60 ? prompt.substring(0, 60) + '...' : prompt;
+                        const folder = item.folder || item.filename?.replace('.wav', '') || '';
+                        const audioUrl = '/output/tts/' + _esc(folder) + '/' + _esc(item.filename);
+
+                        return `
+                        <div style="cursor:pointer;padding:10px 14px;border-radius:8px;border:1px solid transparent;transition:all 0.15s;margin-bottom:4px"
+                             onclick="editorLoadTTSAudio('${_esc(audioUrl)}','${_esc(item.filename)}',${item.duration_seconds || 0})"
+                             onmouseover="this.style.background='var(--bg-darkest,#111)';this.style.borderColor='var(--border,#2a2a3e)'"
+                             onmouseout="this.style.background='';this.style.borderColor='transparent'">
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <div style="width:36px;height:36px;border-radius:8px;flex-shrink:0;background:rgba(78,205,196,0.08);display:flex;align-items:center;justify-content:center">
+                                    <svg width="16" height="16" fill="none" stroke="var(--accent,#4ECDC4)" stroke-width="1.8" viewBox="0 0 24 24">
+                                        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                                    </svg>
+                                </div>
+                                <div style="flex:1;min-width:0">
+                                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+                                        <span style="font-size:12px;font-weight:600;color:var(--text,#e0e0e0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(truncPrompt) || _esc(item.filename)}</span>
+                                    </div>
+                                    <div style="display:flex;gap:8px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-muted,#666)">
+                                        <span>${dur}</span>
+                                        <span style="color:#A78BFA">${_esc(voice)}</span>
+                                        <span style="opacity:0.7">${time}</span>
+                                    </div>
+                                </div>
+                                <svg width="14" height="14" fill="none" stroke="var(--text-muted,#666)" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:0.4"><path d="M9 18l6-6-6-6"/></svg>
+                            </div>
+                        </div>`;
+                    }).join('');
+                })
+                .catch(() => {
+                    list.innerHTML = '<p style="text-align:center;color:#FF6B6B;font-size:11px;padding:24px 0">Failed to load TTS history</p>';
+                });
+        }
+
+        function editorCloseTTSPicker() {
+            document.getElementById('tts-picker-dialog').classList.add('hidden');
+        }
+
+        function editorLoadTTSAudio(url, filename, duration) {
+            editorCloseTTSPicker();
+            // Dispatch custom event that video-editor.js module listens for
+            window.dispatchEvent(new CustomEvent('editor-load-audio', {
+                detail: { url, filename, duration }
+            }));
+        }
+
+        document.getElementById('tts-picker-dialog')?.addEventListener('click', function(e) {
+            if (e.target === this) editorCloseTTSPicker();
+        });
+
+        // Wire the add-audio button
+        document.getElementById('add-audio')?.addEventListener('click', editorShowTTSPicker);
+
         // Media panel tab switching
         document.querySelectorAll('.media-tab').forEach(tab => {
             tab.addEventListener('click', () => {

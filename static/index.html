@@ -227,9 +227,10 @@
         <span class="nav-label">ASSETS</span>
       </button>
       <button class="nav-item" onclick="switchPage('editor')" data-page="editor" title="Timeline Editor">
-        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
           viewBox="0 0 24 24">
-          <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+          <path d="M7 2v20"/><path d="M17 2v20"/><path d="M2 12h20"/><path d="M2 7h5"/><path d="M2 17h5"/><path d="M17 17h5"/><path d="M17 7h5"/>
         </svg>
         <span class="nav-label">EDITOR</span>
       </button>
@@ -801,10 +802,6 @@
               <span id="assets-progress" class="font-mono text-xs" style="color:var(--text-muted)">0 / 0 complete</span>
               <button id="assets-redownload-btn" onclick="assetsRedownload()" class="action-btn" style="padding:6px 14px;font-size:11px;margin-left:auto;color:var(--text-muted)" title="Retry failed/pending downloads">Retry Downloads</button>
               <button onclick="downloadAllAssets()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px">Download All</button>
-              <button onclick="assetsSendToEditor()" class="action-btn hover-accent" style="padding:6px 14px;font-size:11px;color:var(--accent);border-color:var(--accent)">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px;margin-right:4px"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
-                Stage to Editor
-              </button>
             </div>
             <!-- Status message -->
             <div id="assets-grabber-status" style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--bg-darkest);border:1px solid var(--border)">
@@ -854,14 +851,10 @@
     <!-- PAGE: EDITOR (Timeline Editor)                             -->
     <!-- ========================================================== -->
     <div id="page-editor" class="page" style="height:100vh;overflow:hidden">
-      <div id="editor-loading" style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px">
+      <div id="editor-loading" style="position:fixed;top:0;left:var(--sidebar-w,56px);right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;z-index:10">
         <div style="text-align:center">
-          <svg width="40" height="40" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 12px;opacity:0.5">
-            <rect x="2" y="2" width="20" height="20" rx="2" />
-            <path d="M7 2v20" /><path d="M2 12h5" />
-            <circle cx="14.5" cy="12" r="3" />
-          </svg>
-          <p>Loading Timeline Editor...</p>
+          <div style="width:36px;height:36px;border:2.5px solid rgba(255,255,255,0.08);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
+          <p style="color:var(--text-secondary)">Loading Timeline Editor...</p>
           <p style="font-size:11px;margin-top:4px;color:var(--text-muted);opacity:0.7">Make sure the editor server is running</p>
         </div>
       </div>

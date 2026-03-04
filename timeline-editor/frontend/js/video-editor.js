@@ -867,6 +867,7 @@ const elements = {
     noDataOverlay: document.getElementById('no-data-overlay'),
     timelineTracks: document.getElementById('timeline-tracks'),
     videoTrack: document.getElementById('video-track'),
+    textTrack: document.getElementById('text-track'),
     audioTrack: document.getElementById('audio-track'),
     previewCanvas: document.getElementById('preview-canvas'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
@@ -972,6 +973,7 @@ function loadProjectData(data) {
 
     EditorState.scenes = data.scenes.map(scene => ({
         ...scene,
+        id: scene.id || scene.scene_id,
         mediaLoaded: !!scene.image_url,
         mediaUrl: scene.image_url || null
     }));
@@ -1057,6 +1059,7 @@ function loadProjectData(data) {
     // Update UI
     updateProjectInfo();
     renderTimeline();
+    renderMediaGrid();
     renderTimeRuler();
     updateTimeScrubber();
     updatePlayhead();
@@ -1161,6 +1164,7 @@ async function loadProjectMediaWithProgress() {
     if (scenesWithMedia.length > 0) {
         elements.previewPlaceholder?.classList.add('hidden');
         renderTimeline();
+        renderMediaGrid();
         if (elements.mediaStatus) {
             elements.mediaStatus.textContent = `${scenesWithMedia.length} images loaded`;
         }
@@ -1278,6 +1282,56 @@ function updateSceneClipThumb(sceneId, imagePath) {
 }
 
 /**
+ * Render the media panel grid with scene thumbnails (CapCut-style)
+ */
+function renderMediaGrid() {
+    const pane = document.querySelector('.tab-pane[data-pane="media"] .tab-pane-body');
+    if (!pane || !EditorState.scenes.length) return;
+
+    const emptyEl = pane.querySelector('.media-empty');
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    let grid = pane.querySelector('.media-grid');
+    if (!grid) {
+        grid = document.createElement('div');
+        grid.className = 'media-grid';
+        pane.appendChild(grid);
+    }
+
+    grid.innerHTML = EditorState.scenes.map(scene => {
+        const hasMedia = !!scene.mediaUrl;
+        const dur = (scene.duration || 0).toFixed(1);
+        const icon = SCENE_ICONS[scene.type] || SCENE_ICONS.default;
+        const label = scene.image_prompt
+            ? scene.image_prompt.substring(0, 30)
+            : `Scene ${scene.id}`;
+
+        return `
+            <div class="media-grid-item${EditorState.selectedScene?.id === scene.id ? ' selected' : ''}"
+                 data-scene-id="${scene.id}" title="${(scene.image_prompt || 'Scene ' + scene.id).replace(/"/g, '&quot;')}">
+                ${hasMedia
+                    ? `<img src="${scene.mediaUrl}" alt="Scene ${scene.id}">`
+                    : `<div class="media-grid-placeholder">${icon}</div>`}
+                ${hasMedia ? '<span class="media-grid-badge">Added</span>' : ''}
+                <span class="media-grid-duration">${dur}s</span>
+                <span class="media-grid-label">${label}</span>
+            </div>`;
+    }).join('');
+
+    // Click to select scene
+    grid.querySelectorAll('.media-grid-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const sceneId = parseInt(item.dataset.sceneId);
+            selectScene(sceneId);
+            renderMediaGrid();
+            // Scroll timeline to this clip
+            const clip = elements.videoTrack?.querySelector(`.scene-clip[data-id="${sceneId}"]`);
+            if (clip) clip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        });
+    });
+}
+
+/**
  * Check if an image exists at the given path
  */
 function checkImageExists(imagePath) {
@@ -1348,10 +1402,38 @@ function loadDefaultAudio(stagedData) {
 
     audio.addEventListener('error', (e) => {
         console.warn('Failed to load audio:', audioPath, e);
-        EditorState.audio.loaded = false;
-        EditorState.audio.error = true;
-        renderAudioTrack();
-        showToast(`Audio not found: ${audioFileName}`, 'warning');
+        // Fallback: try latest TTS generation
+        if (!stagedData?._triedTTSFallback) {
+            console.log('Trying TTS fallback...');
+            fetch('/api/tts/generation')
+                .then(r => r.ok ? r.json() : [])
+                .then(items => {
+                    if (items && items.length > 0) {
+                        const latest = items[0];
+                        const folder = latest.folder || latest.filename?.replace('.wav', '') || '';
+                        const ttsUrl = '/output/tts/' + folder + '/' + latest.filename;
+                        console.log('Loading TTS fallback:', ttsUrl);
+                        loadDefaultAudio({
+                            audio: { url: ttsUrl, source_file: latest.filename, duration: latest.duration_seconds || 0 },
+                            _triedTTSFallback: true
+                        });
+                    } else {
+                        EditorState.audio.loaded = false;
+                        EditorState.audio.error = true;
+                        renderAudioTrack();
+                    }
+                })
+                .catch(() => {
+                    EditorState.audio.loaded = false;
+                    EditorState.audio.error = true;
+                    renderAudioTrack();
+                });
+        } else {
+            EditorState.audio.loaded = false;
+            EditorState.audio.error = true;
+            renderAudioTrack();
+            showToast(`Audio not found: ${audioFileName}`, 'warning');
+        }
     });
 
     // Handle audio ended event for looping
@@ -1378,6 +1460,72 @@ function loadDefaultAudio(stagedData) {
     // Initial render (before duration is known)
     renderAudioTrack();
 }
+
+/**
+ * Load audio from a URL (used by TTS picker and other sources)
+ */
+function loadAudioFromURL(audioPath, audioFileName, hintDuration) {
+    // Stop any existing audio
+    if (EditorState.audioElement) {
+        EditorState.audioElement.pause();
+        EditorState.audioElement.src = '';
+    }
+
+    const audio = new Audio(audioPath);
+    EditorState.audioElement = audio;
+
+    EditorState.audio = {
+        file: audioFileName,
+        path: audioPath,
+        duration: hintDuration || 0,
+        loaded: false
+    };
+
+    audio.addEventListener('loadedmetadata', () => {
+        EditorState.audio.duration = audio.duration;
+        EditorState.audio.loaded = true;
+
+        const audioDur = audio.duration;
+        const scenesDur = getScenesDuration();
+        if (EditorState.scenes.length > 0 && audioDur > scenesDur + 0.05) {
+            const lastScene = EditorState.scenes[EditorState.scenes.length - 1];
+            const gap = parseFloat((audioDur - scenesDur).toFixed(3));
+            lastScene.duration = parseFloat((lastScene.duration + gap).toFixed(3));
+        }
+
+        recalculateDuration();
+        renderAudioTrack();
+        saveProjectEdits();
+        showToast('Audio loaded: ' + formatTimestamp(audio.duration), 'success');
+    });
+
+    audio.addEventListener('error', () => {
+        EditorState.audio.loaded = false;
+        EditorState.audio.error = true;
+        renderAudioTrack();
+        showToast(`Audio not found: ${audioFileName}`, 'warning');
+    });
+
+    audio.addEventListener('ended', () => {
+        if (EditorState.isLooping && EditorState.isPlaying) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+            EditorState.playbackPosition = 0;
+            if (EditorState.preview) { EditorState.preview.seek(0); EditorState.preview.play(); }
+            if (elements.timelineTracks) elements.timelineTracks.scrollLeft = 0;
+            updatePlayhead();
+            updateTimeScrubber();
+        }
+    });
+
+    renderAudioTrack();
+}
+
+// Listen for audio load requests from the TTS picker
+window.addEventListener('editor-load-audio', (e) => {
+    const { url, filename, duration } = e.detail;
+    loadAudioFromURL(url, filename, duration);
+});
 
 /**
  * Render audio track with loaded audio - uses helper for width calculation
@@ -1550,6 +1698,9 @@ function renderTimeline() {
 
     elements.videoTrack.innerHTML = clips;
 
+    // Render text track — text clips positioned at matching scene times
+    renderTextTrack();
+
     // Add click listeners
     elements.videoTrack.querySelectorAll('.scene-clip').forEach(clip => {
         clip.addEventListener('click', (e) => {
@@ -1565,6 +1716,52 @@ function renderTimeline() {
     // Validate and show errors
     validateScenes();
     applySceneErrorStyles();
+}
+
+/**
+ * Render text track — shows text_content for scenes that have it, aligned to scene times
+ */
+function renderTextTrack() {
+    if (!elements.textTrack) return;
+
+    // Build text clips for scenes that have text_content
+    let offset = 0;
+    const textClips = [];
+
+    for (const scene of EditorState.scenes) {
+        const width = getScenePixelWidth(scene);
+        const text = scene.text_content;
+
+        if (text) {
+            const truncText = text.length > 30 ? text.substring(0, 30) + '...' : text;
+            textClips.push(`
+                <div class="text-clip"
+                     data-id="${scene.id}"
+                     style="position:absolute;left:${offset}px;width:${width}px;"
+                     title="${text.replace(/"/g, '&quot;')}">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:0.6">
+                        <path d="M4 7V4h16v3"/><path d="M12 4v16"/><path d="M8 20h8"/>
+                    </svg>
+                    <span class="text-clip-label">${truncText.replace(/</g, '&lt;')}</span>
+                    <span class="text-clip-duration">${scene.duration}s</span>
+                </div>
+            `);
+        }
+        offset += width;
+    }
+
+    if (textClips.length > 0) {
+        elements.textTrack.innerHTML = `<div style="position:relative;width:${offset}px;height:100%">${textClips.join('')}</div>`;
+
+        // Click to select scene
+        elements.textTrack.querySelectorAll('.text-clip').forEach(clip => {
+            clip.addEventListener('click', () => {
+                selectScene(parseInt(clip.dataset.id));
+            });
+        });
+    } else {
+        elements.textTrack.innerHTML = `<div class="text-track-empty">No text overlays</div>`;
+    }
 }
 
 /**
@@ -1706,6 +1903,11 @@ function selectScene(sceneId) {
     }
 
     renderSceneProperties();
+
+    // Sync media grid selection
+    document.querySelectorAll('.media-grid-item').forEach(item => {
+        item.classList.toggle('selected', parseInt(item.dataset.sceneId) === sceneId);
+    });
 }
 
 /**

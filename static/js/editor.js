@@ -8,7 +8,7 @@ function initEditorIframe() {
   if (STATE.editorLoaded && iframe.src.includes(targetSrc)) return;
   STATE.editorLoaded = false;
   iframe.style.display = 'none';
-  $('#editor-loading').style.display = '';
+  $('#editor-loading').style.display = 'flex';
   // Cache-bust to force reload+onload when src is already set
   iframe.src = targetSrc + '?t=' + Date.now();
   iframe.onload = () => {

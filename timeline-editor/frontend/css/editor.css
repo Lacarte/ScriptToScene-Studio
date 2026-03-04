@@ -254,6 +254,95 @@
     opacity: 0.6;
 }
 
+/* ---- Media Grid (CapCut-style thumbnails) ---- */
+.media-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.media-grid-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-dark);
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.media-grid-item:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+
+
+.media-grid-item.selected {
+    border-color: #0c433f;
+    box-shadow: 0 0 0 1px #165854;
+}
+
+.media-grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.media-grid-item .media-grid-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    opacity: 0.25;
+}
+
+.media-grid-item .media-grid-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--accent);
+    color: var(--bg-darkest);
+    letter-spacing: 0.03em;
+    line-height: 1.4;
+}
+
+.media-grid-item .media-grid-duration {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.65);
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.4;
+}
+
+.media-grid-item .media-grid-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 14px 5px 4px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* ---- Preview Panel (CapCut-style) ---- */
 .preview-panel {
     grid-column: 3;
@@ -1359,6 +1448,57 @@
 .scene-clip .resize-handle-right {
     right: 0;
     background: linear-gradient(to left, var(--accent), transparent);
+}
+
+/* ---- Text Track ---- */
+.text-clip {
+    position: absolute;
+    height: calc(100% - 6px);
+    top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    background: rgba(170, 68, 255, 0.1);
+    border: 1px solid rgba(170, 68, 255, 0.25);
+    border-radius: 4px;
+    cursor: pointer;
+    overflow: hidden;
+    box-sizing: border-box;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.text-clip:hover {
+    background: rgba(170, 68, 255, 0.18);
+    border-color: rgba(170, 68, 255, 0.45);
+}
+
+.text-clip svg { color: #AA44FF; }
+
+.text-clip-label {
+    flex: 1;
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.text-clip-duration {
+    font-size: 0.48rem;
+    font-family: var(--font-mono);
+    color: rgba(170, 68, 255, 0.5);
+    flex-shrink: 0;
+}
+
+.text-track-empty {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    opacity: 0.3;
+    padding: 0 8px;
+    font-style: italic;
 }
 
 /* ---- Audio ---- */

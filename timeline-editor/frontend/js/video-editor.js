@@ -792,11 +792,21 @@ function getScenesDuration() {
  */
 function getTotalDuration() {
     const scenesDuration = getScenesDuration();
+
     // Use trimmed duration if set, otherwise use full audio duration
     const audioDuration = EditorState.audio?.loaded
         ? (EditorState.audio.trimmedDuration || EditorState.audio.duration)
         : 0;
-    return Math.max(scenesDuration, audioDuration);
+
+    const bgMusicDuration = EditorState.bgMusic?.duration || 0;
+
+    let captionsDuration = 0;
+    if (EditorState.captionsEnabled && EditorState.captionData?.captions?.length > 0) {
+        const lastCaption = EditorState.captionData.captions[EditorState.captionData.captions.length - 1];
+        captionsDuration = lastCaption.end || 0;
+    }
+
+    return Math.max(scenesDuration, audioDuration, bgMusicDuration, captionsDuration);
 }
 
 /**
@@ -1422,58 +1432,29 @@ function loadDefaultAudio(stagedData) {
 
     audio.addEventListener('error', (e) => {
         console.warn('Failed to load audio:', audioPath, e);
-        // Fallback: try latest TTS generation
-        if (!stagedData?._triedTTSFallback) {
-            console.log('Trying TTS fallback...');
-            fetch('/api/tts/generation')
-                .then(r => r.ok ? r.json() : [])
-                .then(items => {
-                    if (items && items.length > 0) {
-                        const latest = items[0];
-                        const folder = latest.folder || latest.filename?.replace('.wav', '') || '';
-                        const ttsUrl = '/output/tts/' + folder + '/' + latest.filename;
-                        console.log('Loading TTS fallback:', ttsUrl);
-                        loadDefaultAudio({
-                            audio: { url: ttsUrl, source_file: latest.filename, duration: latest.duration_seconds || 0 },
-                            _triedTTSFallback: true
-                        });
-                    } else {
-                        EditorState.audio.loaded = false;
-                        EditorState.audio.error = true;
-                        renderAudioTrack();
-                    }
-                })
-                .catch(() => {
-                    EditorState.audio.loaded = false;
-                    EditorState.audio.error = true;
-                    renderAudioTrack();
-                });
-        } else {
-            EditorState.audio.loaded = false;
-            EditorState.audio.error = true;
-            renderAudioTrack();
-            showToast(`Audio not found: ${audioFileName}`, 'warning');
+
+        // Try alternative extension before failing
+        if (!stagedData?._triedAltExtensionFallback && !stagedData?.audio?.url) {
+            const projectId = EditorState.project?.id || 'default';
+            const altFileName = audioFileName.endsWith('.wav')
+                ? audioFileName.replace('.wav', '.mp3')
+                : audioFileName.replace('.mp3', '.wav');
+            const altPath = `working-assets/${projectId}/${altFileName}`;
+            console.log('Trying alternative audio fallback:', altPath);
+            loadDefaultAudio({
+                audio: { url: altPath, source_file: altFileName, duration: 0 },
+                _triedAltExtensionFallback: true
+            });
+            return;
         }
-    });
 
-    // Handle audio ended event for looping
-    audio.addEventListener('ended', () => {
-        if (EditorState.isLooping && EditorState.isPlaying) {
-            // Restart from beginning
-            audio.currentTime = 0;
-            audio.play().catch(e => console.warn('Audio loop play failed:', e));
+        EditorState.audio.loaded = false;
+        EditorState.audio.error = true;
+        renderAudioTrack();
 
-            // Reset preview and timeline
-            EditorState.playbackPosition = 0;
-            if (EditorState.preview) {
-                EditorState.preview.seek(0);
-                EditorState.preview.play();
-            }
-            if (elements.timelineTracks) {
-                elements.timelineTracks.scrollLeft = 0;
-            }
-            updatePlayhead();
-            updateTimeScrubber();
+        // Only show toast if we aren't about to successfully load from picker
+        if (stagedData?._triedAltExtensionFallback) {
+            showToast(`Audio not found: ${audioFileName}`, 'warning');
         }
     });
 
@@ -1524,18 +1505,6 @@ function loadAudioFromURL(audioPath, audioFileName, hintDuration) {
         EditorState.audio.error = true;
         renderAudioTrack();
         showToast(`Audio not found: ${audioFileName}`, 'warning');
-    });
-
-    audio.addEventListener('ended', () => {
-        if (EditorState.isLooping && EditorState.isPlaying) {
-            audio.currentTime = 0;
-            audio.play().catch(() => { });
-            EditorState.playbackPosition = 0;
-            if (EditorState.preview) { EditorState.preview.seek(0); EditorState.preview.play(); }
-            if (elements.timelineTracks) elements.timelineTracks.scrollLeft = 0;
-            updatePlayhead();
-            updateTimeScrubber();
-        }
     });
 
     renderAudioTrack();
@@ -1690,11 +1659,14 @@ function updateProjectInfo() {
     if (elements.infoScenes) {
         elements.infoScenes.textContent = EditorState.project.sceneCount;
     }
+
+    const displayTotalDuration = getTotalDuration();
+
     if (elements.infoDuration) {
-        elements.infoDuration.textContent = formatTimestamp(EditorState.project.totalDuration);
+        elements.infoDuration.textContent = formatTimestamp(displayTotalDuration);
     }
     if (elements.totalTime) {
-        elements.totalTime.textContent = formatTimecode(EditorState.project.totalDuration);
+        elements.totalTime.textContent = formatTimecode(displayTotalDuration);
     }
 }
 
@@ -2410,7 +2382,7 @@ function renderTimeRuler() {
  */
 function updateTimeScrubber() {
     if (elements.timeScrubber) {
-        elements.timeScrubber.max = EditorState.project.totalDuration;
+        elements.timeScrubber.max = getTotalDuration();
         elements.timeScrubber.value = EditorState.playbackPosition;
     }
     if (elements.currentTime) {
@@ -2981,9 +2953,7 @@ function skipToStart() {
  * Jump to end of timeline
  */
 function skipToEnd() {
-    const totalDuration = EditorState.preview
-        ? EditorState.preview.getTotalDuration()
-        : EditorState.scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
+    const totalDuration = getTotalDuration();
     if (totalDuration <= 0) return;
 
     // Pause first if playing
@@ -2991,7 +2961,7 @@ function skipToEnd() {
 
     EditorState.playbackPosition = Math.max(0, totalDuration - 0.01);
     if (EditorState.preview) EditorState.preview.seek(EditorState.playbackPosition);
-    if (EditorState.audioElement) EditorState.audioElement.currentTime = EditorState.playbackPosition;
+    if (EditorState.audioElement) EditorState.audioElement.currentTime = Math.min(EditorState.playbackPosition, EditorState.audioElement.duration || 999);
     updatePlayhead();
     updateTimeDisplay();
 }
@@ -3108,9 +3078,22 @@ function syncAudioPlayback() {
             EditorState.bgMusicElement.play().catch(() => { });
         }
 
-        // Use audio as master clock for perfect sync
+        // Use audio as master clock for perfect sync, fallback to system time if audio ends but timeline is longer
         if (EditorState.preview) {
-            EditorState.preview.setTimeSource(() => EditorState.audioElement.currentTime);
+            const startSysTime = performance.now();
+            const startPlayPos = EditorState.playbackPosition;
+            EditorState.preview.setTimeSource(() => {
+                const audioEnd = EditorState.audioElement ? (EditorState.audioElement.duration || 0) : 0;
+                const audioTrimEnd = EditorState.audio?.loaded ? (EditorState.audio.trimmedDuration || audioEnd) : audioEnd;
+
+                const timeFromStart = startPlayPos + (performance.now() - startSysTime) / 1000;
+
+                if (EditorState.audioElement && EditorState.audioElement.currentTime < audioTrimEnd && !EditorState.audioElement.paused) {
+                    return EditorState.audioElement.currentTime;
+                } else {
+                    return timeFromStart;
+                }
+            });
         }
     } else {
         EditorState.audioElement.pause();
@@ -3128,7 +3111,7 @@ function syncAudioPlayback() {
  */
 function seekAudio(time) {
     if (EditorState.audioElement && EditorState.audio?.loaded) {
-        EditorState.audioElement.currentTime = time;
+        EditorState.audioElement.currentTime = Math.min(time, EditorState.audioElement.duration || 999);
     }
     if (EditorState.bgMusicElement && EditorState.bgMusic) {
         EditorState.bgMusicElement.currentTime = time % (EditorState.bgMusic.duration || 999);
@@ -3347,52 +3330,65 @@ async function randomizeSceneMedia() {
         return;
     }
 
-    // Fetch asset data (cached after first call)
-    if (!EditorState._assetFilesCache) {
-        try {
-            const resp = await fetch(`/api/assets/project/${encodeURIComponent(projectId)}`);
-            if (!resp.ok) throw new Error(resp.status);
-            EditorState._assetFilesCache = await resp.json();
-        } catch (e) {
-            showToast('Failed to load asset files', 'error');
-            console.error('Asset fetch error:', e);
-            return;
-        }
+    // Always fetch latest to ensure we see newly added files
+    try {
+        const resp = await fetch(`/api/assets/project/${encodeURIComponent(projectId)}`);
+        if (!resp.ok) throw new Error(resp.status);
+        EditorState._assetFilesCache = await resp.json();
+    } catch (e) {
+        showToast('Failed to load asset files', 'error');
+        console.error('Asset fetch error:', e);
+        return;
     }
 
     const assetScenes = EditorState._assetFilesCache.scenes || {};
     let assignedCount = 0;
 
-    for (const scene of EditorState.scenes) {
+    for (let i = 0; i < EditorState.scenes.length; i++) {
+        const scene = EditorState.scenes[i];
         if (scene.type === 'text' || scene.type === 'cta') continue;
 
-        // Try multiple index strategies to find this scene's asset folder
-        const sceneIdx = String((scene.id || 1) - 1);
-        const sceneAsset = assetScenes[sceneIdx] || assetScenes[String(scene.id)];
+        // Find this scene's asset folder using its true index
+        const sceneNumber = String(i + 1);
+        const sceneAsset = assetScenes[sceneNumber] || assetScenes[String(scene.id)];
         const files = sceneAsset?.files_on_disk;
         if (!files || !files.length) continue;
 
         // Pick a random file from this scene's asset folder
         const pick = files[Math.floor(Math.random() * files.length)];
-        scene.mediaUrl = pick.url;
-        scene.image = pick.filename;
-        scene.mediaLoaded = true;
-        updateSceneClipThumb(scene.id, pick.url);
-        assignedCount++;
+
+        // Only update if it's different to be efficient
+        if (scene.image !== pick.filename || scene.mediaUrl !== pick.url) {
+            scene.mediaUrl = pick.url;
+            scene.image = pick.filename;
+            scene.mediaLoaded = true;
+
+            // Update DOM thumbnail directly without full timeline rebuild
+            updateSceneClipThumb(scene.id, pick.url);
+
+            // Clear only this specific scene from preview cache
+            if (EditorState.preview) {
+                EditorState.preview.imageCache.delete(scene.id);
+            }
+
+            assignedCount++;
+        }
     }
 
     if (assignedCount === 0) {
-        showToast('No scenes with multiple assets to randomize', 'warning');
+        showToast('No new media assigned', 'info');
         return;
     }
 
-    // Clear preview image cache so new URLs are loaded, then re-sync
+    // Re-sync preview so the new images are preloaded and rendered
     if (EditorState.preview) {
-        EditorState.preview.imageCache.clear();
         EditorState.preview.setScenes(EditorState.scenes);
     }
 
-    renderTimeline();
+    // Record edit action
+    recordEdit('Randomize scene media', 'all', 'media', null, null);
+    saveProjectEdits();
+
     showToast(`Randomized ${assignedCount} scenes`, 'success');
 }
 

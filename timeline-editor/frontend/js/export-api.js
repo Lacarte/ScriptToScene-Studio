@@ -318,11 +318,19 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
     // Calculate total scenes duration
     const scenesDuration = scenes.reduce((sum, s) => sum + s.duration, 0);
 
-    // Determine total video duration (max of scenes and trimmed audio)
+    // Determine total video duration (max of scenes, audio, bgMusic, and captions)
     const audioDuration = audioConfig?.trimmedDuration || audioConfig?.duration || 0;
-    const totalDuration = Math.max(scenesDuration, audioDuration);
+    const bgMusicDuration = bgMusicConfig?.duration || 0;
 
-    console.log('[prepareExportData] Duration: scenes=', scenesDuration, 'audio=', audioDuration, 'total=', totalDuration);
+    let captionsDuration = 0;
+    if (captionData?.captions?.length > 0) {
+        const lastCaption = captionData.captions[captionData.captions.length - 1];
+        captionsDuration = lastCaption.end || 0;
+    }
+
+    const totalDuration = Math.max(scenesDuration, audioDuration, bgMusicDuration, captionsDuration);
+
+    console.log('[prepareExportData] Duration: scenes=', scenesDuration, 'audio=', audioDuration, 'bgMusic=', bgMusicDuration, 'captions=', captionsDuration, 'total=', totalDuration);
 
     // Use profile settings or defaults
     const p = profile || EXPORT_PROFILES.yt_shorts;

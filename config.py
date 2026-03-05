@@ -57,8 +57,7 @@ import random
 import string
 from datetime import datetime as _dt
 
-def generate_project_id(prefix="sts"):
-    """Generate a unique project ID like sts_20240315_143022_A3F8."""
-    ts = _dt.now().strftime("%Y%m%d_%H%M%S")
-    suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"{prefix}_{ts}_{suffix}"
+def generate_project_id(prefix="proj"):
+    """Generate a unique project ID like proj_SLLGTM."""
+    suffix = "".join(random.choices(string.ascii_uppercase, k=6))
+    return f"{prefix}_{suffix}"

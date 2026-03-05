@@ -105,7 +105,9 @@ const EditorState = {
     captionsEnabled: false, // Whether caption track is visible
     selectedExportProfile: 'yt_shorts',  // Export profile ID
     bgMusic: null,          // { file, path, duration, volume, duckingEnabled, duckingLevel, fadeIn, fadeOut, loop }
-    bgMusicElement: null    // HTML Audio element for bgmusic playback
+    bgMusicElement: null,   // HTML Audio element for bgmusic playback
+    disabledTracks: new Set(), // Keep track of which tracks are disabled
+    storageEnabled: localStorage.getItem('editor_storage_enabled') !== 'false' // Global save toggle (default ON)
 };
 
 // ============================================================
@@ -130,7 +132,7 @@ function getProjectHistoryKey(projectId) {
  * Save current scene edits to localStorage
  */
 function saveProjectEdits() {
-    if (!EditorState.project?.id) return;
+    if (!EditorState.project?.id || !EditorState.storageEnabled) return;
 
     const edits = EditorState.scenes.map(scene => ({
         id: scene.id,
@@ -264,7 +266,7 @@ function recordEdit(action, sceneId, field, oldValue, newValue) {
  * Save edit history to localStorage
  */
 function saveEditHistory() {
-    if (!EditorState.project?.id) return;
+    if (!EditorState.project?.id || !EditorState.storageEnabled) return;
 
     try {
         const data = {
@@ -925,6 +927,91 @@ const elements = {
     downloadExportBtn: document.getElementById('download-export')
 };
 
+// ---------------------------------------------------------------------------
+// Font Registry — loads custom + system fonts from backend
+// ---------------------------------------------------------------------------
+let _fontRegistry = [];  // [{family, source, variants:{variant: url}}]
+
+async function loadFontRegistry() {
+    try {
+        const res = await fetch('/api/fonts');
+        if (!res.ok) throw new Error(`Font API ${res.status}`);
+        _fontRegistry = await res.json();
+        console.log(`Font registry loaded: ${_fontRegistry.length} fonts`);
+
+        // Inject @font-face rules for custom fonts
+        const style = document.createElement('style');
+        style.id = 'custom-font-faces';
+        const rules = [];
+        for (const font of _fontRegistry) {
+            if (font.source !== 'custom') continue;
+            for (const [variant, url] of Object.entries(font.variants)) {
+                const weight = variant.includes('bold') || variant === 'black' || variant === 'extrabold' ? 'bold'
+                    : variant.includes('light') || variant === 'thin' || variant === 'extralight' ? '300'
+                        : variant === 'medium' ? '500'
+                            : variant === 'semibold' ? '600'
+                                : 'normal';
+                const fontStyle = variant.includes('italic') ? 'italic' : 'normal';
+                rules.push(`@font-face {
+  font-family: '${font.family}';
+  src: url('${url}') format('${url.endsWith('.otf') ? 'opentype' : 'truetype'}');
+  font-weight: ${weight};
+  font-style: ${fontStyle};
+  font-display: swap;
+}`);
+            }
+        }
+        style.textContent = rules.join('\n');
+        document.head.appendChild(style);
+
+        // Wait for fonts to be ready for canvas rendering
+        if (rules.length > 0) {
+            await document.fonts.ready;
+            console.log(`Custom @font-face rules injected: ${rules.length}`);
+        }
+    } catch (err) {
+        console.warn('Failed to load font registry:', err);
+    }
+}
+
+/**
+ * Build <option> elements for a font <select>, grouped by custom/system.
+ * Each option is styled in its own font for preview.
+ */
+function buildFontOptions(selectEl, selectedFamily) {
+    selectEl.innerHTML = '';
+    const custom = _fontRegistry.filter(f => f.source === 'custom');
+    const system = _fontRegistry.filter(f => f.source === 'system');
+
+    if (custom.length) {
+        const grp = document.createElement('optgroup');
+        grp.label = 'Custom Fonts';
+        for (const f of custom) {
+            const opt = document.createElement('option');
+            opt.value = f.family;
+            opt.textContent = f.family;
+            opt.style.fontFamily = `'${f.family}', sans-serif`;
+            if (f.family === selectedFamily) opt.selected = true;
+            grp.appendChild(opt);
+        }
+        selectEl.appendChild(grp);
+    }
+
+    if (system.length) {
+        const grp = document.createElement('optgroup');
+        grp.label = 'System Fonts';
+        for (const f of system) {
+            const opt = document.createElement('option');
+            opt.value = f.family;
+            opt.textContent = f.family;
+            opt.style.fontFamily = `'${f.family}', sans-serif`;
+            if (f.family === selectedFamily) opt.selected = true;
+            grp.appendChild(opt);
+        }
+        selectEl.appendChild(grp);
+    }
+}
+
 /**
  * Initialize the editor with sequential loading
  */
@@ -954,7 +1041,11 @@ async function init() {
     // Show single loading overlay that stays until everything is ready
     showLoadingOverlay('Initializing editor...');
 
-    // Setup
+    // Load font registry FIRST (custom + system fonts)
+    updateLoadingOverlay('Loading fonts...');
+    await loadFontRegistry();
+
+    // Setup UI now that fonts and other dependencies are ready
     setupEventListeners();
     applySavedSettings();
 
@@ -1124,27 +1215,39 @@ async function loadProjectMediaWithProgress() {
         // If image_url was set from staged data, verify it loads
         if (scene.mediaUrl) {
             updateLoadingOverlay(`Loading scene ${sceneNumber} (${loadedCount}/${totalScenes})...`);
-            const exists = await checkImageExists(scene.mediaUrl);
+            const isVideo = isVideoFile(scene.mediaUrl);
+            const exists = isVideo
+                ? await checkMediaExists(scene.mediaUrl)
+                : await checkImageExists(scene.mediaUrl);
             if (exists) {
+                scene.isVideo = isVideo;
+                if (isVideo) {
+                    const meta = await getVideoMeta(scene.mediaUrl);
+                    if (meta) {
+                        scene.videoDuration = meta.duration;
+                        scene.videoThumb = meta.thumbDataUrl;
+                        console.log(`Scene ${sceneNumber}: video src=${meta.duration.toFixed(1)}s, scene trimmed to ${scene.duration}s`);
+                    }
+                }
                 loadedCount++;
-                console.log(`Scene ${sceneNumber}: loaded from image_url: ${scene.mediaUrl}`);
-                updateSceneClipThumb(scene.id, scene.mediaUrl);
+                console.log(`Scene ${sceneNumber}: loaded from mediaUrl (${isVideo ? 'video' : 'image'}): ${scene.mediaUrl}`);
+                updateSceneClipThumb(scene.id, scene.mediaUrl, isVideo, scene.videoThumb);
                 await sleep(30);
                 continue;
             }
-            // image_url didn't load, clear and fall through to probing
-            console.warn(`Scene ${sceneNumber}: image_url failed (${scene.mediaUrl}), trying fallback`);
+            // mediaUrl didn't load, clear and fall through to probing
+            console.warn(`Scene ${sceneNumber}: mediaUrl failed (${scene.mediaUrl}), trying fallback`);
             scene.mediaUrl = null;
             scene.mediaLoaded = false;
         }
 
-        // Fallback: probe working-assets/{project_id}/
+        // Fallback: probe working-assets/{project_id}/ for images then videos
         updateLoadingOverlay(`Loading scene ${sceneNumber} (${loadedCount}/${totalScenes})...`);
         const basePath = `working-assets/${projectId}/`;
-        const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        const allExtensions = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS];
 
         const pathsToTry = [];
-        for (const ext of imageExtensions) {
+        for (const ext of allExtensions) {
             pathsToTry.push({ path: `${basePath}${sceneNumber}.${ext}`, filename: `${sceneNumber}.${ext}` });
         }
         if (scene.image) {
@@ -1156,17 +1259,29 @@ async function loadProjectMediaWithProgress() {
         }
 
         let found = false;
-        for (const { path: imagePath, filename } of pathsToTry) {
+        for (const { path: mediaPath, filename } of pathsToTry) {
             try {
-                const exists = await checkImageExists(imagePath);
+                const isVideo = isVideoFile(mediaPath);
+                const exists = isVideo
+                    ? await checkMediaExists(mediaPath)
+                    : await checkImageExists(mediaPath);
                 if (exists) {
-                    scene.mediaUrl = imagePath;
+                    scene.mediaUrl = mediaPath;
                     scene.mediaLoaded = true;
+                    scene.isVideo = isVideo;
                     scene.image = filename;
+                    if (isVideo) {
+                        const meta = await getVideoMeta(mediaPath);
+                        if (meta) {
+                            scene.videoDuration = meta.duration;
+                            scene.videoThumb = meta.thumbDataUrl;
+                            console.log(`Scene ${sceneNumber}: video src=${meta.duration.toFixed(1)}s, scene trimmed to ${scene.duration}s`);
+                        }
+                    }
                     loadedCount++;
                     found = true;
-                    console.log(`Scene ${sceneNumber}: fallback loaded ${imagePath}`);
-                    updateSceneClipThumb(scene.id, imagePath);
+                    console.log(`Scene ${sceneNumber}: fallback loaded ${isVideo ? 'video' : 'image'} ${mediaPath}`);
+                    updateSceneClipThumb(scene.id, mediaPath, isVideo, scene.videoThumb);
                     break;
                 }
             } catch (error) {
@@ -1175,7 +1290,7 @@ async function loadProjectMediaWithProgress() {
         }
 
         if (!found) {
-            console.warn(`Scene ${sceneNumber} (id: ${scene.id}): No image found`);
+            console.warn(`Scene ${sceneNumber} (id: ${scene.id}): No media found`);
         }
 
         await sleep(50);
@@ -1191,16 +1306,24 @@ async function loadProjectMediaWithProgress() {
         EditorState.preview.render();
     }
 
+    // Recalculate total duration (video scenes may have updated durations)
+    recalculateDuration();
+
     if (scenesWithMedia.length > 0) {
         elements.previewPlaceholder?.classList.add('hidden');
         renderTimeline();
         renderMediaGrid();
         if (elements.mediaStatus) {
-            elements.mediaStatus.textContent = `${scenesWithMedia.length} images loaded`;
+            const videoCount = scenesWithMedia.filter(s => s.isVideo).length;
+            const imageCount = scenesWithMedia.length - videoCount;
+            const parts = [];
+            if (imageCount) parts.push(`${imageCount} image${imageCount > 1 ? 's' : ''}`);
+            if (videoCount) parts.push(`${videoCount} video${videoCount > 1 ? 's' : ''}`);
+            elements.mediaStatus.textContent = `${parts.join(' + ')} loaded`;
         }
-        showToast(`Loaded ${scenesWithMedia.length} scene images`, 'success');
+        showToast(`Loaded ${scenesWithMedia.length} scene assets`, 'success');
     } else {
-        showToast('No images found for this project', 'info');
+        showToast('No media found for this project', 'info');
     }
 }
 
@@ -1291,23 +1414,35 @@ function hideNoDataOverlay() {
 /**
  * Update a single scene clip thumbnail in the timeline
  */
-function updateSceneClipThumb(sceneId, imagePath) {
+function updateSceneClipThumb(sceneId, mediaPath, isVideo = false, videoThumbUrl = null) {
     const clip = document.querySelector(`.scene-clip[data-id="${sceneId}"]`);
-    if (clip) {
-        const thumb = clip.querySelector('.scene-clip-thumb');
-        if (thumb) {
-            // Add loading class while image loads
-            thumb.classList.add('loading');
-            const img = new Image();
-            img.onload = () => {
-                thumb.innerHTML = `<img src="${imagePath}" alt="Scene ${sceneId}">`;
-                thumb.classList.remove('loading');
-            };
-            img.onerror = () => {
-                thumb.classList.remove('loading');
-            };
-            img.src = imagePath;
-        }
+    if (!clip) return;
+    const thumb = clip.querySelector('.scene-clip-thumb');
+    if (!thumb) return;
+
+    if (isVideo && videoThumbUrl) {
+        // Use pre-generated thumbnail data URL
+        thumb.innerHTML = `<img src="${videoThumbUrl}" alt="Scene ${sceneId}">
+            <span class="media-video-badge">VIDEO</span>`;
+    } else if (isVideo) {
+        // Fallback: generate thumbnail from video
+        thumb.classList.add('loading');
+        getVideoMeta(mediaPath).then(meta => {
+            if (meta?.thumbDataUrl) {
+                thumb.innerHTML = `<img src="${meta.thumbDataUrl}" alt="Scene ${sceneId}">
+                    <span class="media-video-badge">VIDEO</span>`;
+            }
+            thumb.classList.remove('loading');
+        });
+    } else {
+        thumb.classList.add('loading');
+        const img = new Image();
+        img.onload = () => {
+            thumb.innerHTML = `<img src="${mediaPath}" alt="Scene ${sceneId}">`;
+            thumb.classList.remove('loading');
+        };
+        img.onerror = () => thumb.classList.remove('loading');
+        img.src = mediaPath;
     }
 }
 
@@ -1340,7 +1475,13 @@ function renderMediaGrid() {
             <div class="media-grid-item${EditorState.selectedScene?.id === scene.id ? ' selected' : ''}"
                  data-scene-id="${scene.id}" title="${(scene.image_prompt || 'Scene ' + scene.id).replace(/"/g, '&quot;')}">
                 ${hasMedia
-                ? `<img src="${scene.mediaUrl}" alt="Scene ${scene.id}">`
+                ? (scene.isVideo && scene.videoThumb
+                    ? `<img src="${scene.videoThumb}" alt="Scene ${scene.id}" style="width:100%;height:100%;object-fit:cover">
+                       <span class="media-video-badge">VIDEO</span>`
+                    : scene.isVideo
+                        ? `<div class="media-grid-placeholder">${icon}</div>
+                           <span class="media-video-badge">VIDEO</span>`
+                        : `<img src="${scene.mediaUrl}" alt="Scene ${scene.id}">`)
                 : `<div class="media-grid-placeholder">${icon}</div>`}
                 ${hasMedia ? '<span class="media-grid-badge">Added</span>' : ''}
                 <span class="media-grid-duration">${dur}s</span>
@@ -1370,6 +1511,56 @@ function checkImageExists(imagePath) {
         img.onload = () => resolve(true);
         img.onerror = () => resolve(false);
         img.src = imagePath;
+    });
+}
+
+const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov'];
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+/**
+ * Check if a media file (image or video) exists via HEAD request
+ */
+function checkMediaExists(mediaPath) {
+    return fetch(mediaPath, { method: 'HEAD' })
+        .then(res => res.ok)
+        .catch(() => false);
+}
+
+/**
+ * Determine if a file path is a video
+ */
+function isVideoFile(path) {
+    const ext = (path || '').split('.').pop().toLowerCase();
+    return VIDEO_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Load video metadata (duration) and capture a poster thumbnail.
+ * Returns { duration, thumbDataUrl } or null on failure.
+ */
+function getVideoMeta(videoUrl) {
+    return new Promise((resolve) => {
+        const video = document.createElement('video');
+        video.muted = true;
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => {
+            const duration = video.duration;
+            // Seek to 1s or 10% for a representative frame
+            video.currentTime = Math.min(1, duration * 0.1);
+            video.onseeked = () => {
+                let thumbDataUrl = null;
+                try {
+                    const c = document.createElement('canvas');
+                    c.width = video.videoWidth;
+                    c.height = video.videoHeight;
+                    c.getContext('2d').drawImage(video, 0, 0);
+                    thumbDataUrl = c.toDataURL('image/jpeg', 0.7);
+                } catch (_) { /* cross-origin, ignore */ }
+                resolve({ duration, thumbDataUrl });
+            };
+        };
+        video.onerror = () => resolve(null);
+        video.src = videoUrl;
     });
 }
 
@@ -1688,9 +1879,11 @@ function renderTimeline() {
                  style="width: ${width}px; --scene-color: ${color};"
                  title="${scene.type} - ${scene.duration}s">
                 <div class="scene-clip-thumb">
-                    ${scene.mediaUrl
-                ? `<img src="${scene.mediaUrl}" alt="Scene ${scene.id}">`
-                : icon
+                    ${scene.isVideo && scene.videoThumb
+                ? `<img src="${scene.videoThumb}" alt="Scene ${scene.id}"><span class="media-video-badge">VIDEO</span>`
+                : scene.mediaUrl
+                    ? `<img src="${scene.mediaUrl}" alt="Scene ${scene.id}">`
+                    : icon
             }
                 </div>
                 <div class="scene-clip-info">
@@ -1838,6 +2031,7 @@ function setupCaptionControls() {
     // Style controls
     const presetSel = document.getElementById('cap-ed-preset');
     const fontSel = document.getElementById('cap-ed-font');
+    if (fontSel) buildFontOptions(fontSel, EditorState.captionData?.style?.font_family || 'Montserrat');
     const sizeInput = document.getElementById('cap-ed-size');
     const colorInput = document.getElementById('cap-ed-color');
     const strokeInput = document.getElementById('cap-ed-stroke');
@@ -2135,24 +2329,7 @@ function renderSceneProperties() {
             </div>
             <div class="property-group">
                 <label>Font Family</label>
-                <select class="property-select" id="prop-font-family">
-                    <option value="Inter" ${(scene.font_family || 'Inter') === 'Inter' ? 'selected' : ''}>Inter</option>
-                    <option value="Arial" ${scene.font_family === 'Arial' ? 'selected' : ''}>Arial</option>
-                    <option value="Helvetica" ${scene.font_family === 'Helvetica' ? 'selected' : ''}>Helvetica</option>
-                    <option value="Georgia" ${scene.font_family === 'Georgia' ? 'selected' : ''}>Georgia</option>
-                    <option value="Times New Roman" ${scene.font_family === 'Times New Roman' ? 'selected' : ''}>Times New Roman</option>
-                    <option value="Verdana" ${scene.font_family === 'Verdana' ? 'selected' : ''}>Verdana</option>
-                    <option value="Trebuchet MS" ${scene.font_family === 'Trebuchet MS' ? 'selected' : ''}>Trebuchet MS</option>
-                    <option value="Impact" ${scene.font_family === 'Impact' ? 'selected' : ''}>Impact</option>
-                    <option value="Comic Sans MS" ${scene.font_family === 'Comic Sans MS' ? 'selected' : ''}>Comic Sans MS</option>
-                    <option value="Courier New" ${scene.font_family === 'Courier New' ? 'selected' : ''}>Courier New</option>
-                    <option value="Montserrat" ${scene.font_family === 'Montserrat' ? 'selected' : ''}>Montserrat</option>
-                    <option value="Roboto" ${scene.font_family === 'Roboto' ? 'selected' : ''}>Roboto</option>
-                    <option value="Open Sans" ${scene.font_family === 'Open Sans' ? 'selected' : ''}>Open Sans</option>
-                    <option value="Playfair Display" ${scene.font_family === 'Playfair Display' ? 'selected' : ''}>Playfair Display</option>
-                    <option value="Oswald" ${scene.font_family === 'Oswald' ? 'selected' : ''}>Oswald</option>
-                    <option value="Poppins" ${scene.font_family === 'Poppins' ? 'selected' : ''}>Poppins</option>
-                </select>
+                <select class="property-select" id="prop-font-family"></select>
             </div>
             <div class="property-row">
                 <div class="property-group property-half">
@@ -2237,6 +2414,7 @@ function renderSceneProperties() {
     const textContentInput = document.getElementById('prop-text-content');
     const textColorSelect = document.getElementById('prop-text-color');
     const fontFamilySelect = document.getElementById('prop-font-family');
+    if (fontFamilySelect) buildFontOptions(fontFamilySelect, scene.font_family || 'Inter');
     const textSizeInput = document.getElementById('prop-text-size');
     const fontStyleSelect = document.getElementById('prop-font-style');
     const textAlignSelect = document.getElementById('prop-text-align');
@@ -2587,6 +2765,13 @@ function setupPlayheadDrag() {
 /**
  * Setup event listeners
  */
+function _updateStorageBtn(btn) {
+    const on = EditorState.storageEnabled;
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Session saving ON (click to disable)' : 'Session saving OFF (click to enable)';
+    btn.style.opacity = on ? '1' : '0.4';
+}
+
 function setupEventListeners() {
     // Play/Pause
     elements.playBtn?.addEventListener('click', togglePlayback);
@@ -2618,6 +2803,20 @@ function setupEventListeners() {
 
     // Error dropdown
     setupErrorDropdown();
+
+    // Storage toggle
+    const storageBtn = document.getElementById('toggle-storage');
+    if (storageBtn) {
+        _updateStorageBtn(storageBtn);
+        storageBtn.addEventListener('click', () => {
+            EditorState.storageEnabled = !EditorState.storageEnabled;
+            // This one preference is always persisted so the toggle survives reload
+            localStorage.setItem('editor_storage_enabled', EditorState.storageEnabled.toString());
+            _updateStorageBtn(storageBtn);
+            showToast(EditorState.storageEnabled ? 'Session saving enabled' : 'Session saving disabled',
+                      EditorState.storageEnabled ? 'success' : 'info');
+        });
+    }
 
     // Keyboard shortcuts for undo/redo
     document.addEventListener('keydown', (e) => {
@@ -2734,6 +2933,77 @@ function setupEventListeners() {
     // Effects & Transitions tabs
     setupEffectsTab();
     setupTransitionsTab();
+
+    // Track toggling
+    document.querySelectorAll('.track-toggle').forEach(icon => {
+        icon.addEventListener('click', (e) => {
+            const trackEl = e.target.closest('.track');
+            if (!trackEl) return;
+
+            const trackType = trackEl.dataset.track;
+
+            // Toggle state
+            if (EditorState.disabledTracks.has(trackType)) {
+                EditorState.disabledTracks.delete(trackType);
+                trackEl.classList.remove('disabled');
+                showToast(`${trackType.charAt(0).toUpperCase() + trackType.slice(1)} track enabled`, 'info');
+            } else {
+                EditorState.disabledTracks.add(trackType);
+                trackEl.classList.add('disabled');
+                showToast(`${trackType.charAt(0).toUpperCase() + trackType.slice(1)} track disabled`, 'info');
+            }
+
+            // Update preview and playback if necessary
+            updatePreviewFromDisabledTracks();
+        });
+    });
+}
+
+/**
+ * Update the preview state based on which tracks are disabled.
+ */
+function updatePreviewFromDisabledTracks() {
+    // 1. Video track disabled - Hide/Show scenes in preview
+    if (EditorState.preview) {
+        if (EditorState.disabledTracks.has('video')) {
+            EditorState.preview.setScenes([]);
+        } else {
+            EditorState.preview.setScenes(EditorState.scenes);
+        }
+    }
+
+    // 2. Audio track disabled - Mute/Unmute main audio
+    if (EditorState.audioElement) {
+        if (EditorState.disabledTracks.has('audio') || EditorState.isMuted) {
+            EditorState.audioElement.muted = true;
+        } else {
+            EditorState.audioElement.muted = false;
+        }
+    }
+
+    // 3. Background Music disabled - Mute/Unmute bg music
+    if (EditorState.bgMusicElement) {
+        if (EditorState.disabledTracks.has('bgmusic') || EditorState.isMuted) {
+            EditorState.bgMusicElement.muted = true;
+        } else {
+            EditorState.bgMusicElement.muted = false;
+        }
+    }
+
+    // 4. Caption track disabled - Hide/Show captions in preview
+    if (EditorState.preview) {
+        if (EditorState.disabledTracks.has('caption') || !EditorState.captionsEnabled) {
+            EditorState.preview.setCaptions(null, null);
+        } else if (EditorState.captionData) {
+            EditorState.preview.setCaptions(EditorState.captionData.captions, EditorState.captionData.style);
+        }
+    }
+
+    // Sync disabled tracks to preview so text scenes are hidden
+    if (EditorState.preview) {
+        EditorState.preview.disabledTracks = new Set(EditorState.disabledTracks);
+        EditorState.preview.render();
+    }
 }
 
 /**
@@ -2779,7 +3049,7 @@ function setupTimelineResize() {
             // Save timeline height to localStorage
             const currentHeight = elements.timelinePanel?.offsetHeight || 180;
             EditorState.timelineHeight = currentHeight;
-            localStorage.setItem(STORAGE_KEYS.TIMELINE_HEIGHT, currentHeight.toString());
+            if (EditorState.storageEnabled) localStorage.setItem(STORAGE_KEYS.TIMELINE_HEIGHT, currentHeight.toString());
         }
     });
 }
@@ -3004,7 +3274,7 @@ function toggleLoop() {
     EditorState.isLooping = !EditorState.isLooping;
 
     // Save to localStorage
-    localStorage.setItem(STORAGE_KEYS.LOOP_STATE, EditorState.isLooping.toString());
+    if (EditorState.storageEnabled) localStorage.setItem(STORAGE_KEYS.LOOP_STATE, EditorState.isLooping.toString());
 
     if (elements.loopBtn) {
         if (EditorState.isLooping) {
@@ -3201,7 +3471,7 @@ function updatePlayhead() {
  */
 function updateZoom() {
     // Save to localStorage
-    localStorage.setItem(STORAGE_KEYS.ZOOM_LEVEL, EditorState.zoomLevel.toString());
+    if (EditorState.storageEnabled) localStorage.setItem(STORAGE_KEYS.ZOOM_LEVEL, EditorState.zoomLevel.toString());
 
     if (elements.zoomLevel) {
         elements.zoomLevel.textContent = `${Math.round(EditorState.zoomLevel * 100)}%`;
@@ -3419,14 +3689,30 @@ function getExportData() {
     const profile = EXPORT_PROFILES[EditorState.selectedExportProfile] || EXPORT_PROFILES.yt_shorts;
     console.log('[Editor] Using profile:', profile.id, profile.width + 'x' + profile.height);
 
+    // Deep clone scenes to prevent modifying the state
+    let exportScenes = JSON.parse(JSON.stringify(EditorState.scenes));
+
+    // Remove text from scenes if text track is disabled
+    if (EditorState.disabledTracks.has('text')) {
+        exportScenes = exportScenes.map(s => {
+            delete s.text_content;
+            return s;
+        });
+    }
+
+    // Clear scenes if video track is disabled
+    if (EditorState.disabledTracks.has('video')) {
+        exportScenes = [];
+    }
+
     const data = prepareExportData(
         EditorState.project,
-        EditorState.scenes,
+        exportScenes,
         '',
         audioConfig,
-        EditorState.captionsEnabled ? EditorState.captionData : null,
+        EditorState.captionsEnabled && !EditorState.disabledTracks.has('caption') ? EditorState.captionData : null,
         profile,
-        EditorState.bgMusic
+        EditorState.disabledTracks.has('bgmusic') ? null : EditorState.bgMusic
     );
 
     console.log('[Editor] Export data prepared:', data.scenes?.length, 'scenes,', data.timeline?.total_duration + 's total');

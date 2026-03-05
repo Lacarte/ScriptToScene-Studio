@@ -398,8 +398,8 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
 
                 media: {
                     type: mediaType,
-                    file: isTextScene ? null : (scene.image || `${index + 1}.jpg`),
-                    path: isTextScene ? null : (scene.mediaUrl && scene.mediaUrl.startsWith('/output/') ? '..' + scene.mediaUrl : `working-assets/${project.id}/${scene.image || `${index + 1}.jpg`}`)
+                    file: isTextScene ? null : (scene.image || `${index + 1}.${scene.isVideo ? 'mp4' : 'jpg'}`),
+                    path: isTextScene ? null : (scene.mediaUrl && scene.mediaUrl.startsWith('/output/') ? '..' + scene.mediaUrl : `working-assets/${project.id}/${scene.image || `${index + 1}.${scene.isVideo ? 'mp4' : 'jpg'}`}`)
                 },
 
                 text: isTextScene ? {

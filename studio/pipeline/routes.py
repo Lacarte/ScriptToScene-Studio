@@ -74,7 +74,7 @@ def run_pipeline():
         return jsonify({"error": "No text provided"}), 400
 
     _cleanup_old_jobs()
-    project_id = generate_project_id()
+    project_id = generate_project_id(prefix="pp")
     job_id = uuid.uuid4().hex[:12]
 
     config = {

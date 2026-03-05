@@ -32,6 +32,7 @@ TTS_TRASH_DIR = os.path.join(TTS_DIR, "TRASH")
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 TIMELINE_EDITOR_DIR = os.path.join(ROOT_DIR, "timeline-editor", "frontend")
 BIN_DIR = os.path.join(ROOT_DIR, "bin")
+FONTS_DIR = os.path.join(ROOT_DIR, "fonts")
 
 # ---------------------------------------------------------------------------
 # Ensure output directories exist
@@ -57,7 +58,27 @@ import random
 import string
 from datetime import datetime as _dt
 
-def generate_project_id(prefix="proj"):
-    """Generate a unique project ID like proj_SLLGTM."""
-    suffix = "".join(random.choices(string.ascii_uppercase, k=6))
-    return f"{prefix}_{suffix}"
+def generate_project_id(prefix="pm"):
+    """Generate a unique project ID like pm_SLLGTM or pp_A3F82K.
+
+    Prefixes:
+      pm  — project created manually (editor / timing)
+      pp  — project created via pipeline
+
+    Scans existing output directories to avoid collisions.
+    """
+    existing = set()
+    for search_dir in (ALIGN_DIR, SCENES_DIR, ASSETS_DIR):
+        if os.path.exists(search_dir):
+            for entry in os.listdir(search_dir):
+                if os.path.isdir(os.path.join(search_dir, entry)):
+                    existing.add(entry)
+
+    charset = string.ascii_uppercase + string.digits
+    for _ in range(100):
+        candidate = f"{prefix}_" + "".join(random.choices(charset, k=6))
+        if candidate not in existing:
+            return candidate
+
+    # Fallback: timestamp suffix to guarantee uniqueness
+    return f"{prefix}_" + _dt.now().strftime("%H%M%S") + "".join(random.choices(charset, k=3))

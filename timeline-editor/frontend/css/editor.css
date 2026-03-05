@@ -591,6 +591,27 @@
     line-height: 1.4;
 }
 
+.media-video-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-family: var(--font-mono);
+    font-size: 7px;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: #a78bfa;
+    color: #fff;
+    letter-spacing: 0.05em;
+    z-index: 2;
+}
+
+.scene-clip-thumb .media-video-badge {
+    top: 2px;
+    right: 2px;
+    font-size: 6px;
+}
+
 .media-grid-item .media-grid-duration {
     position: absolute;
     top: 4px;
@@ -1842,12 +1863,26 @@
     background: var(--bg-surface, #141522);
 }
 
-.track-header svg {
+.track-toggle {
     opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 0.15s, color 0.15s;
 }
 
-.track-header:hover svg {
-    opacity: 0.8;
+.track-toggle:hover {
+    opacity: 1;
+    color: var(--text);
+}
+
+.track.disabled .track-toggle {
+    opacity: 0.2;
+    color: var(--text-muted);
+}
+
+.track.disabled .track-content {
+    opacity: 0.4;
+    pointer-events: none;
+    filter: grayscale(100%);
 }
 
 /* Track content — flush, no border */

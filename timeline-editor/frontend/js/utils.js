@@ -75,7 +75,7 @@ export function getTotalDuration(scenes) {
 
 // Generate unique ID
 export function generateId() {
-    return `proj_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    return `pm_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 }
 
 // Deep clone object
@@ -106,6 +106,7 @@ export function formatRelativeTime(date) {
 // Local storage helpers
 export const Storage = {
     save(key, data) {
+        if (localStorage.getItem('editor_storage_enabled') === 'false') return false;
         try {
             localStorage.setItem(key, JSON.stringify(data));
             return true;
@@ -179,7 +180,7 @@ function _flushLogQueue() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(entry)
-        }).catch(() => {}); // fire-and-forget
+        }).catch(() => { }); // fire-and-forget
     }
 }
 
@@ -190,10 +191,10 @@ function _queueLog(level, source, message, context) {
 }
 
 export const backendLog = {
-    info:    (msg, ctx) => { console.log(`[${msg}]`, ctx || '');   _queueLog('info',    'editor', msg, ctx); },
-    warn:    (msg, ctx) => { console.warn(`[${msg}]`, ctx || '');  _queueLog('warning', 'editor', msg, ctx); },
-    error:   (msg, ctx) => { console.error(`[${msg}]`, ctx || ''); _queueLog('error',   'editor', msg, ctx); },
-    debug:   (msg, ctx) => { console.debug(`[${msg}]`, ctx || ''); _queueLog('debug',   'editor', msg, ctx); },
+    info: (msg, ctx) => { console.log(`[${msg}]`, ctx || ''); _queueLog('info', 'editor', msg, ctx); },
+    warn: (msg, ctx) => { console.warn(`[${msg}]`, ctx || ''); _queueLog('warning', 'editor', msg, ctx); },
+    error: (msg, ctx) => { console.error(`[${msg}]`, ctx || ''); _queueLog('error', 'editor', msg, ctx); },
+    debug: (msg, ctx) => { console.debug(`[${msg}]`, ctx || ''); _queueLog('debug', 'editor', msg, ctx); },
 };
 
 // ---------------------------------------------------------------------------

@@ -9,7 +9,15 @@ import tempfile
 import shutil
 from PIL import Image, ImageDraw, ImageFont
 import platform
+import sys
 from loguru import logger
+
+# Ensure project root is on sys.path so we can import studio modules
+_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+from studio.fonts import get_font_path as _custom_font_path
 
 # Check if ffmpeg-python is available, fallback to subprocess
 try:
@@ -222,6 +230,19 @@ class VideoProcessor:
 
     def _load_font(self, font_family, font_size, font_style='normal'):
         """Load font by family name with fallback support"""
+        # Try custom fonts first (from fonts/ directory)
+        variant = 'bold' if font_style == 'bold' else ('italic' if font_style == 'italic' else 'regular')
+        if font_style == 'bold-italic':
+            variant = 'bold_italic'
+        custom_path = _custom_font_path(font_family, variant)
+        if custom_path and os.path.isfile(custom_path):
+            try:
+                font = ImageFont.truetype(custom_path, font_size)
+                logger.debug("Font loaded (custom): {} {} -> {}", font_family, variant, custom_path)
+                return font
+            except (OSError, IOError):
+                logger.warning("Custom font file failed to load: {}", custom_path)
+
         current_os = platform.system().lower()
         os_key = 'win32' if current_os == 'windows' else ('darwin' if current_os == 'darwin' else 'linux')
 
@@ -380,7 +401,7 @@ class VideoProcessor:
             logger.debug("Scene {}: creating text scene", scene_id)
             return self._create_text_scene(scene, temp_dir, index)
 
-        # Handle image scenes
+        # Handle image/video scenes
         media_path = media.get('path')
         if not media_path:
             logger.error("Scene {} has no media path", scene_id)
@@ -404,7 +425,12 @@ class VideoProcessor:
 
         output_path = os.path.join(temp_dir, f"scene_{index:03d}.mp4")
 
-        if USE_FFMPEG_PYTHON:
+        # Detect video source files
+        is_video_source = full_media_path.lower().endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv'))
+
+        if is_video_source:
+            self._create_scene_from_video(full_media_path, output_path, duration, effect)
+        elif USE_FFMPEG_PYTHON:
             self._create_scene_ffmpeg(full_media_path, output_path, duration, effect)
         else:
             self._create_scene_subprocess(full_media_path, output_path, duration, effect)
@@ -560,6 +586,45 @@ class VideoProcessor:
             logger.error("FFmpeg zoompan failed:\nstdout: {}\nstderr: {}",
                           result.stdout[:300], result.stderr[:500])
             raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
+
+    def _create_scene_from_video(self, video_path, output_path, duration, effect):
+        """Create a scene clip from a video source — trim, scale, and re-encode."""
+        effect_type = effect.get('type', 'static')
+
+        filters = [
+            f"scale='if(gte(iw/ih,{self.width}/{self.height}),-2,{self.width})':'if(gte(iw/ih,{self.width}/{self.height}),{self.height},-2)'",
+            f"crop={self.width}:{self.height}",
+            f"fps={self.fps}",
+        ]
+
+        if effect_type == 'fade':
+            fade_dur = 0.5
+            filters.append(f"fade=t=in:st=0:d={fade_dur}")
+            filters.append(f"fade=t=out:st={duration - fade_dur}:d={fade_dur}")
+
+        vf = ','.join(filters)
+
+        cmd = [
+            FFMPEG_BIN, '-y',
+            '-i', video_path,
+            '-t', str(duration),
+            '-vf', vf,
+            '-c:v', self.codec,
+            '-pix_fmt', self.pixel_format,
+            '-an',
+            '-preset', 'fast',
+            '-crf', str(self.crf),
+            output_path,
+        ]
+
+        logger.info("Video source scene: {}s effect={} src={}",
+                     duration, effect_type, os.path.basename(video_path))
+        logger.debug("Video scene cmd: {}", ' '.join(cmd[:12]) + '...')
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error("FFmpeg video scene failed:\nstdout: {}\nstderr: {}",
+                          result.stdout[:300], result.stderr[:500])
+            raise RuntimeError(f"FFmpeg video scene failed: {result.stderr[:200]}")
 
     def _create_scene_subprocess(self, media_path, output_path, duration, effect):
         """Create scene video with effects using subprocess (fallback)"""
@@ -824,6 +889,13 @@ class VideoProcessor:
 
     def _resolve_font_path(self, family, weight='normal'):
         """Resolve a font family name to a filesystem path for FFmpeg drawtext."""
+        # Try custom fonts first
+        variant = 'bold' if weight == 'bold' else 'regular'
+        custom_path = _custom_font_path(family, variant)
+        if custom_path and os.path.isfile(custom_path):
+            logger.debug("Font resolved (custom): {} {} -> {}", family, variant, custom_path)
+            return custom_path
+
         current_os = platform.system().lower()
         os_key = 'win32' if current_os == 'windows' else ('darwin' if current_os == 'darwin' else 'linux')
 

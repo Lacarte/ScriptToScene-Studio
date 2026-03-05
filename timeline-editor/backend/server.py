@@ -50,7 +50,7 @@ def start_export():
 
     Expected JSON body:
     {
-        "project_id": "proj_123",
+        "project_id": "pm_123",
         "media_folder": "/path/to/media",
         "output": {
             "resolution": [1080, 1920],

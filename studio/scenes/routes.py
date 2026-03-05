@@ -8,7 +8,7 @@ import requests as http_requests
 from flask import Blueprint, jsonify, request
 from loguru import logger
 
-from config import SCENES_DIR, N8N_WEBHOOK_URL
+from config import SCENES_DIR, N8N_WEBHOOK_URL, generate_project_id
 from studio.scenes.templates import SCENE_STYLE_TEMPLATES, TEMPLATES_BY_ID
 
 scenes_bp = Blueprint("scenes", __name__)
@@ -106,7 +106,7 @@ def generate_scenes():
             return jsonify({"error": "Webhook returned unexpected format (expected JSON object)"}), 502
 
         # Save to disk — use incoming project_id from pipeline, fallback to generated
-        project_id = data.get("project_id") or f"scene_gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        project_id = data.get("project_id") or generate_project_id("pm")
         result["project_id"] = project_id
         result["timestamp"] = datetime.now().isoformat()
         result["source_folder"] = data.get("source_folder", "")

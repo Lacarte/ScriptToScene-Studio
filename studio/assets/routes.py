@@ -240,7 +240,7 @@ def grabber_upload():
 
     Expected format:
     {
-      "projectId": "proj_XXX",
+      "projectId": "pm_XXX",
       "scenes": [
         {
           "scene": 0,
@@ -492,7 +492,7 @@ def assets_history():
             for fname in sorted(os.listdir(scene_path)):
                 fpath = os.path.join(scene_path, fname)
                 if os.path.isfile(fpath) and fname.lower().endswith(
-                    (".png", ".jpg", ".jpeg", ".webp", ".gif")
+                    (".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".mov")
                 ):
                     project_info["preview"] = f"/output/assets/{project_id}/{scene_num}/{fname}"
                     break

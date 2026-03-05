@@ -37,6 +37,9 @@ export class CanvasPreview {
 
         // Background color
         this.backgroundColor = '#000000';
+
+        // Disabled tracks set — synced from EditorState
+        this.disabledTracks = new Set();
     }
 
     /**
@@ -100,32 +103,60 @@ export class CanvasPreview {
     }
 
     /**
-     * Preload all scene images
+     * Preload all scene media (images and videos)
      */
     async preloadImages() {
         for (const scene of this.scenes) {
             if (scene.mediaUrl && !this.imageCache.has(scene.id)) {
-                const img = new Image();
-                // Only set crossOrigin for non-local URLs (blob: or http:)
-                if (scene.mediaUrl.startsWith('blob:') || scene.mediaUrl.startsWith('http')) {
-                    img.crossOrigin = 'anonymous';
-                }
-
-                try {
-                    await new Promise((resolve, reject) => {
-                        img.onload = () => {
-                            console.log(`Preview: Loaded image for scene ${scene.id}`);
-                            resolve();
-                        };
-                        img.onerror = (e) => {
-                            console.warn(`Preview: Failed to load image for scene ${scene.id}:`, scene.mediaUrl, e);
-                            reject(e);
-                        };
-                        img.src = scene.mediaUrl;
-                    });
-                    this.imageCache.set(scene.id, img);
-                } catch (error) {
-                    console.warn(`Failed to load image for scene ${scene.id}:`, error);
+                if (scene.isVideo) {
+                    // Load as <video> element for canvas drawing
+                    try {
+                        const video = document.createElement('video');
+                        video.muted = true;
+                        video.playsInline = true;
+                        video.preload = 'auto';
+                        video.loop = true;
+                        if (scene.mediaUrl.startsWith('blob:') || scene.mediaUrl.startsWith('http')) {
+                            video.crossOrigin = 'anonymous';
+                        }
+                        await new Promise((resolve, reject) => {
+                            video.onloadeddata = () => {
+                                console.log(`Preview: Loaded video for scene ${scene.id} (${video.videoWidth}x${video.videoHeight})`);
+                                resolve();
+                            };
+                            video.onerror = (e) => {
+                                console.warn(`Preview: Failed to load video for scene ${scene.id}:`, scene.mediaUrl, e);
+                                reject(e);
+                            };
+                            video.src = scene.mediaUrl;
+                        });
+                        video._isVideo = true;
+                        this.imageCache.set(scene.id, video);
+                    } catch (error) {
+                        console.warn(`Failed to load video for scene ${scene.id}:`, error);
+                    }
+                } else {
+                    const img = new Image();
+                    // Only set crossOrigin for non-local URLs (blob: or http:)
+                    if (scene.mediaUrl.startsWith('blob:') || scene.mediaUrl.startsWith('http')) {
+                        img.crossOrigin = 'anonymous';
+                    }
+                    try {
+                        await new Promise((resolve, reject) => {
+                            img.onload = () => {
+                                console.log(`Preview: Loaded image for scene ${scene.id}`);
+                                resolve();
+                            };
+                            img.onerror = (e) => {
+                                console.warn(`Preview: Failed to load image for scene ${scene.id}:`, scene.mediaUrl, e);
+                                reject(e);
+                            };
+                            img.src = scene.mediaUrl;
+                        });
+                        this.imageCache.set(scene.id, img);
+                    } catch (error) {
+                        console.warn(`Failed to load image for scene ${scene.id}:`, error);
+                    }
                 }
             }
         }
@@ -195,6 +226,7 @@ export class CanvasPreview {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
+        this._pauseAllVideos();
     }
 
     /**
@@ -261,15 +293,24 @@ export class CanvasPreview {
         const { scene, progress } = current;
         const img = this.imageCache.get(scene.id);
 
-        // For text scenes, render background + text overlay
+        // For text scenes, render background + text overlay (unless text track disabled)
         if (scene.type === 'text') {
-            this.renderTextScene(scene, progress);
+            if (this.disabledTracks.has('text')) {
+                this.renderPlaceholder(scene);
+            } else {
+                this.renderTextScene(scene, progress);
+            }
             return;
         }
 
         // For image/video scenes, render media with effects
         if (img) {
-            this.renderImage(img, scene.visual_fx || 'static', progress);
+            if (img._isVideo) {
+                this._syncVideo(img, current.localTime);
+                this.renderImage(img, scene.visual_fx || 'static', progress);
+            } else {
+                this.renderImage(img, scene.visual_fx || 'static', progress);
+            }
         } else {
             this.renderPlaceholder(scene);
         }
@@ -280,12 +321,13 @@ export class CanvasPreview {
             if (progress > transStart) {
                 const nextScene = this._getNextScene();
                 if (nextScene) {
-                    const nextImg = this.imageCache.get(nextScene.id);
-                    if (nextImg) {
+                    const nextMedia = this.imageCache.get(nextScene.id);
+                    if (nextMedia) {
                         const alpha = (progress - transStart) / (1.0 - transStart);
                         this.ctx.save();
                         this.ctx.globalAlpha = alpha;
-                        this.renderImage(nextImg, nextScene.visual_fx || 'static', 0);
+                        if (nextMedia._isVideo) this._syncVideo(nextMedia, 0);
+                        this.renderImage(nextMedia, nextScene.visual_fx || 'static', 0);
                         this.ctx.restore();
                     }
                 }
@@ -294,6 +336,33 @@ export class CanvasPreview {
 
         // Caption overlay on top
         this.renderCaptionOverlay(this.currentTime);
+    }
+
+    /**
+     * Sync a <video> element to the scene-local time.
+     * Plays during playback, pauses+seeks during scrubbing.
+     */
+    _syncVideo(video, localTime) {
+        if (this.isPlaying) {
+            if (video.paused) video.play().catch(() => {});
+        } else {
+            if (!video.paused) video.pause();
+            // Only seek if far enough from current (avoid jitter)
+            if (Math.abs(video.currentTime - localTime) > 0.1) {
+                video.currentTime = localTime % (video.duration || 1);
+            }
+        }
+    }
+
+    /**
+     * Pause all cached video elements (call on stop/pause)
+     */
+    _pauseAllVideos() {
+        for (const media of this.imageCache.values()) {
+            if (media._isVideo && !media.paused) {
+                media.pause();
+            }
+        }
     }
 
     /**
@@ -540,7 +609,11 @@ export class CanvasPreview {
         this.ctx.save();
 
         // Calculate how to fit image in canvas (cover)
-        const imgAspect = img.width / img.height;
+        // Video elements use videoWidth/videoHeight; Image elements use width/height
+        const w = img.videoWidth || img.naturalWidth || img.width;
+        const h = img.videoHeight || img.naturalHeight || img.height;
+        if (!w || !h) { this.ctx.restore(); return; } // not ready yet
+        const imgAspect = w / h;
         const canvasAspect = this.width / this.height;
 
         let drawWidth, drawHeight, offsetX, offsetY;

@@ -10,7 +10,8 @@ import traceback
 from flask import Blueprint, send_from_directory, request, jsonify, send_file
 from loguru import logger
 
-from config import TIMELINE_EDITOR_DIR, OUTPUT_DIR, BIN_DIR
+from config import TIMELINE_EDITOR_DIR, OUTPUT_DIR, BIN_DIR, FONTS_DIR
+from studio.fonts import FONT_REGISTRY, get_font_path, get_font_url
 
 editor_bp = Blueprint("editor", __name__)
 
@@ -31,6 +32,50 @@ logger.info("Export output directory: {}", EXPORT_DIR)
 def serve_timeline_editor(filename):
     """Serve timeline editor static files."""
     return send_from_directory(TIMELINE_EDITOR_DIR, filename)
+
+
+@editor_bp.route("/fonts/<path:filepath>")
+def serve_font_file(filepath):
+    """Serve font files from the fonts/ directory for @font-face loading."""
+    return send_from_directory(FONTS_DIR, filepath)
+
+
+# ---------------------------------------------------------------------------
+# Font API
+# ---------------------------------------------------------------------------
+
+SYSTEM_FONTS = [
+    'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Verdana',
+    'Trebuchet MS', 'Impact', 'Comic Sans MS', 'Courier New',
+]
+
+
+@editor_bp.route("/api/fonts", methods=["GET"])
+def list_fonts():
+    """Return combined list of custom + system fonts."""
+    fonts = []
+
+    # Custom fonts from registry
+    for family, entry in sorted(FONT_REGISTRY.items()):
+        variants = {}
+        for variant, abs_path in entry['variants'].items():
+            variants[variant] = get_font_url(abs_path)
+        fonts.append({
+            'family': family,
+            'source': 'custom',
+            'variants': variants,
+        })
+
+    # System fonts (no variant URLs — browser resolves them)
+    for family in SYSTEM_FONTS:
+        fonts.append({
+            'family': family,
+            'source': 'system',
+            'variants': {},
+        })
+
+    logger.debug("Font API: {} custom + {} system fonts", len(FONT_REGISTRY), len(SYSTEM_FONTS))
+    return jsonify(fonts)
 
 
 # ---------------------------------------------------------------------------

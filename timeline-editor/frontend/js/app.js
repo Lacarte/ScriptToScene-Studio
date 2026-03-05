@@ -142,7 +142,7 @@ class App {
                 return;
             }
 
-            const projectId = sceneData.project_id || `studio_${Date.now()}`;
+            const projectId = sceneData.project_id || `pm_${Array.from({length:6}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.random()*36|0]).join('')}`;
             const project = {
                 project_id: projectId,
                 script: sceneData.script || '',
@@ -377,7 +377,7 @@ class App {
             return;
         }
 
-        const projectId = studioData.project_id || `studio_${Date.now()}`;
+        const projectId = studioData.project_id || `pm_${Array.from({length:6}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.random()*36|0]).join('')}`;
         const project = {
             project_id: projectId,
             script: studioData.script || '',

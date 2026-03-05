@@ -1212,7 +1212,7 @@
     <div id="page-editor" class="page" style="height:100vh;overflow:hidden">
       <div id="editor-loading"
         style="position:fixed;top:0;left:var(--sidebar-w,56px);right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;z-index:10">
-        <div style="text-align:center; transform: translateX(28px);">
+        <div style="text-align:center;">
           <div
             style="width:36px;height:36px;border:2.5px solid rgba(255,255,255,0.08);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px">
           </div>
@@ -1264,6 +1264,40 @@
             </div>
             <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
               <input type="checkbox" id="setting-clean" checked onchange="settingsToggle('clean', this.checked)">
+              <span class="sts-toggle-slider"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Storage Settings -->
+        <section class="card p-5 mb-4">
+          <label
+            style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Storage</label>
+
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest);margin-bottom:6px">
+            <div style="flex:1;min-width:0">
+              <span style="font-size:13px;color:var(--text);font-weight:500">Local Storage</span>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Save edits, history, zoom, and
+                preferences across sessions</p>
+            </div>
+            <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
+              <input type="checkbox" id="setting-editor-localstorage"
+                onchange="localStorage.setItem('editor_storage_enabled', this.checked)">
+              <span class="sts-toggle-slider"></span>
+            </label>
+          </div>
+
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest)">
+            <div style="flex:1;min-width:0">
+              <span style="font-size:13px;color:var(--text);font-weight:500">Session Storage</span>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Keep staged timeline data when navigating
+                between pages</p>
+            </div>
+            <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
+              <input type="checkbox" id="setting-editor-sessionstorage"
+                onchange="localStorage.setItem('editor_session_storage_enabled', this.checked)">
               <span class="sts-toggle-slider"></span>
             </label>
           </div>

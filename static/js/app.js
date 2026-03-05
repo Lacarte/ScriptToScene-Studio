@@ -35,6 +35,10 @@ function switchPage(page) {
     b.classList.toggle('active', isActive);
   });
   if (page === 'editor') {
+    if (!localStorage.getItem('sts-editor-scenes')) {
+      toast('No scenes or assets available. Generate content first.', 'error');
+      return;
+    }
     $('#main-content').style.overflowY = 'hidden';
     initEditorIframe();
   } else {
@@ -121,6 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const cleanEl = $('#setting-clean');
   if (normEl) normEl.checked = STS_SETTINGS.normalize;
   if (cleanEl) cleanEl.checked = STS_SETTINGS.clean;
+
+  const storageEl = $('#setting-editor-localstorage');
+  const sessionStorageEl = $('#setting-editor-sessionstorage');
+  if (storageEl) storageEl.checked = localStorage.getItem('editor_storage_enabled') !== 'false';
+  if (sessionStorageEl) sessionStorageEl.checked = localStorage.getItem('editor_session_storage_enabled') !== 'false';
 });
 
 // ---- Auto-Forward (Continue to Next Step) ----

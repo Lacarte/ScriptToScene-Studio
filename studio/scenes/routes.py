@@ -105,8 +105,8 @@ def generate_scenes():
         if not isinstance(result, dict):
             return jsonify({"error": "Webhook returned unexpected format (expected JSON object)"}), 502
 
-        # Save to disk — use incoming project_id from pipeline, fallback to generated
-        project_id = data.get("project_id") or generate_project_id("pm")
+        # Save to disk — use incoming project_id from pipeline, fallback to webhook result, fallback to generated
+        project_id = data.get("project_id") or result.get("pp_randomId") or result.get("project_id") or generate_project_id("pm")
         result["project_id"] = project_id
         result["timestamp"] = datetime.now().isoformat()
         result["source_folder"] = data.get("source_folder", "")

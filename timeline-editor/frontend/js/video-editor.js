@@ -107,7 +107,8 @@ const EditorState = {
     bgMusic: null,          // { file, path, duration, volume, duckingEnabled, duckingLevel, fadeIn, fadeOut, loop }
     bgMusicElement: null,   // HTML Audio element for bgmusic playback
     disabledTracks: new Set(), // Keep track of which tracks are disabled
-    storageEnabled: localStorage.getItem('editor_storage_enabled') !== 'false' // Global save toggle (default ON)
+    storageEnabled: localStorage.getItem('editor_storage_enabled') !== 'false', // localStorage toggle (default ON)
+    sessionStorageEnabled: localStorage.getItem('editor_session_storage_enabled') !== 'false' // sessionStorage toggle (default ON)
 };
 
 // ============================================================
@@ -2762,15 +2763,6 @@ function setupPlayheadDrag() {
     });
 }
 
-/**
- * Setup event listeners
- */
-function _updateStorageBtn(btn) {
-    const on = EditorState.storageEnabled;
-    btn.classList.toggle('active', on);
-    btn.title = on ? 'Session saving ON (click to disable)' : 'Session saving OFF (click to enable)';
-    btn.style.opacity = on ? '1' : '0.4';
-}
 
 function setupEventListeners() {
     // Play/Pause
@@ -2803,20 +2795,6 @@ function setupEventListeners() {
 
     // Error dropdown
     setupErrorDropdown();
-
-    // Storage toggle
-    const storageBtn = document.getElementById('toggle-storage');
-    if (storageBtn) {
-        _updateStorageBtn(storageBtn);
-        storageBtn.addEventListener('click', () => {
-            EditorState.storageEnabled = !EditorState.storageEnabled;
-            // This one preference is always persisted so the toggle survives reload
-            localStorage.setItem('editor_storage_enabled', EditorState.storageEnabled.toString());
-            _updateStorageBtn(storageBtn);
-            showToast(EditorState.storageEnabled ? 'Session saving enabled' : 'Session saving disabled',
-                      EditorState.storageEnabled ? 'success' : 'info');
-        });
-    }
 
     // Keyboard shortcuts for undo/redo
     document.addEventListener('keydown', (e) => {
@@ -3613,6 +3591,7 @@ async function randomizeSceneMedia() {
 
     const assetScenes = EditorState._assetFilesCache.scenes || {};
     let assignedCount = 0;
+    const mediaTypeLimit = document.getElementById('randomize-media-type')?.value || 'mixed';
 
     for (let i = 0; i < EditorState.scenes.length; i++) {
         const scene = EditorState.scenes[i];
@@ -3624,8 +3603,21 @@ async function randomizeSceneMedia() {
         const files = sceneAsset?.files_on_disk;
         if (!files || !files.length) continue;
 
-        // Pick a random file from this scene's asset folder
-        const pick = files[Math.floor(Math.random() * files.length)];
+        // Filter to only image/video files
+        const mediaFiles = files.filter(f => {
+            const ext = (f.filename || '').split('.').pop().toLowerCase();
+            const isImg = IMAGE_EXTENSIONS.includes(ext);
+            const isVid = VIDEO_EXTENSIONS.includes(ext);
+
+            if (mediaTypeLimit === 'images' && !isImg) return false;
+            if (mediaTypeLimit === 'videos' && !isVid) return false;
+
+            return isImg || isVid;
+        });
+        if (!mediaFiles.length) continue;
+
+        // Pick a random media file from this scene's asset folder
+        const pick = mediaFiles[Math.floor(Math.random() * mediaFiles.length)];
 
         // Only update if it's different to be efficient
         if (scene.image !== pick.filename || scene.mediaUrl !== pick.url) {
@@ -3633,8 +3625,28 @@ async function randomizeSceneMedia() {
             scene.image = pick.filename;
             scene.mediaLoaded = true;
 
-            // Update DOM thumbnail directly without full timeline rebuild
-            updateSceneClipThumb(scene.id, pick.url);
+            const isVideo = isVideoFile(pick.filename);
+            scene.isVideo = isVideo;
+
+            if (isVideo) {
+                // Extract video metadata + thumbnail
+                const meta = await getVideoMeta(pick.url);
+                if (meta) {
+                    scene.videoDuration = meta.duration;
+                    scene.videoThumb = meta.thumbDataUrl;
+                } else {
+                    scene.videoDuration = null;
+                    scene.videoThumb = null;
+                }
+            } else {
+                // Clear video flags for image files
+                scene.isVideo = false;
+                scene.videoDuration = null;
+                scene.videoThumb = null;
+            }
+
+            // Update DOM thumbnail with correct type info
+            updateSceneClipThumb(scene.id, pick.url, isVideo, scene.videoThumb);
 
             // Clear only this specific scene from preview cache
             if (EditorState.preview) {
@@ -3650,16 +3662,29 @@ async function randomizeSceneMedia() {
         return;
     }
 
-    // Re-sync preview so the new images are preloaded and rendered
+    // Recalculate total duration
+    recalculateDuration();
+
+    // Re-sync preview so the new media is preloaded and rendered
     if (EditorState.preview) {
         EditorState.preview.setScenes(EditorState.scenes);
     }
+
+    // Refresh timeline and media grid to show updated thumbnails and video badges
+    renderTimeline();
+    renderMediaGrid();
 
     // Record edit action
     recordEdit('Randomize scene media', 'all', 'media', null, null);
     saveProjectEdits();
 
-    showToast(`Randomized ${assignedCount} scenes`, 'success');
+    // Show summary with image/video counts
+    const videoCount = EditorState.scenes.filter(s => s.isVideo).length;
+    const imageCount = EditorState.scenes.filter(s => s.mediaUrl && !s.isVideo && s.type !== 'text' && s.type !== 'cta').length;
+    const parts = [];
+    if (imageCount) parts.push(`${imageCount} image${imageCount > 1 ? 's' : ''}`);
+    if (videoCount) parts.push(`${videoCount} video${videoCount > 1 ? 's' : ''}`);
+    showToast(`Randomized ${assignedCount} scenes (${parts.join(' + ')})`, 'success');
 }
 
 /**
@@ -4428,7 +4453,7 @@ function updateTransitionsTab() {
  */
 function handleKeyboard(e) {
     // Space - Play/Pause
-    if (e.code === 'Space' && !e.target.matches('input, textarea')) {
+    if (e.code === 'Space' && !e.target.matches('input, textarea, [contenteditable="true"]')) {
         e.preventDefault();
         togglePlayback();
     }

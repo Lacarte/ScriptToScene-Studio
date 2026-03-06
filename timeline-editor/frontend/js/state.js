@@ -233,7 +233,7 @@ class StateManager {
     removeScene(sceneId) {
         const scenes = this.store.scenes
             .filter(s => s.scene_id !== sceneId)
-            .map((s, i) => ({ ...s, scene_id: i + 1 })); // Resequence
+            .map((s, i) => ({ ...s, scene_id: i })); // Resequence
         this.set({ scenes });
 
         // Deselect if removed scene was selected
@@ -248,7 +248,7 @@ class StateManager {
         scenes.splice(toIndex, 0, moved);
 
         // Resequence scene_ids
-        const resequenced = scenes.map((s, i) => ({ ...s, scene_id: i + 1 }));
+        const resequenced = scenes.map((s, i) => ({ ...s, scene_id: i }));
         this.set({ scenes: resequenced });
     }
 

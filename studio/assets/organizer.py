@@ -166,6 +166,106 @@ def _truncate(s, n):
     return s if len(s) <= n else s[:n] + "..."
 
 
+def reconcile_project(assets_dir, project_id):
+    """Scan disk folders and update metadata.json + grabber_job.json to match.
+
+    Finds scene folders with files that aren't tracked in JSON and adds them.
+    Returns the number of scenes that were added/updated.
+    """
+    project_dir = os.path.join(assets_dir, project_id)
+    if not os.path.isdir(project_dir):
+        return 0
+
+    # --- Load existing JSON files ---
+    meta_path = os.path.join(project_dir, "metadata.json")
+    job_path = os.path.join(project_dir, "grabber_job.json")
+
+    meta = {}
+    if os.path.isfile(meta_path):
+        try:
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            meta = {}
+    if "scenes" not in meta:
+        meta["scenes"] = {}
+
+    job = {}
+    if os.path.isfile(job_path):
+        try:
+            with open(job_path, "r") as f:
+                job = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            job = {}
+    if "scene_statuses" not in job:
+        job["scene_statuses"] = {}
+
+    # --- Scan disk for scene folders ---
+    updated = 0
+    for entry in os.scandir(project_dir):
+        if not entry.is_dir():
+            continue
+        try:
+            int(entry.name)  # only numeric subdirs
+        except ValueError:
+            continue
+
+        scene_key = entry.name
+        files_on_disk = []
+        for fname in sorted(os.listdir(entry.path)):
+            fpath = os.path.join(entry.path, fname)
+            if os.path.isfile(fpath) and fname.lower().endswith(
+                (".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".mov")
+            ):
+                files_on_disk.append(f"/output/assets/{project_id}/{scene_key}/{fname}")
+
+        if not files_on_disk:
+            continue
+
+        # --- Update metadata.json if scene missing or file list changed ---
+        existing_meta = meta["scenes"].get(scene_key, {})
+        existing_files = set(existing_meta.get("local_files", []))
+        if set(files_on_disk) != existing_files:
+            meta["scenes"][scene_key] = {
+                "scene": scene_key,
+                "source_urls": existing_meta.get("source_urls", []),
+                "local_files": files_on_disk,
+                "file_count": len(files_on_disk),
+            }
+            updated += 1
+
+        # --- Update grabber_job.json if scene missing or status stale ---
+        existing_status = job["scene_statuses"].get(scene_key, {})
+        if existing_status.get("status") != "ready" or set(existing_status.get("local_files", [])) != set(files_on_disk):
+            job["scene_statuses"][scene_key] = {
+                "status": "ready",
+                "urls": existing_status.get("urls", existing_meta.get("source_urls", [])),
+                "local_files": files_on_disk,
+            }
+            if scene_key not in job.get("scene_statuses", {}):
+                updated += 1  # only count as new update if truly new
+
+    # --- Write back only if something changed ---
+    if updated > 0:
+        with open(meta_path, "w") as f:
+            json.dump(meta, f, indent=2)
+
+        # Fix overall job status
+        if job.get("scene_statuses"):
+            all_ready = all(
+                s.get("status") in ("ready", "error")
+                for s in job["scene_statuses"].values()
+            )
+            if all_ready:
+                job["status"] = "done"
+            with open(job_path, "w") as f:
+                json.dump(job, f, indent=2)
+
+        logger.info("Reconciled project {}: {} scenes updated", project_id, updated)
+
+    return updated
+
+
 def _update_project_metadata(assets_dir, project_id, scene_num, source_urls, local_files):
     """Update the project metadata.json with scene download info."""
     project_dir = os.path.join(assets_dir, project_id)

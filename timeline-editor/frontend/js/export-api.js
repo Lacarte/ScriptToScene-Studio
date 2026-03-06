@@ -398,8 +398,8 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
 
                 media: {
                     type: mediaType,
-                    file: isTextScene ? null : (scene.image || `${index + 1}.${scene.isVideo ? 'mp4' : 'jpg'}`),
-                    path: isTextScene ? null : (scene.mediaUrl && scene.mediaUrl.startsWith('/output/') ? '..' + scene.mediaUrl : `working-assets/${project.id}/${scene.image || `${index + 1}.${scene.isVideo ? 'mp4' : 'jpg'}`}`)
+                    file: isTextScene ? null : (scene.image || `${index}.${scene.isVideo ? 'mp4' : 'jpg'}`),
+                    path: isTextScene ? null : (scene.mediaUrl && scene.mediaUrl.startsWith('/output/') ? '..' + scene.mediaUrl : `working-assets/${project.id}/${scene.image || `${index}.${scene.isVideo ? 'mp4' : 'jpg'}`}`)
                 },
 
                 text: isTextScene ? {
@@ -432,7 +432,7 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
                 }
             };
 
-            console.log(`[prepareExportData] Scene ${index + 1}: type=${mediaType} dur=${scene.duration}s fx=${scene.visual_fx || 'static'} media=${sceneData.media.path || 'text'}`);
+            console.log(`[prepareExportData] Scene ${index}: type=${mediaType} dur=${scene.duration}s fx=${scene.visual_fx || 'static'} media=${sceneData.media.path || 'text'}`);
 
             return sceneData;
         }),
@@ -567,16 +567,16 @@ export function validateExportData(exportData) {
 
     exportData.scenes?.forEach((scene, index) => {
         if (scene.duration <= 0) {
-            errors.push(`Scene ${index + 1}: Invalid duration (${scene.duration}s)`);
+            errors.push(`Scene ${index}: Invalid duration (${scene.duration}s)`);
         }
 
         if (scene.media.type === 'image' && !scene.media.file) {
-            warnings.push(`Scene ${index + 1}: No media file specified`);
+            warnings.push(`Scene ${index}: No media file specified`);
         }
 
         if (scene.media.type === 'text' && !scene.text?.content) {
             if (scene.type === 'text') {
-                warnings.push(`Scene ${index + 1}: Text scene has no script content (will show background only)`);
+                warnings.push(`Scene ${index}: Text scene has no script content (will show background only)`);
             }
         }
     });

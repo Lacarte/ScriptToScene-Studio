@@ -84,6 +84,12 @@ def serve_js(filename):
     return send_from_directory(os.path.join(STATIC_DIR, "js"), filename)
 
 
+@app.route("/assets/<path:filename>")
+def serve_app_assets(filename):
+    from config import APP_ASSETS_DIR
+    return send_from_directory(APP_ASSETS_DIR, filename)
+
+
 @app.route("/api/health")
 def health():
     from studio.timing.routes import _check_alignment_available, _find_ffmpeg

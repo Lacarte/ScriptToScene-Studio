@@ -32,6 +32,7 @@ function loadScenesForAssets() {
   }
   STATE.assetsSceneData = STATE.scenesResult;
   STATE.assetStatuses = {};  // Clear stale statuses from previous project
+  STATE.assetSelected = {};  // Clear selection
   renderAssetsFromScenes();
   loadAssetsHistory(); // refresh to highlight active row
   toast(`Loaded ${STATE.scenesResult.scenes.length} scenes`);
@@ -86,6 +87,7 @@ async function assetsSelectSceneProject(projectId) {
     if (!data.scenes || !data.scenes.length) throw new Error('No scenes found');
     STATE.assetsSceneData = data;
     STATE.assetStatuses = {};  // Clear stale statuses from previous project
+  STATE.assetSelected = {};  // Clear selection
     renderAssetsFromScenes();
     loadAssetsHistory(); // refresh to highlight active row
     toast(`Loaded ${data.scenes.length} scenes from history`);
@@ -117,6 +119,7 @@ function handleAssetsJSONImport(input) {
       }
       STATE.assetsSceneData = data;
       STATE.assetStatuses = {};  // Clear stale statuses from previous project
+  STATE.assetSelected = {};  // Clear selection
       renderAssetsFromScenes();
       loadAssetsHistory(); // refresh to highlight active row
       toast(`Loaded ${data.scenes.length} scenes from file`);
@@ -208,10 +211,10 @@ function _renderTypeMix(data) {
 // ---- Asset Grid ----
 
 function renderAssetGrid(scenes) {
-  $('#assets-grid').innerHTML = scenes.map(s => _buildAssetCard(s)).join('');
+  $('#assets-grid').innerHTML = scenes.map((s, i) => _buildAssetCard(s, i)).join('');
 }
 
-function _buildAssetCard(scene) {
+function _buildAssetCard(scene, sceneNum) {
   const idx = scene.index;
   const st = STATE.assetStatuses[idx] || { status: 'pending' };
   const tc = _typeConf(scene.type_of_scene);
@@ -265,7 +268,7 @@ function _buildAssetCard(scene) {
     previewContent = `
       <div style="text-align:center;color:var(--text-muted);opacity:0.5">
         ${typeIcons[scene.type_of_scene] || typeIcons.video}
-        <p style="font-size:10px;margin-top:6px">#${idx}</p>
+        <p style="font-size:10px;margin-top:6px">#${sceneNum}</p>
       </div>`;
   }
 
@@ -282,17 +285,22 @@ function _buildAssetCard(scene) {
       </div>`
     : '';
 
+  const checked = STATE.assetSelected?.[idx] ? 'checked' : '';
+
   return `
   <div class="asset-card" id="asset-card-${idx}" style="border-left:3px solid ${tc.color}">
     <div class="asset-preview" style="height:180px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
       ${previewContent}
       ${statusBadge}
+      <label style="position:absolute;top:6px;left:6px;z-index:2;cursor:pointer;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;background:rgba(0,0,0,0.55);border:1.5px solid rgba(255,255,255,0.25);transition:all 0.15s" onclick="event.stopPropagation()">
+        <input type="checkbox" ${checked} onchange="assetsToggleSelect(${idx},this.checked)" style="accent-color:var(--accent);width:13px;height:13px;cursor:pointer;margin:0" />
+      </label>
     </div>
     <div style="padding:14px">
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px">
         <div style="display:flex;align-items:center;gap:8px;min-width:0">
-          <span class="font-mono" style="font-size:10px;color:var(--text-muted);flex-shrink:0">#${idx}</span>
+          <span class="font-mono" style="font-size:10px;color:var(--text-muted);flex-shrink:0">#${sceneNum}</span>
           <span style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(scene.title || '')}</span>
         </div>
         <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
@@ -387,11 +395,12 @@ function assetsOpenLightbox(sceneIndex, fileIndex) {
 
 function updateAssetCard(sceneIndex) {
   if (!STATE.assetsSceneData) return;
-  const scene = STATE.assetsSceneData.scenes.find(s => s.index === sceneIndex);
-  if (!scene) return;
+  const scenes = STATE.assetsSceneData.scenes;
+  const pos = scenes.findIndex(s => s.index === sceneIndex);
+  if (pos === -1) return;
   const el = document.getElementById(`asset-card-${sceneIndex}`);
   if (el) {
-    el.outerHTML = _buildAssetCard(scene);
+    el.outerHTML = _buildAssetCard(scenes[pos], pos);
   }
 }
 
@@ -459,7 +468,149 @@ function assetsCancelPromptEdit(sceneIndex) {
   $(`#asset-prompt-input-${sceneIndex}`).value = currentPrompt;
 }
 
+// ---- Scene Selection ----
+
+function assetsToggleSelect(idx, checked) {
+  if (!STATE.assetSelected) STATE.assetSelected = {};
+  STATE.assetSelected[idx] = checked;
+  _updateSelectionUI();
+}
+
+function assetsSelectAll() {
+  if (!STATE.assetsSceneData?.scenes) return;
+  const allSelected = _getSelectedCount() === STATE.assetsSceneData.scenes.length;
+  STATE.assetSelected = {};
+  STATE.assetsSceneData.scenes.forEach(s => { STATE.assetSelected[s.index] = !allSelected; });
+  renderAssetGrid(STATE.assetsSceneData.scenes);
+  _updateSelectionUI();
+}
+
+function assetsSelectPending() {
+  if (!STATE.assetsSceneData?.scenes) return;
+  STATE.assetSelected = {};
+  STATE.assetsSceneData.scenes.forEach(s => {
+    const st = STATE.assetStatuses[s.index];
+    if (!st || st.status !== 'ready') STATE.assetSelected[s.index] = true;
+  });
+  renderAssetGrid(STATE.assetsSceneData.scenes);
+  _updateSelectionUI();
+}
+
+function _getSelectedCount() {
+  return Object.values(STATE.assetSelected || {}).filter(Boolean).length;
+}
+
+function _updateSelectionUI() {
+  const count = _getSelectedCount();
+  const bar = $('#assets-selection-bar');
+  if (!bar) return;
+  if (count > 0) {
+    bar.style.display = '';
+    $('#assets-selection-count').textContent = `${count} selected`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+async function assetsResendSelected() {
+  if (!STATE.assetsSceneData?.scenes) return;
+  const scenes = STATE.assetsSceneData.scenes;
+  const selected = scenes.filter((s, i) => STATE.assetSelected?.[s.index]);
+  if (!selected.length) { toast('No scenes selected', 'error'); return; }
+
+  const provider = $('#assets-provider').value;
+  const arguments_ = provider === 'midjourney' ? ($('#assets-arguments').value || '-v 7 -ar 9:16') : '';
+  const projectId = STATE.assetsSceneData.project_id || 'default';
+
+  // Build payload with original sequential positions
+  const scenesPayload = selected.map(s => {
+    const pos = scenes.indexOf(s);
+    return {
+      prompt: STATE.assetStatuses[s.index]?.editedPrompt || s.image_prompt,
+      scene: pos,
+    };
+  }).filter(s => s.prompt);
+
+  if (!scenesPayload.length) { toast('No prompts for selected scenes', 'error'); return; }
+
+  _setGrabberStatus('Re-sending selected scenes...');
+
+  try {
+    const res = await fetch('/api/assets/grabber/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id: projectId,
+        provider,
+        arguments: arguments_,
+        scenes: scenesPayload,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to start grabber');
+
+    // Mark selected scenes as pending
+    selected.forEach(s => {
+      if (STATE.assetStatuses[s.index]) STATE.assetStatuses[s.index].status = 'pending';
+    });
+    renderAssetGrid(scenes);
+    updateAssetsProgress();
+
+    const providerUrl = _PROVIDER_URLS[provider] || _PROVIDER_URLS.midjourney;
+    window.open(providerUrl, 'sts-provider-tab');
+
+    _setGrabberStatus(`${data.scene_count} selected scenes queued — activate Automa`);
+    toast(`${data.scene_count} scenes re-sent to grabber`);
+
+    _startGrabberPolling(projectId);
+    _setGrabberUI(true);
+
+    // Clear selection
+    STATE.assetSelected = {};
+    _updateSelectionUI();
+  } catch (e) {
+    toast(e.message || 'Resend failed', 'error');
+    _setGrabberStatus('');
+  }
+}
+
 // ---- Assets Grabber ----
+
+let _grabberRunning = false;
+
+function assetsToggleGrabber() {
+  if (_grabberRunning) {
+    assetsStopGrabber();
+  } else {
+    assetsStartGrabber();
+  }
+}
+
+function _setGrabberUI(running) {
+  _grabberRunning = running;
+  const label = $('#assets-grabber-label');
+  const icon = $('#assets-grabber-icon');
+  const btn = $('#assets-grabber-btn');
+  if (running) {
+    label.textContent = 'Stop Grabber';
+    icon.innerHTML = '<rect x="6" y="6" width="12" height="12" rx="1"/>';
+    btn.style.background = '#FF6B6B';
+  } else {
+    label.textContent = 'Start Grabber';
+    icon.innerHTML = '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>';
+    btn.style.background = '';
+  }
+}
+
+function assetsStopGrabber() {
+  if (_grabberPollTimer) {
+    clearInterval(_grabberPollTimer);
+    _grabberPollTimer = null;
+  }
+  _setGrabberUI(false);
+  _setGrabberStatus('Grabber stopped');
+  toast('Grabber stopped');
+}
 
 async function assetsStartGrabber() {
   if (!STATE.assetsSceneData || !STATE.assetsSceneData.scenes) {
@@ -472,12 +623,12 @@ async function assetsStartGrabber() {
   const arguments_ = provider === 'midjourney' ? ($('#assets-arguments').value || '-v 7 -ar 9:16') : '';
   const projectId = STATE.assetsSceneData.project_id || 'default';
 
-  // Build scenes payload (respect edited prompts)
+  // Build scenes payload (respect edited prompts, sequential folder numbering)
   const scenesPayload = scenes
     .filter(s => s.image_prompt || STATE.assetStatuses[s.index]?.editedPrompt)
-    .map(s => ({
+    .map((s, i) => ({
       prompt: STATE.assetStatuses[s.index]?.editedPrompt || s.image_prompt,
-      scene: s.index,
+      scene: i,
     }));
 
   if (!scenesPayload.length) {
@@ -524,9 +675,11 @@ async function assetsStartGrabber() {
 
     // Start polling for results
     _startGrabberPolling(projectId);
+    _setGrabberUI(true);
   } catch (e) {
     toast(e.message || 'Grabber failed', 'error');
     _setGrabberStatus('');
+    _setGrabberUI(false);
   } finally {
     btn.disabled = false;
     btn.style.opacity = '';
@@ -586,6 +739,7 @@ function _startGrabberPolling(projectId) {
       if (data.status === 'done' || data.status === 'error') {
         clearInterval(_grabberPollTimer);
         _grabberPollTimer = null;
+        _setGrabberUI(false);
         loadAssetsHistory(); // refresh history
         if (data.status === 'done') {
           showContinueBar('assets-controls', 'editor', 'Auto-Assemble & Edit →', autoAssembleAndSendToEditor);
@@ -764,6 +918,7 @@ async function assetsLoadFromHistory(projectId) {
 
     // Populate asset statuses from the project data
     STATE.assetStatuses = {};
+    STATE.assetSelected = {};
     for (const [sceneNum, sceneInfo] of Object.entries(data.scenes)) {
       const idx = parseInt(sceneNum);
       const localFiles = sceneInfo.files_on_disk

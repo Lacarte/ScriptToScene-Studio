@@ -6,12 +6,11 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-import requests as http_requests
 from flask import Blueprint, jsonify, request, send_from_directory
 from loguru import logger
 
 from config import ASSETS_DIR
-from .organizer import organize_grabber_assets, save_base64_assets
+from .organizer import organize_grabber_assets, save_base64_assets, reconcile_project
 
 assets_bp = Blueprint("assets", __name__)
 
@@ -37,47 +36,19 @@ def _load_jobs_from_disk():
     for entry in os.scandir(ASSETS_DIR):
         if not entry.is_dir():
             continue
+        pid = entry.name
+        # Reconcile disk → JSON first (fixes missing scenes in metadata/job)
+        reconcile_project(ASSETS_DIR, pid)
+        # Now load the (possibly updated) job
         job_path = os.path.join(entry.path, "grabber_job.json")
         if not os.path.isfile(job_path):
             continue
         try:
             with open(job_path, "r") as f:
                 job = json.load(f)
-            pid = job.get("project_id", entry.name)
-            # Reconcile with metadata.json for accurate local_files
-            meta_path = os.path.join(entry.path, "metadata.json")
-            if os.path.isfile(meta_path):
-                with open(meta_path, "r") as f:
-                    meta = json.load(f)
-                for scene_key, scene_meta in meta.get("scenes", {}).items():
-                    if scene_key in job.get("scene_statuses", {}):
-                        ss = job["scene_statuses"][scene_key]
-                        ss["urls"] = scene_meta.get("source_urls", ss.get("urls", []))
-                        lf = scene_meta.get("local_files", [])
-                        ss["local_files"] = lf
-                        # Fix status based on actual files on disk
-                        if lf:
-                            ss["status"] = "ready"
-                        elif ss["urls"] and ss["status"] not in ("error",):
-                            ss["status"] = "ready" if _scene_files_exist(entry.path, scene_key) else "pending"
-            # Fix overall status
-            statuses = [s["status"] for s in job.get("scene_statuses", {}).values()]
-            if statuses:
-                if all(s in ("ready", "error") for s in statuses):
-                    job["status"] = "done"
-                elif any(s == "downloading" for s in statuses):
-                    job["status"] = "downloading"
             grabber_jobs[pid] = job
         except (json.JSONDecodeError, OSError, KeyError) as e:
-            logger.warning("Skipped loading job from {}: {}", entry.name, e)
-
-
-def _scene_files_exist(project_path, scene_num):
-    """Check if a scene subfolder has any downloaded files."""
-    scene_dir = os.path.join(project_path, str(scene_num))
-    if not os.path.isdir(scene_dir):
-        return False
-    return any(f.is_file() for f in Path(scene_dir).iterdir())
+            logger.warning("Skipped loading job from {}: {}", pid, e)
 
 
 # Load existing jobs on module import
@@ -519,12 +490,31 @@ def assets_history():
     return jsonify(projects)
 
 
+@assets_bp.route("/api/assets/reconcile/<project_id>", methods=["POST"])
+def reconcile_assets(project_id):
+    """Force reconcile disk files with metadata.json + grabber_job.json."""
+    project_dir = os.path.join(ASSETS_DIR, project_id)
+    if not os.path.isdir(project_dir):
+        return jsonify({"error": "Project not found"}), 404
+    updated = reconcile_project(ASSETS_DIR, project_id)
+    # Reload job into memory if it was updated
+    if updated > 0:
+        job_path = os.path.join(project_dir, "grabber_job.json")
+        if os.path.isfile(job_path):
+            with open(job_path, "r") as f:
+                grabber_jobs[project_id] = json.load(f)
+    return jsonify({"updated": updated})
+
+
 @assets_bp.route("/api/assets/project/<project_id>")
 def get_asset_project(project_id):
     """Get full asset project details — all scenes with local files."""
     project_dir = os.path.join(ASSETS_DIR, project_id)
     if not os.path.isdir(project_dir):
         return jsonify({"error": "Project not found"}), 404
+
+    # Auto-reconcile: sync disk → JSON before returning
+    reconcile_project(ASSETS_DIR, project_id)
 
     result = {
         "project_id": project_id,

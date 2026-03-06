@@ -74,7 +74,7 @@ export function validateProject(scenes, projectDuration = null) {
 
     // Rule 2 & 3: scene_id sequential and no duplicates
     const sceneIds = scenes.map(s => s.scene_id);
-    const expectedIds = scenes.map((_, i) => i + 1);
+    const expectedIds = scenes.map((_, i) => i);
 
     const hasDuplicates = sceneIds.length !== new Set(sceneIds).size;
     const isSequential = JSON.stringify(sceneIds.sort((a, b) => a - b)) === JSON.stringify(expectedIds);

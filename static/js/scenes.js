@@ -368,21 +368,31 @@ function renderSceneResults(data) {
   const typeColors = { video: '#4ECDC4', image: '#A78BFA', text: '#FFB347' };
   const typeBg = { video: 'rgba(78,205,196,0.1)', image: 'rgba(167,139,250,0.1)', text: 'rgba(255,179,71,0.1)' };
 
+  // Build segment text lookup by index (scene.index → segment.index)
+  const segByIdx = {};
+  if (STATE.scenesSegData?.segments) {
+    for (const seg of STATE.scenesSegData.segments) {
+      if (!seg.is_filler) segByIdx[seg.index] = seg.words || '';
+    }
+  }
+
   $('#scenes-list').innerHTML = scenes.map((s, i) => {
     const tc = typeColors[s.type_of_scene] || '#6b7f93';
     const tb = typeBg[s.type_of_scene] || 'rgba(107,127,147,0.1)';
     const timing = _scnSegTimings[i];
     const timeStr = timing ? `${timing.start.toFixed(2)}s - ${timing.end.toFixed(2)}s` : '';
+    const segText = segByIdx[s.index] ?? '';
     return `
     <div class="scene-card" data-scene-idx="${i}" data-start="${timing?.start || 0}" data-end="${timing?.end || 0}" onclick="scnPlayBlock(${i})" style="border-left-color:${tc};cursor:pointer">
       <div class="flex items-center justify-between mb-2">
-        <span class="font-mono text-xs" style="color:${tc}">#${i + 1} &middot; ${esc(s.title || '')}${timeStr ? ` · <span style="color:var(--text-muted)">${timeStr}</span>` : ''}</span>
+        <span class="font-mono text-xs" style="color:${tc}">#${i} &middot; ${esc(s.title || '')}${timeStr ? ` · <span style="color:var(--text-muted)">${timeStr}</span>` : ''}</span>
         <div style="display:flex;gap:6px;align-items:center">
           <span class="font-mono" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background:${tb};color:${tc};text-transform:uppercase;letter-spacing:0.05em">${s.type_of_scene || 'video'}</span>
           ${s.narrative_role ? `<span class="font-mono" style="font-size:9px;padding:2px 8px;border-radius:4px;background:rgba(78,205,196,0.08);color:var(--accent)">${esc(s.narrative_role)}</span>` : ''}
           <span class="font-mono" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg-darkest);color:var(--text-muted)">${(s.duration || 0).toFixed(1)}s</span>
         </div>
       </div>
+      ${segText ? `<p style="font-size:12px;color:var(--text);line-height:1.5;margin-bottom:6px">"${esc(segText)}"</p>` : ''}
       ${s.text_content ? `<p style="font-size:14px;color:${tc};margin-bottom:8px;font-weight:600">"${esc(s.text_content)}"</p>` : ''}
       <p style="font-size:11px;color:var(--text-secondary);font-style:italic;line-height:1.5">${esc(s.image_prompt || '')}</p>
     </div>`;

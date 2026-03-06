@@ -160,9 +160,14 @@ function _plUpdateStep(event) {
   if (step === 'done') {
     _plRenderProgress('done');
     $('#pipeline-current-step').innerHTML = `<span style="font-size:13px;color:#26DE81;font-weight:600">Pipeline complete</span>`;
-    pipelineLoadHistory();
+    try { new Audio('/assets/pipeline_done.mp3').play(); } catch (_) {}
+    // Small delay to ensure scenes.json is flushed to disk before reading
+    setTimeout(() => pipelineLoadHistory(), 500);
 
-    // Store result for editor
+    // Store results for scenes page and editor
+    if (event.summary?.segment) {
+      STATE.scenesSegData = event.summary.segment;
+    }
     if (event.summary?.scenes) {
       STATE.scenesResult = event.summary.scenes;
       localStorage.setItem('sts-editor-scenes', JSON.stringify(event.summary.scenes));
@@ -208,6 +213,7 @@ async function pipelineLoadHistory() {
     list.innerHTML = jobs.map(j => {
       const color = j.status === 'done' ? '#26DE81' : j.status === 'error' ? '#FF6B6B' : 'var(--accent)';
       const scenes = j.scene_count ? `${j.scene_count} scenes` : '';
+      const date = j.timestamp ? timeAgo(j.timestamp) : '';
       return `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)">
         <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>
@@ -215,10 +221,10 @@ async function pipelineLoadHistory() {
           <div class="font-mono" style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.label || j.project_id)}</div>
           <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${esc(j.project_id)}${scenes ? ' · ' + scenes : ''}</div>
         </div>
-        <span class="font-mono" style="font-size:10px;color:var(--text-muted);flex-shrink:0">${j.status}</span>
+        <span class="font-mono" style="font-size:10px;color:var(--text-muted);flex-shrink:0;text-align:right">${date}</span>
       </div>`;
     }).join('');
-  } catch (e) { /* ignore */ }
+  } catch (e) { console.error('Pipeline history:', e); }
 }
 
 // ---- Blueprint Selector ----

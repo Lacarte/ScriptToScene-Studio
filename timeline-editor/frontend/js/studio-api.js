@@ -64,7 +64,7 @@ class StudioAPIManager {
 
         return studioData.scenes.map((scene, i) => ({
             project_id: studioData.project_id || '',
-            scene_id: i + 1,
+            scene_id: i,
             scene_type: scene.scene_type || this._mapType(scene.type || scene.type_of_scene),
             description: scene.description || scene.image_prompt || '',
             timestamp: scene.timestamp || '0:00',
@@ -123,9 +123,9 @@ class StudioAPIManager {
         return scenes.map((scene, i) => {
             const sceneIndex = scene.index ?? i;
 
-            // Get asset image for this scene
-            const assetInfo = assetScenes[String(sceneIndex)] || {};
-            const statusInfo = assetStatuses[String(sceneIndex)] || {};
+            // Get asset image for this scene (folders are sequential 0-based)
+            const assetInfo = assetScenes[String(i)] || {};
+            const statusInfo = assetStatuses[String(i)] || {};
             const localFiles = assetInfo.files_on_disk
                 ? assetInfo.files_on_disk.map(f => f.url)
                 : statusInfo.local_files || [];
@@ -142,7 +142,7 @@ class StudioAPIManager {
 
             return {
                 project_id: sceneData.project_id || '',
-                scene_id: i + 1,
+                scene_id: i,
                 scene_type: scene.scene_type || this._mapType(scene.type || scene.type_of_scene),
                 description: scene.description || scene.image_prompt || '',
                 timestamp: '0:00',

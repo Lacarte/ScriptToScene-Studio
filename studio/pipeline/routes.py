@@ -252,9 +252,7 @@ def _run_pipeline(job_id):
                     "inference_time": results["timing"]["inference_time"],
                     "folder": results["timing"]["folder"],
                 },
-                "segment": {
-                    "stats": results["segment"].get("stats"),
-                },
+                "segment": results["segment"],
                 "scenes": results["scenes"],
             },
         })

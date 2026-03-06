@@ -349,7 +349,7 @@ class SceneEditor {
         // Show saving indicator
         this.showSaveIndicator('saving');
         try {
-            await API.saveScene(scene, scene.scene_id + 1); // +1 for header row
+            await API.saveScene(scene, scene.scene_id + 2); // +2 for header row (scene_id is 0-based)
             this.showSaveIndicator('saved');
         } catch (error) {
             console.error('Failed to save scene:', error);

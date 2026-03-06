@@ -253,7 +253,7 @@ class APIManager {
                 const idx = projectScenes.findIndex(s => s.scene_id === sceneId);
                 if (idx !== -1) {
                     projectScenes.splice(idx, 1);
-                    projectScenes.forEach((s, i) => s.scene_id = i + 1);
+                    projectScenes.forEach((s, i) => s.scene_id = i);
                 }
             }
             showToast('Scene deleted', 'success');

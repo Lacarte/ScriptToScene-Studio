@@ -180,6 +180,7 @@ function renderSegResults(data) {
   renderSegTimeline(segments, data.metadata);
 
   // Segment list
+  let segNum = -1;
   $('#seg-list').innerHTML = segments.map(s => {
     if (s.is_filler) {
       return `
@@ -189,6 +190,7 @@ function renderSegResults(data) {
         <span class="font-mono" style="font-size:10px;color:var(--text-muted)">${s.duration.toFixed(2)}s</span>
       </div>`;
     }
+    segNum++;
     const reasonColor = {
       strong_break: '#4ECDC4',
       natural_break: '#A78BFA',
@@ -199,7 +201,7 @@ function renderSegResults(data) {
     return `
     <div class="seg-card" data-seg-idx="${s.index}" data-start="${s.start}" data-end="${s.end}" onclick="segPlayBlock(${s.index})" style="background:var(--bg-surface);border:1px solid var(--border);border-left:3px solid ${rc};border-radius:10px;padding:12px 14px;transition:all 0.2s;cursor:pointer">
       <div class="flex items-center justify-between mb-1.5">
-        <span class="font-mono text-xs" style="color:${rc}">Segment ${s.index} · ${s.start.toFixed(2)}s - ${s.end.toFixed(2)}s</span>
+        <span class="font-mono text-xs" style="color:${rc}">Segment ${segNum} · ${s.start.toFixed(2)}s - ${s.end.toFixed(2)}s</span>
         <div style="display:flex;gap:6px;align-items:center">
           <span class="font-mono" style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(78,205,196,0.1);color:var(--accent)">${s.duration.toFixed(2)}s</span>
           <span class="font-mono" style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg-darkest);color:var(--text-muted)">${s.break_reason}</span>

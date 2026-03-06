@@ -1209,7 +1209,7 @@ async function loadProjectMediaWithProgress() {
 
     for (let i = 0; i < EditorState.scenes.length; i++) {
         const scene = EditorState.scenes[i];
-        const sceneNumber = i + 1;
+        const sceneNumber = i;
 
         if (scene.type === 'text') continue;
 
@@ -3598,7 +3598,7 @@ async function randomizeSceneMedia() {
         if (scene.type === 'text' || scene.type === 'cta') continue;
 
         // Find this scene's asset folder using its true index
-        const sceneNumber = String(i + 1);
+        const sceneNumber = String(i);
         const sceneAsset = assetScenes[sceneNumber] || assetScenes[String(scene.id)];
         const files = sceneAsset?.files_on_disk;
         if (!files || !files.length) continue;

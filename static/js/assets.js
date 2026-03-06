@@ -707,11 +707,15 @@ function _startGrabberPolling(projectId) {
       const data = await res.json();
 
       // Update per-scene statuses
+      // sceneNum is sequential (0,1,2...), map to scene.index for STATE lookup
       const sceneStatuses = data.scene_statuses || {};
+      const scenes = STATE.assetsSceneData?.scenes || [];
       let anyChange = false;
 
       for (const [sceneNum, ss] of Object.entries(sceneStatuses)) {
-        const idx = parseInt(sceneNum);
+        const pos = parseInt(sceneNum);
+        const scene = scenes[pos];
+        const idx = scene ? scene.index : pos;
         if (!STATE.assetStatuses[idx]) continue;
         const prev = STATE.assetStatuses[idx].status;
 
@@ -917,14 +921,19 @@ async function assetsLoadFromHistory(projectId) {
     }
 
     // Populate asset statuses from the project data
+    // Metadata keys are sequential (0,1,2...) but STATE.assetStatuses must be
+    // keyed by scene.index (raw segment index, e.g. 0,1,3,4,6,8,9,11,13).
     STATE.assetStatuses = {};
     STATE.assetSelected = {};
-    for (const [sceneNum, sceneInfo] of Object.entries(data.scenes)) {
-      const idx = parseInt(sceneNum);
+    const scenes = STATE.assetsSceneData.scenes;
+    for (const [seqNum, sceneInfo] of Object.entries(data.scenes)) {
+      const pos = parseInt(seqNum);
+      const scene = scenes[pos];
+      const idx = scene ? scene.index : pos;  // map sequential → scene.index
       const localFiles = sceneInfo.files_on_disk
         ? sceneInfo.files_on_disk.map(f => f.url)
         : sceneInfo.local_files || [];
-      const ss = data.scene_statuses?.[sceneNum];
+      const ss = data.scene_statuses?.[seqNum];
 
       STATE.assetStatuses[idx] = {
         status: localFiles.length > 0 ? 'ready' : (ss?.status || 'pending'),

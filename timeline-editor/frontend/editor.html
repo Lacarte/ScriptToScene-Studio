@@ -407,6 +407,7 @@
                                     <option value="subtitle_bar">Subtitle Bar</option>
                                     <option value="karaoke">Karaoke</option>
                                     <option value="minimal">Minimal</option>
+                                    <option value="single_line">Single Line</option>
                                 </select>
                             </div>
 
@@ -440,6 +441,26 @@
                                     style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Position
                                     Y: <span id="cap-ed-pos-val">75%</span></label>
                                 <input id="cap-ed-position" type="range" min="10" max="95" value="75" class="cap-range">
+                            </div>
+
+                            <div>
+                                <label
+                                    style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Letter
+                                    Spacing: <span id="cap-ed-ls-val">0em</span></label>
+                                <input id="cap-ed-letter-spacing" type="range" min="-10" max="10" value="0" step="1"
+                                    class="cap-range">
+                            </div>
+
+                            <div style="border-top:1px solid var(--border-subtle);padding-top:10px;margin-top:2px">
+                                <div
+                                    style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px">
+                                    Options</div>
+                                <label
+                                    style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;font-size:11px;color:var(--text)">
+                                    <input type="checkbox" id="cap-clean-text-toggle"
+                                        style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+                                    Clean special characters
+                                </label>
                             </div>
                         </div>
 

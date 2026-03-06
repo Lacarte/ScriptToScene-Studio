@@ -960,22 +960,26 @@ async function autoAssembleAndSendToEditor() {
   }
   const projectId = STATE.assetsSceneData.project_id;
 
-  // Build asset data for the editor
-  const assetsData = {
-    scenes: {},
-    scene_statuses: {},
-  };
-  if (STATE.assetsSceneData.scenes) {
-    STATE.assetsSceneData.scenes.forEach((scene, i) => {
-      const st = STATE.assetStatuses[scene.index] || {};
-      assetsData.scenes[String(i)] = {
-        files_on_disk: (st.local_files || []).map(f => ({ url: f })),
-      };
-      assetsData.scene_statuses[String(i)] = {
-        status: st.status || 'pending',
-        local_files: st.local_files || [],
-      };
-    });
+  // Fetch fresh asset data from API — bypasses fragile STATE.assetStatuses mapping.
+  // The API scans disk and returns files_on_disk with correct URLs for every scene.
+  let assetsData;
+  try {
+    assetsData = await api(`/api/assets/project/${encodeURIComponent(projectId)}`);
+  } catch (e) {
+    // Fallback: build from STATE if API fails
+    assetsData = { scenes: {}, scene_statuses: {} };
+    if (STATE.assetsSceneData.scenes) {
+      STATE.assetsSceneData.scenes.forEach((scene, i) => {
+        const st = STATE.assetStatuses[scene.index] || {};
+        assetsData.scenes[String(i)] = {
+          files_on_disk: (st.local_files || []).map(f => ({ url: f })),
+        };
+        assetsData.scene_statuses[String(i)] = {
+          status: st.status || 'pending',
+          local_files: st.local_files || [],
+        };
+      });
+    }
   }
 
   // Store scene data with auto-assemble flag

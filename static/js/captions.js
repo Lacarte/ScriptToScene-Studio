@@ -159,6 +159,27 @@ function capEditText(idx, value) {
   }
 }
 
+function capCleanSpecialChars() {
+  if (!STATE.captionData?.captions?.length) return;
+  let changed = 0;
+  for (const cap of STATE.captionData.captions) {
+    const cleaned = cap.text
+      .replace(/[^\w\s.,!?;:'"()\-—–]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (cleaned !== cap.text) {
+      cap.text = cleaned;
+      changed++;
+    }
+  }
+  if (changed > 0) {
+    renderCaptionList();
+    toast(`Cleaned ${changed} caption${changed > 1 ? 's' : ''}`, 'success');
+  } else {
+    toast('No special characters found', 'info');
+  }
+}
+
 // ---- Style panel ----
 
 function renderCaptionStylePanel(style) {

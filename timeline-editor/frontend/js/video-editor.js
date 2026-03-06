@@ -2063,6 +2063,7 @@ function setupCaptionControls() {
             subtitle_bar: { font_family: 'Inter', font_size: 48, font_weight: '600', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 85, animation: 'none', text_transform: 'none', bg_bar: true },
             karaoke: { font_family: 'Bebas Neue', font_size: 72, font_weight: '400', color: '#FFFFFF', stroke_color: '#000000', stroke_width: 3, position_y: 70, animation: 'none', text_transform: 'uppercase', highlight: true },
             minimal: { font_family: 'DM Sans', font_size: 42, font_weight: '500', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 80, animation: 'none', text_transform: 'none' },
+            single_line: { font_family: 'Bebas Neue', font_size: 80, font_weight: '900', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, background: 'none', position_y: 81, animation: 'hard_cut', text_transform: 'uppercase', letter_spacing: -0.03, blend_mode: 'difference', shadow_color: 'rgba(0,0,0,1.00)', shadow_blur: 6, shadow_offset_x: 3, shadow_offset_y: 3, diff_strength: 0.59, overlay_strength: 0.37, overlay_color: '#ffffff' },
         };
         const p = PRESETS[presetSel.value];
         if (p && EditorState.captionData) {
@@ -2082,6 +2083,23 @@ function setupCaptionControls() {
         if (posVal) posVal.textContent = posInput.value + '%';
         updateStyle('position_y', parseInt(posInput.value));
     });
+
+    // Letter spacing slider (-0.10 to 0.10 em, step 0.01)
+    const lsInput = document.getElementById('cap-ed-letter-spacing');
+    const lsVal = document.getElementById('cap-ed-ls-val');
+    lsInput?.addEventListener('input', () => {
+        const em = parseInt(lsInput.value) / 100;
+        if (lsVal) lsVal.textContent = em.toFixed(2) + 'em';
+        updateStyle('letter_spacing', em);
+    });
+
+    // Clean special characters checkbox
+    const cleanToggle = document.getElementById('cap-clean-text-toggle');
+    cleanToggle?.addEventListener('change', () => {
+        if (cleanToggle.checked) {
+            capCleanAllSpecialChars();
+        }
+    });
 }
 
 /**
@@ -2099,6 +2117,46 @@ function _capSyncStyleUI() {
     s('cap-ed-position', style.position_y || 75);
     const posVal = document.getElementById('cap-ed-pos-val');
     if (posVal) posVal.textContent = (style.position_y || 75) + '%';
+
+    const ls = style.letter_spacing || 0;
+    s('cap-ed-letter-spacing', Math.round(ls * 100));
+    const lsVal = document.getElementById('cap-ed-ls-val');
+    if (lsVal) lsVal.textContent = ls.toFixed(2) + 'em';
+}
+
+/**
+ * Strip special characters from caption text, keeping only letters, numbers,
+ * basic punctuation, and spaces.
+ */
+function _cleanCaptionSpecialChars(text) {
+    return text
+        .replace(/[^\w\s.,!?;:'"()\-—–]/g, '')  // keep word chars, spaces, basic punctuation
+        .replace(/\s{2,}/g, ' ')                  // collapse multiple spaces
+        .trim();
+}
+
+/**
+ * Clean special characters from all captions and refresh UI + preview
+ */
+function capCleanAllSpecialChars() {
+    if (!EditorState.captionData?.captions?.length) return;
+    let changed = 0;
+    for (const cap of EditorState.captionData.captions) {
+        const cleaned = _cleanCaptionSpecialChars(cap.text);
+        if (cleaned !== cap.text) {
+            cap.text = cleaned;
+            changed++;
+        }
+    }
+    if (changed > 0) {
+        if (EditorState.preview && EditorState.captionsEnabled) {
+            EditorState.preview.setCaptions(EditorState.captionData.captions, EditorState.captionData.style);
+        }
+        renderCaptionTrack();
+        showToast(`Cleaned ${changed} caption${changed > 1 ? 's' : ''}`, 'success');
+    } else {
+        showToast('No special characters found', 'info');
+    }
 }
 
 /**
@@ -2139,6 +2197,14 @@ function _loadCaptionsFromStorage() {
 function _receiveCaptionData(captionData) {
     if (!captionData || !captionData.captions || !captionData.captions.length) return;
     EditorState.captionData = captionData;
+
+    // Auto-clean special characters if toggle is checked
+    const cleanToggle = document.getElementById('cap-clean-text-toggle');
+    if (cleanToggle?.checked) {
+        for (const cap of captionData.captions) {
+            cap.text = _cleanCaptionSpecialChars(cap.text);
+        }
+    }
 
     // Auto-enable captions when data arrives
     EditorState.captionsEnabled = true;
@@ -3204,7 +3270,7 @@ function skipToStart() {
     if (EditorState.audioElement) EditorState.audioElement.currentTime = 0;
     if (EditorState.bgMusicElement) EditorState.bgMusicElement.currentTime = 0;
     updatePlayhead();
-    updateTimeDisplay();
+    updateTimeScrubber();
 }
 
 /**
@@ -3221,7 +3287,7 @@ function skipToEnd() {
     if (EditorState.preview) EditorState.preview.seek(EditorState.playbackPosition);
     if (EditorState.audioElement) EditorState.audioElement.currentTime = Math.min(EditorState.playbackPosition, EditorState.audioElement.duration || 999);
     updatePlayhead();
-    updateTimeDisplay();
+    updateTimeScrubber();
 }
 
 /**

@@ -300,6 +300,7 @@ export class CanvasPreview {
             } else {
                 this.renderTextScene(scene, progress);
             }
+            this.renderCaptionOverlay(this.currentTime);
             return;
         }
 
@@ -344,7 +345,7 @@ export class CanvasPreview {
      */
     _syncVideo(video, localTime) {
         if (this.isPlaying) {
-            if (video.paused) video.play().catch(() => {});
+            if (video.paused) video.play().catch(() => { });
         } else {
             if (!video.paused) video.pause();
             // Only seek if far enough from current (avoid jitter)
@@ -824,9 +825,9 @@ export class CanvasPreview {
         const halfHeight = bounds.height / 2;
 
         return pos.x >= bounds.x - halfWidth &&
-               pos.x <= bounds.x + halfWidth &&
-               pos.y >= bounds.y - halfHeight &&
-               pos.y <= bounds.y + bounds.height - halfHeight;
+            pos.x <= bounds.x + halfWidth &&
+            pos.y >= bounds.y - halfHeight &&
+            pos.y <= bounds.y + bounds.height - halfHeight;
     }
 
     /**
@@ -960,30 +961,56 @@ export class CanvasPreview {
         const style = this.captionStyle;
         const fontFamily = style.font_family || 'Montserrat';
         const fontWeight = style.font_weight || '800';
-        const fontSize = (style.font_size || 64) * (this.height / 1920);
+        const scale = this.height / 1920;
+        const fontSize = (style.font_size || 64) * scale;
         const color = style.color || '#FFFFFF';
-        const strokeColor = style.stroke_color || '#000000';
-        const strokeWidth = (style.stroke_width || 4) * (this.height / 1920);
+        const strokeColor = style.stroke_color ?? '#000000';
+        const strokeWidth = (style.stroke_width ?? 4) * scale;
         const posY = (style.position_y || 75) / 100;
         const transform = style.text_transform || 'uppercase';
         const animation = style.animation || 'pop';
+        const letterSpacing = style.letter_spacing || 0; // em units
+        const bgColor = style.background || 'none';
+        const blendMode = style.blend_mode || 'source-over';
+        const boxPadX = (style.box_padding_x || 0) * scale;
+        const boxPadY = (style.box_padding_y || 0) * scale;
+        const shadowColor = style.shadow_color || '';
+        const shadowBlur = (style.shadow_blur || 0) * scale;
+        const shadowOffX = (style.shadow_offset_x || 0) * scale;
+        const shadowOffY = (style.shadow_offset_y || 0) * scale;
 
         let text = active.text;
         if (transform === 'uppercase') text = text.toUpperCase();
 
         this.ctx.save();
+        this.ctx.globalCompositeOperation = blendMode;
         this.ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
-        // Word-wrap: split text into lines that fit within canvas width
-        const maxWidth = this.width * 0.85;
-        const lines = this._wrapText(text, maxWidth);
-        const lineHeight = fontSize * 1.25;
-        const totalHeight = lines.length * lineHeight;
+        // Apply letter-spacing via canvas letterSpacing (widely supported)
+        if (letterSpacing) {
+            this.ctx.letterSpacing = `${letterSpacing}em`;
+        }
 
         const x = this.width / 2;
-        const baseY = this.height * posY - (totalHeight - lineHeight) / 2;
+
+        // Single-line mode: no word-wrap, force single line
+        const isSingleLine = animation === 'hard_cut' || style.preset === 'single_line';
+        let lines, lineHeight, totalHeight, baseY;
+
+        if (isSingleLine) {
+            lines = [text];
+            lineHeight = fontSize * 1.1;
+            totalHeight = lineHeight;
+            baseY = this.height * posY;
+        } else {
+            const maxWidth = this.width * 0.85;
+            lines = this._wrapText(text, maxWidth);
+            lineHeight = fontSize * 1.25;
+            totalHeight = lines.length * lineHeight;
+            baseY = this.height * posY - (totalHeight - lineHeight) / 2;
+        }
 
         // Pop animation: scale in
         if (animation === 'pop') {
@@ -998,23 +1025,129 @@ export class CanvasPreview {
             this.ctx.translate(-cx, -cy);
         }
 
-        for (let i = 0; i < lines.length; i++) {
-            const ly = baseY + i * lineHeight;
-
-            // Stroke
-            if (strokeColor && strokeColor !== 'none' && strokeWidth > 0) {
-                this.ctx.strokeStyle = strokeColor;
-                this.ctx.lineWidth = strokeWidth;
-                this.ctx.lineJoin = 'round';
-                this.ctx.strokeText(lines[i], x, ly);
+        // Hard-cut animation: instant appear/disappear (no fade, optional fast scale-up)
+        if (animation === 'hard_cut') {
+            const capProgress = (time - active.start) / (active.end - active.start);
+            if (capProgress < 0.05) {
+                const s = 0.9 + (capProgress / 0.05) * 0.1;
+                const cx = this.width / 2;
+                const cy = this.height * posY;
+                this.ctx.translate(cx, cy);
+                this.ctx.scale(s, s);
+                this.ctx.translate(-cx, -cy);
             }
-
-            // Fill
-            this.ctx.fillStyle = color;
-            this.ctx.fillText(lines[i], x, ly);
         }
 
-        this.ctx.restore();
+        const isDifference = blendMode === 'difference';
+        const fontStr = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+
+        if (isDifference) {
+            // --- 3-pass difference blend rendering ---
+            // Read tuned values from style config
+            const diffStrength = style.diff_strength ?? 1.0;
+            const overlayStrength = style.overlay_strength ?? 0.35;
+            const overlayColor = style.overlay_color || '#ffffff';
+
+            // Convert diff_strength (0-1) to fill alpha for the difference pass
+            const diffR = Math.round(diffStrength * 255);
+            const diffFill = `rgb(${diffR},${diffR},${diffR})`;
+
+            // Parse overlay color hex to rgb for rgba fill
+            const oR = parseInt((overlayColor).slice(1, 3), 16) || 255;
+            const oG = parseInt((overlayColor).slice(3, 5), 16) || 255;
+            const oB = parseInt((overlayColor).slice(5, 7), 16) || 255;
+            const overlayFill = `rgba(${oR},${oG},${oB},${overlayStrength})`;
+
+            // Pass 1: drop shadow (normal compositing)
+            this.ctx.restore();
+            this.ctx.save();
+            this.ctx.font = fontStr;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}em`;
+            this.ctx.globalCompositeOperation = 'source-over';
+            this.ctx.shadowColor = shadowColor || 'rgba(0,0,0,0.45)';
+            this.ctx.shadowBlur = shadowBlur || 6 * scale;
+            this.ctx.shadowOffsetX = shadowOffX || 3 * scale;
+            this.ctx.shadowOffsetY = shadowOffY || 3 * scale;
+            this.ctx.fillStyle = 'rgba(0,0,0,0)';
+            for (let i = 0; i < lines.length; i++) {
+                this.ctx.fillText(lines[i], x, baseY + i * lineHeight);
+            }
+            this.ctx.restore();
+
+            // Pass 2: difference blend — inverts image inside glyphs
+            this.ctx.save();
+            this.ctx.font = fontStr;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}em`;
+            this.ctx.globalCompositeOperation = 'difference';
+            this.ctx.fillStyle = diffFill;
+            for (let i = 0; i < lines.length; i++) {
+                this.ctx.fillText(lines[i], x, baseY + i * lineHeight);
+            }
+            this.ctx.restore();
+
+            // Pass 3: overlay brightness/contrast boost
+            this.ctx.save();
+            this.ctx.font = fontStr;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}em`;
+            this.ctx.globalCompositeOperation = 'overlay';
+            this.ctx.fillStyle = overlayFill;
+            for (let i = 0; i < lines.length; i++) {
+                this.ctx.fillText(lines[i], x, baseY + i * lineHeight);
+            }
+            this.ctx.restore();
+        } else {
+            // --- Standard rendering ---
+            for (let i = 0; i < lines.length; i++) {
+                const ly = baseY + i * lineHeight;
+
+                // Draw solid background box behind text
+                if (bgColor && bgColor !== 'none' && bgColor !== 'transparent') {
+                    const textW = this.ctx.measureText(lines[i]).width;
+                    const bx = x - textW / 2 - boxPadX;
+                    const by = ly - fontSize / 2 - boxPadY;
+                    const bw = textW + boxPadX * 2;
+                    const bh = fontSize + boxPadY * 2;
+                    this.ctx.fillStyle = bgColor;
+                    this.ctx.fillRect(bx, by, bw, bh);
+                }
+
+                // Stroke
+                if (!isSingleLine && strokeColor && strokeColor !== 'none' && strokeWidth > 0) {
+                    this.ctx.strokeStyle = strokeColor;
+                    this.ctx.lineWidth = strokeWidth;
+                    this.ctx.lineJoin = 'round';
+                    this.ctx.strokeText(lines[i], x, ly);
+                }
+
+                // Text shadow
+                if (shadowColor && shadowColor !== 'none') {
+                    this.ctx.shadowColor = shadowColor;
+                    this.ctx.shadowBlur = shadowBlur;
+                    this.ctx.shadowOffsetX = shadowOffX;
+                    this.ctx.shadowOffsetY = shadowOffY;
+                }
+
+                // Fill text
+                this.ctx.fillStyle = color;
+                this.ctx.fillText(lines[i], x, ly);
+
+                // Reset shadow
+                if (shadowColor && shadowColor !== 'none') {
+                    this.ctx.shadowColor = 'transparent';
+                    this.ctx.shadowBlur = 0;
+                    this.ctx.shadowOffsetX = 0;
+                    this.ctx.shadowOffsetY = 0;
+                }
+            }
+
+            this.ctx.restore();
+        }
     }
 
     /**

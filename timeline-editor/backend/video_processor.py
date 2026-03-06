@@ -4,6 +4,7 @@ FFmpeg-based video processing for scene assembly and effects
 """
 
 import os
+import re
 import subprocess
 import tempfile
 import shutil
@@ -528,8 +529,8 @@ class VideoProcessor:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error("FFmpeg simple scene failed:\nstdout: {}\nstderr: {}",
-                          result.stdout[:300], result.stderr[:500])
-            raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
+                          result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
+            raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:] if result.stderr else ''}")
 
     def _create_effect_scene(self, media_path, output_path, duration, effect):
         """Create scene with zoom/pan effects using zoompan filter"""
@@ -584,8 +585,8 @@ class VideoProcessor:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error("FFmpeg zoompan failed:\nstdout: {}\nstderr: {}",
-                          result.stdout[:300], result.stderr[:500])
-            raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
+                          result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
+            raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:] if result.stderr else ''}")
 
     def _create_scene_from_video(self, video_path, output_path, duration, effect):
         """Create a scene clip from a video source — trim, scale, and re-encode."""
@@ -623,8 +624,8 @@ class VideoProcessor:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error("FFmpeg video scene failed:\nstdout: {}\nstderr: {}",
-                          result.stdout[:300], result.stderr[:500])
-            raise RuntimeError(f"FFmpeg video scene failed: {result.stderr[:200]}")
+                          result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
+            raise RuntimeError(f"FFmpeg video scene failed: {result.stderr[-500:] if result.stderr else ''}")
 
     def _create_scene_subprocess(self, media_path, output_path, duration, effect):
         """Create scene video with effects using subprocess (fallback)"""
@@ -659,8 +660,8 @@ class VideoProcessor:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error("FFmpeg subprocess scene failed:\nstdout: {}\nstderr: {}",
-                          result.stdout[:300], result.stderr[:500])
-            raise RuntimeError(f"FFmpeg failed: {result.stderr[:200]}")
+                          result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
+            raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:] if result.stderr else ''}")
 
     def _concat_scenes(self, scene_clips, output_path):
         """Concatenate scene clips into final video"""
@@ -848,8 +849,8 @@ class VideoProcessor:
             logger.debug("Concat cmd: {}", ' '.join(cmd))
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error("FFmpeg concat (no audio) failed:\nstderr: {}", result.stderr[:500])
-                raise RuntimeError(f"FFmpeg concat failed: {result.stderr[:200]}")
+                logger.error("FFmpeg concat (no audio) failed:\nstderr: {}", result.stderr[-1000:] if result.stderr else "")
+                raise RuntimeError(f"FFmpeg concat failed: {result.stderr[-500:] if result.stderr else ''}")
             return
 
         # Build input list
@@ -883,8 +884,8 @@ class VideoProcessor:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error("FFmpeg concat failed:\nstdout: {}\nstderr: {}",
-                          result.stdout[:300], result.stderr[:500])
-            raise RuntimeError(f"FFmpeg concat failed: {result.stderr[:200]}")
+                          result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
+            raise RuntimeError(f"FFmpeg concat failed: {result.stderr[-500:] if result.stderr else ''}")
         logger.info("Concat completed: {}", output_path)
 
     def _resolve_font_path(self, family, weight='normal'):
@@ -944,15 +945,22 @@ class VideoProcessor:
             return video_path
 
         style = captions.get('style', {})
-        font_family = style.get('fontFamily', 'Inter')
-        font_weight = style.get('fontWeight', 'bold')
-        font_size = style.get('fontSize', 48)
+        # Support both camelCase and snake_case keys from frontend
+        font_family = style.get('fontFamily', style.get('font_family', 'Inter'))
+        font_weight = style.get('fontWeight', style.get('font_weight', 'bold'))
+        font_size = style.get('fontSize', style.get('font_size', 48))
         font_color = style.get('color', '#FFFFFF').lstrip('#')
-        bg_color = style.get('backgroundColor', '')
-        text_transform = style.get('textTransform', 'none')
-        stroke_width = style.get('strokeWidth', 2)
-        stroke_color = style.get('strokeColor', '#000000').lstrip('#')
-        position_y = style.get('positionY', 80)
+        bg_color = style.get('backgroundColor', style.get('background', ''))
+        text_transform = style.get('textTransform', style.get('text_transform', 'none'))
+        stroke_width = style.get('strokeWidth', style.get('stroke_width', 2))
+        stroke_color = style.get('strokeColor', style.get('stroke_color', '#000000')).lstrip('#')
+        position_y = style.get('positionY', style.get('position_y', 80))
+        box_padding_x = style.get('boxPaddingX', style.get('box_padding_x', 0))
+        box_padding_y = style.get('boxPaddingY', style.get('box_padding_y', 0))
+        shadow_color = style.get('shadowColor', style.get('shadow_color', ''))
+        shadow_x = style.get('shadowOffsetX', style.get('shadow_offset_x', 0))
+        shadow_y = style.get('shadowOffsetY', style.get('shadow_offset_y', 0))
+        blend_mode = style.get('blendMode', style.get('blend_mode', 'normal'))
 
         font_path = self._resolve_font_path(font_family, font_weight)
         font_path_esc = font_path.replace('\\', '/').replace(':', '\\:')
@@ -986,16 +994,26 @@ class VideoProcessor:
                 f":text='{escaped}'"
                 f":fontsize={font_size}"
                 f":fontcolor=#{font_color}"
-                f":borderw={stroke_width}"
-                f":bordercolor=#{stroke_color}"
                 f":x=(w-text_w)/2"
                 f":y={y_expr}"
                 f":enable='between(t,{start},{end})'"
             )
 
-            if bg_color and bg_color != 'transparent':
+            if stroke_width and stroke_color and stroke_color != 'none':
+                dt += f":borderw={stroke_width}:bordercolor=#{stroke_color}"
+
+            if bg_color and bg_color not in ('transparent', 'none'):
                 bg_hex = bg_color.lstrip('#')
-                dt += f":box=1:boxcolor=#{bg_hex}@0.6:boxborderw=8"
+                pad = max(box_padding_x, box_padding_y, 8)
+                dt += f":box=1:boxcolor=#{bg_hex}:boxborderw={pad}"
+
+            if shadow_color and shadow_color not in ('none', 'transparent'):
+                # Parse rgba or hex to hex for FFmpeg shadowcolor
+                sc = shadow_color.lstrip('#')
+                if sc.startswith('rgba') or sc.startswith('rgb'):
+                    # FFmpeg shadowcolor only supports hex; use black fallback
+                    sc = '000000'
+                dt += f":shadowcolor=#{sc}:shadowx={shadow_x}:shadowy={shadow_y}"
 
             drawtext_parts.append(dt)
             logger.debug("  Caption {}: [{:.1f}s-{:.1f}s] '{}'", i + 1, start, end, text[:40])
@@ -1004,7 +1022,51 @@ class VideoProcessor:
             logger.debug("No valid caption entries after filtering")
             return video_path
 
-        vf = ','.join(drawtext_parts)
+        vf_drawtext = ','.join(drawtext_parts)
+        if blend_mode == 'difference':
+            # Read tuned strength values from style config
+            diff_strength = float(style.get('diff_strength', style.get('diffStrength', 1.0)))
+            overlay_strength = float(style.get('overlay_strength', style.get('overlayStrength', 0.0)))
+
+            # Convert diff_strength (0-1) to a gray hex for drawtext fontcolor
+            gray_val = int(diff_strength * 255)
+            diff_hex = f"{gray_val:02x}" * 3  # e.g. 0.59 -> '969696'
+
+            # Build drawtext filters with gray font for controlled diff strength
+            # Include shadow on the mask — it gets inverted along with text
+            diff_drawtext_parts = []
+            for dt in drawtext_parts:
+                dt_diff = dt.replace(f":fontcolor=#{font_color}", f":fontcolor=#{diff_hex}")
+                diff_drawtext_parts.append(dt_diff)
+            vf_diff_drawtext = ','.join(diff_drawtext_parts)
+
+            # Difference blend: gray text on black → blend with original
+            # NOTE: format=gbrp (planar rgb) BEFORE drawbox ensures black is true (0,0,0)
+            # pack format like rgb24 is NOT supported by blend filter, prompting auto YUV fallback
+            vf = (f"split[base][mask_bg];"
+                  f"[mask_bg]format=gbrp,"
+                  f"drawbox=x=0:y=0:w=iw:h=ih:color=0x000000:t=fill,"
+                  f"{vf_diff_drawtext}[mask];"
+                  f"[base]format=gbrp[base_rgb];"
+                  f"[base_rgb][mask]blend=all_mode=difference,format={self.pixel_format}")
+
+            # Overlay brightness boost: draw text again with low-alpha white on top
+            if overlay_strength > 0:
+                overlay_dt_parts = []
+                for dt in drawtext_parts:
+                    # White text with controlled alpha, no shadow/stroke
+                    # Supported alpha notation: color@0.X
+                    dt_ov = dt.replace(f":fontcolor=#{font_color}",
+                                       f":fontcolor=white@{overlay_strength:.2f}")
+                    if ':shadowcolor=' in dt_ov:
+                        dt_ov = re.sub(r':shadowcolor=[^:]*:shadowx=[^:]*:shadowy=[^:]*', '', dt_ov)
+                    if ':borderw=' in dt_ov:
+                        dt_ov = re.sub(r':borderw=[^:]*:bordercolor=[^:]*', '', dt_ov)
+                    overlay_dt_parts.append(dt_ov)
+                vf_overlay = ','.join(overlay_dt_parts)
+                vf += f",{vf_overlay}"
+        else:
+            vf = vf_drawtext
 
         cmd = [
             FFMPEG_BIN, '-y',
@@ -1023,8 +1085,8 @@ class VideoProcessor:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             logger.error("Caption burn-in failed:\nstdout: {}\nstderr: {}",
-                          result.stdout[:300], result.stderr[:500])
-            raise RuntimeError(f"Caption burn-in failed: {result.stderr[:200]}")
+                          result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
+            raise RuntimeError(f"Caption burn-in failed: {result.stderr[-500:] if result.stderr else ''}")
 
         logger.success("Caption burn-in complete: {}", output_path)
         return output_path

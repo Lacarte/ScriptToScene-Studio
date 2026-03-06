@@ -4,6 +4,7 @@ Flask API for processing video exports from the timeline editor
 """
 
 import os
+import sys
 import uuid
 import json
 import threading
@@ -214,6 +215,41 @@ def cancel_export(job_id):
 
     del jobs[job_id]
     return jsonify({'message': 'Job cancelled and cleaned up'})
+
+
+@app.route('/api/export/<job_id>/open-folder', methods=['POST'])
+def open_export_folder(job_id):
+    """Open the folder containing the exported video and select it."""
+    if job_id not in jobs:
+        return jsonify({'error': 'Job not found'}), 404
+
+    job = jobs[job_id]
+    output_path = os.path.abspath(job.get('output_path', ''))
+
+    if not os.path.exists(output_path):
+        # Fall back to opening the exports directory
+        output_path = EXPORT_DIR
+        if not os.path.isdir(output_path):
+            return jsonify({'error': 'Output file not found'}), 404
+
+    try:
+        import platform
+        if platform.system() == 'Windows':
+            if os.path.isfile(output_path):
+                subprocess.run(['explorer', '/select,', output_path], check=False)
+            else:
+                subprocess.run(['explorer', output_path], check=False)
+        elif platform.system() == 'Darwin':
+            if os.path.isfile(output_path):
+                subprocess.run(['open', '-R', output_path], check=False)
+            else:
+                subprocess.run(['open', output_path], check=False)
+        else:
+            folder = os.path.dirname(output_path) if os.path.isfile(output_path) else output_path
+            subprocess.run(['xdg-open', folder], check=False)
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

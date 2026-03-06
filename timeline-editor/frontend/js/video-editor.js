@@ -925,6 +925,7 @@ const elements = {
     exportProgressMessage: document.getElementById('export-progress-message'),
     cancelExportBtn: document.getElementById('cancel-export'),
     previewExportBtn: document.getElementById('preview-export'),
+    openExportFolderBtn: document.getElementById('open-export-folder'),
     downloadExportBtn: document.getElementById('download-export')
 };
 
@@ -1410,10 +1411,80 @@ function hideLoadingOverlay() {
 }
 
 /**
- * Show the no data overlay
+ * Show the no data overlay — auto-loads asset list
  */
 function showNoDataOverlay() {
     elements.noDataOverlay?.classList.remove('hidden');
+    _loadNoDataAssets();
+}
+
+function _loadNoDataAssets() {
+    const listEl = document.getElementById('no-data-asset-items');
+    const listContainer = document.getElementById('no-data-asset-list');
+    const emptyEl = document.getElementById('no-data-empty');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<p style="text-align:center;color:var(--text-muted,#666);font-size:12px;padding:24px 0">Loading...</p>';
+
+    fetch('/api/assets/history')
+        .then(r => r.json())
+        .then(projects => {
+            if (!projects || !projects.length) {
+                // No assets — show empty state, hide list
+                if (listContainer) listContainer.style.display = 'none';
+                if (emptyEl) emptyEl.style.display = '';
+                return;
+            }
+            if (listContainer) listContainer.style.display = '';
+            if (emptyEl) emptyEl.style.display = 'none';
+
+            const statusColors = { done: '#4ECDC4', downloading: '#FFB347', error: '#FF6B6B', waiting: '#8B8B8B', grabbing: '#A78BFA' };
+            const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+            const timeAgo = ts => {
+                if (!ts) return '';
+                const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+                if (diff < 60) return 'just now';
+                if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+                if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+                return Math.floor(diff / 86400) + 'd ago';
+            };
+
+            listEl.innerHTML = projects.map(p => {
+                const sc = statusColors[p.status] || '#8B8B8B';
+                const files = p.disk_files || p.total_files || 0;
+                const ready = p.ready_count || 0;
+                const scenes = p.scene_count || 0;
+                const time = timeAgo(p.created_at || p.timestamp);
+                return `
+                <div style="cursor:pointer;padding:10px 14px;border-radius:8px;border:1px solid transparent;transition:all 0.15s;margin-bottom:4px"
+                     onclick="editorImportAssetProject('${esc(p.project_id)}')"
+                     onmouseover="this.style.background='var(--bg-darkest,#111)';this.style.borderColor='var(--border,#2a2a3e)'"
+                     onmouseout="this.style.background='';this.style.borderColor='transparent'">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        ${p.preview
+                        ? '<div style="width:40px;height:40px;border-radius:6px;overflow:hidden;flex-shrink:0;border:1px solid var(--border,#2a2a3e)"><img src="' + esc(p.preview) + '" style="width:100%;height:100%;object-fit:cover" /></div>'
+                        : '<div style="width:40px;height:40px;border-radius:6px;flex-shrink:0;background:var(--bg-darkest,#111);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" fill="none" stroke="var(--text-muted,#666)" stroke-width="1.5" viewBox="0 0 24 24" style="opacity:0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>'}
+                        <div style="flex:1;min-width:0">
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+                                <span style="font-size:12px;font-weight:600;color:var(--text,#e0e0e0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.project_id)}</span>
+                                <span style="width:6px;height:6px;border-radius:50%;background:${sc};flex-shrink:0"></span>
+                            </div>
+                            <div style="display:flex;gap:8px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-muted,#666)">
+                                <span>${scenes} scene${scenes !== 1 ? 's' : ''}</span>
+                                ${ready > 0 ? '<span style="color:#4ECDC4">' + ready + ' ready</span>' : ''}
+                                ${files > 0 ? '<span>' + files + ' files</span>' : ''}
+                                <span style="opacity:0.7">${time}</span>
+                            </div>
+                        </div>
+                        <svg width="14" height="14" fill="none" stroke="var(--text-muted,#666)" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;opacity:0.4"><path d="M9 18l6-6-6-6"/></svg>
+                    </div>
+                </div>`;
+            }).join('');
+        })
+        .catch(() => {
+            if (listContainer) listContainer.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = '';
+        });
 }
 
 /**
@@ -3958,6 +4029,9 @@ function showExportProgress() {
     if (elements.previewExportBtn) {
         elements.previewExportBtn.classList.add('hidden');
     }
+    if (elements.openExportFolderBtn) {
+        elements.openExportFolderBtn.classList.add('hidden');
+    }
     if (elements.downloadExportBtn) {
         elements.downloadExportBtn.classList.add('hidden');
     }
@@ -4004,6 +4078,9 @@ function showExportComplete(downloadUrl) {
     if (elements.previewExportBtn) {
         elements.previewExportBtn.classList.remove('hidden');
     }
+    if (elements.openExportFolderBtn) {
+        elements.openExportFolderBtn.classList.remove('hidden');
+    }
     if (elements.downloadExportBtn) {
         elements.downloadExportBtn.classList.remove('hidden');
     }
@@ -4029,6 +4106,9 @@ function showExportError(error) {
     }
     if (elements.previewExportBtn) {
         elements.previewExportBtn.classList.add('hidden');
+    }
+    if (elements.openExportFolderBtn) {
+        elements.openExportFolderBtn.classList.add('hidden');
     }
     if (elements.downloadExportBtn) {
         elements.downloadExportBtn.classList.add('hidden');
@@ -4079,6 +4159,17 @@ function setupExportProgressModal() {
         if (currentJobId) {
             const url = `${exportAPI.baseUrl}/api/export/${currentJobId}/preview`;
             window.open(url, '_blank');
+        }
+    });
+
+    // Open Folder button
+    elements.openExportFolderBtn?.addEventListener('click', async () => {
+        if (currentJobId) {
+            try {
+                await fetch(`${exportAPI.baseUrl}/api/export/${currentJobId}/open-folder`, { method: 'POST' });
+            } catch (e) {
+                showToast('Failed to open folder', 'error');
+            }
         }
     });
 }

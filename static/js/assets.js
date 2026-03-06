@@ -966,16 +966,16 @@ async function autoAssembleAndSendToEditor() {
     scene_statuses: {},
   };
   if (STATE.assetsSceneData.scenes) {
-    for (const scene of STATE.assetsSceneData.scenes) {
+    STATE.assetsSceneData.scenes.forEach((scene, i) => {
       const st = STATE.assetStatuses[scene.index] || {};
-      assetsData.scenes[String(scene.index)] = {
+      assetsData.scenes[String(i)] = {
         files_on_disk: (st.local_files || []).map(f => ({ url: f })),
       };
-      assetsData.scene_statuses[String(scene.index)] = {
+      assetsData.scene_statuses[String(i)] = {
         status: st.status || 'pending',
         local_files: st.local_files || [],
       };
-    }
+    });
   }
 
   // Store scene data with auto-assemble flag

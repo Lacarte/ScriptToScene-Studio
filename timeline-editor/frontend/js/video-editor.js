@@ -1242,12 +1242,25 @@ async function loadProjectMediaWithProgress() {
             scene.mediaLoaded = false;
         }
 
-        // Fallback: probe working-assets/{project_id}/ for images then videos
+        // Fallback: try asset_files from buildTimelineFromAssets, then probe paths
         updateLoadingOverlay(`Loading scene ${sceneNumber} (${loadedCount}/${totalScenes})...`);
         const basePath = `working-assets/${projectId}/`;
+        const assetsBasePath = `/output/assets/${projectId}/${sceneNumber}/`;
         const allExtensions = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS];
 
         const pathsToTry = [];
+        // Try asset_files stored on scene (from buildTimelineFromAssets)
+        if (scene.asset_files && scene.asset_files.length) {
+            for (const af of scene.asset_files) {
+                const fn = af.split('/').pop();
+                pathsToTry.push({ path: af, filename: fn });
+            }
+        }
+        // Try /output/assets/{project}/{sceneNum}/ paths
+        for (const ext of allExtensions) {
+            pathsToTry.push({ path: `${assetsBasePath}0.${ext}`, filename: `0.${ext}` });
+        }
+        // Try working-assets/ paths
         for (const ext of allExtensions) {
             pathsToTry.push({ path: `${basePath}${sceneNumber}.${ext}`, filename: `${sceneNumber}.${ext}` });
         }
@@ -1507,12 +1520,9 @@ function renderMediaGrid() {
  * Check if an image exists at the given path
  */
 function checkImageExists(imagePath) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(true);
-        img.onerror = () => resolve(false);
-        img.src = imagePath;
-    });
+    return fetch(imagePath, { method: 'HEAD' })
+        .then(res => res.ok)
+        .catch(() => false);
 }
 
 const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov'];

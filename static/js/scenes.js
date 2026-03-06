@@ -15,11 +15,19 @@ let _scnSegTimings = []; // [{start, end, sceneIdx}] derived from segmenter segm
 
 // ---- Source Selection ----
 
+function _scnClearResults() {
+  scnStopAudio();
+  STATE.scenesResult = null;
+  const el = $('#scenes-results');
+  if (el) el.style.display = 'none';
+}
+
 function scenesUseCurrentSegment() {
   if (!STATE.segmenterResult || !STATE.segmenterResult.segments) {
     toast('No segmenter result available. Run the segmenter first.', 'error');
     return;
   }
+  _scnClearResults();
   STATE.scenesSegData = STATE.segmenterResult;
   _updateScenesSource();
   toast('Segmentation loaded');
@@ -64,6 +72,7 @@ async function scenesSelectSegHistory(folder) {
     const res = await fetch(`/api/segmenter/${encodeURIComponent(folder)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load');
+    _scnClearResults();
     STATE.scenesSegData = data;
     _updateScenesSource();
     toast('Segmentation loaded from history');
@@ -498,9 +507,19 @@ function _scnGetAudioUrl() {
   return null;
 }
 
-function _scnLoadAudio() {
+async function _scnLoadAudio() {
   scnStopAudio();
-  const url = _scnGetAudioUrl();
+  let url = _scnGetAudioUrl();
+  // Fallback: resolve audio from source_folder via API
+  if (!url) {
+    const sf = STATE.scenesResult?.source_folder || STATE.scenesSegData?.metadata?.source_folder;
+    if (sf) {
+      try {
+        const res = await api(`/api/scenes/audio/${encodeURIComponent(sf)}`);
+        if (res?.url) url = res.url;
+      } catch { /* ignore */ }
+    }
+  }
   if (!url) {
     const btn = $('#scn-play-btn');
     if (btn) btn.style.display = 'none';

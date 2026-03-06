@@ -99,15 +99,30 @@ def grabber_start():
     provider = data.get("provider", "midjourney")
     arguments = data.get("arguments", "-v 7 -ar 9:16")
     scenes = data.get("scenes", [])
+    consistency = data.get("consistency")  # {character, setting, mood} from blueprint
 
     grabber_id = f"grab_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{project_id}"
 
-    # Build Automa-compatible payload
+    # Build consistency prefix for visual consistency across all scenes
+    consistency_prefix = ""
+    if consistency:
+        parts = []
+        if consistency.get("character"):
+            parts.append(consistency["character"])
+        if consistency.get("setting"):
+            parts.append(consistency["setting"])
+        if consistency.get("mood"):
+            parts.append(consistency["mood"])
+        if parts:
+            consistency_prefix = ", ".join(parts) + ". "
+            logger.info("Applying consistency prefix to {} scene prompts", len(scenes))
+
+    # Build Automa-compatible payload (prepend consistency prefix to each prompt)
     automa_payload = {
         "projectId": project_id,
         "arguments": arguments if provider == "midjourney" else "",
         "scenes": [
-            {"prompt": s["prompt"], "scene": s["scene"]}
+            {"prompt": consistency_prefix + s["prompt"], "scene": s["scene"]}
             for s in scenes if s.get("prompt")
         ],
     }

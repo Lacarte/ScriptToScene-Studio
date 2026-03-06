@@ -92,33 +92,40 @@ def get_punctuation(word):
     return "none"
 
 
-def get_break_score(word, next_gap, next_word=None):
-    """Score 0-20 indicating how good a break point this word is.
+def get_break_score(word, next_gap, next_word=None, weights=None):
+    """Score 0-20+ indicating how good a break point this word is.
 
     Higher = better break.  Factors:
-      - punctuation type (0-8)
-      - silence gap after word (0-6)
+      - punctuation type (scaled by weights["punctuation"], default 8)
+      - silence gap after word (scaled by weights["pause"], default 6)
       - mood-shift word following (0-3)
       - current word is a visual noun or action verb (0-3)
+
+    Optional weights dict from blueprint break_weights:
+      {"punctuation": 8, "pause": 6, "density": 3}
     """
+    w = weights or {}
+    punc_max = w.get("punctuation", 8)
+    pause_max = w.get("pause", 6)
+
     score = 0
     punc = get_punctuation(word)
 
-    # Punctuation
+    # Punctuation (scaled)
     if punc == "sentence_end":
-        score += 8
+        score += punc_max
     elif punc == "clause_end":
-        score += 5
+        score += max(1, round(punc_max * 0.625))
     elif punc == "comma":
-        score += 3
+        score += max(1, round(punc_max * 0.375))
 
-    # Silence gap
+    # Silence gap (scaled)
     if next_gap >= 0.5:
-        score += 6
+        score += pause_max
     elif next_gap >= 0.3:
-        score += 4
+        score += max(1, round(pause_max * 0.67))
     elif next_gap >= 0.15:
-        score += 2
+        score += max(1, round(pause_max * 0.33))
 
     # Mood shift (next word starts a new mood)
     if next_word:
@@ -140,11 +147,13 @@ def segment(alignment, config=None):
     """Main segmentation algorithm — greedy scan with score-based cutting.
 
     Returns list of raw segment dicts (before merge/fill post-processing).
+    Config may include "break_weights" dict to customize scoring.
     """
     cfg = {**DEFAULT_CONFIG, **(config or {})}
     target_min = cfg["target_min"]
     target_max = cfg["target_max"]
     hard_max = cfg["hard_max"]
+    break_weights = cfg.get("break_weights")
 
     if not alignment:
         return []
@@ -170,7 +179,7 @@ def segment(alignment, config=None):
 
         # Track best break point once we've reached minimum duration
         if elapsed >= target_min:
-            score = get_break_score(w["word"], next_gap, next_word)
+            score = get_break_score(w["word"], next_gap, next_word, break_weights)
             if score > best_break_score:
                 best_break_score = score
                 best_break_idx = i

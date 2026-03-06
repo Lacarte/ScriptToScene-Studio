@@ -246,6 +246,16 @@
 
     <!-- Navigation -->
     <div class="flex-1 py-3 flex flex-col gap-0.5">
+      <button class="nav-item" onclick="switchPage('dna')" data-page="dna" title="Viral DNA Analyzer">
+        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          viewBox="0 0 24 24">
+          <path d="M12 2v20" />
+          <path d="M6 6c0 2 2.5 3 6 3s6-1 6-3" />
+          <path d="M6 12c0 2 2.5 3 6 3s6-1 6-3" />
+          <path d="M6 18c0 2 2.5 3 6 3s6-1 6-3" />
+        </svg>
+        <span class="nav-label">DNA</span>
+      </button>
       <button class="nav-item" onclick="switchPage('pipeline')" data-page="pipeline" title="Pipeline Dashboard">
         <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
           viewBox="0 0 24 24">
@@ -403,10 +413,106 @@
   <div id="main-content">
 
     <!-- ========================================================== -->
+    <!-- PAGE: DNA (Viral DNA Analyzer)                             -->
+    <!-- ========================================================== -->
+    <div id="page-dna" class="page">
+      <div class="mx-auto px-6 py-8" style="max-width:780px">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="font-display text-2xl font-bold tracking-tight" style="color:var(--text)">Viral DNA</h2>
+            <p class="text-sm mt-1" style="color:var(--text-secondary)">Analyze viral videos → extract style DNA → generate blueprints</p>
+          </div>
+        </div>
+
+        <!-- Section A: Niche Input -->
+        <section class="card p-5 mb-4">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Niche Source</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <select id="dna-niche-select" class="input-field" style="flex:1;font-size:13px;height:40px">
+              <option value="">Loading niches...</option>
+            </select>
+            <button id="dna-analyze-btn" class="action-btn hover-accent" style="padding:0 20px;height:40px;font-size:13px;font-weight:600;white-space:nowrap" onclick="dnaStartAnalysis()">Analyze</button>
+          </div>
+          <div id="dna-niche-info" style="margin-top:10px;font-size:11px;color:var(--text-muted);display:none"></div>
+        </section>
+
+        <!-- Progress -->
+        <section id="dna-progress" class="card p-5 mb-4" style="display:none">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-4" style="color:var(--text-muted)">Analysis Progress</label>
+          <div id="dna-steps"></div>
+        </section>
+
+        <!-- Section B: Raw Features -->
+        <section id="dna-features-section" class="card p-5 mb-4" style="display:none">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Raw Features</label>
+          <div id="dna-features-grid" style="display:grid;gap:12px"></div>
+        </section>
+
+        <!-- Section C: DNA Profile -->
+        <section id="dna-profile-section" class="card p-5 mb-4" style="display:none">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">DNA Profile</label>
+          <div id="dna-profile-badges" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
+          <div id="dna-profile-timing"></div>
+        </section>
+
+        <!-- Section D: Visual Consistency Editor -->
+        <section id="dna-consistency-section" class="card p-5 mb-4" style="display:none">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Visual Consistency</label>
+          <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">These fields are prepended to every scene prompt for consistent characters, settings, and mood.</p>
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Character</label>
+              <textarea id="dna-con-character" class="input-field" rows="2" placeholder="Describe your main character's appearance (e.g. a tall man in a dark wool coat, short grey hair, scar on left cheek)..." style="width:100%;font-size:12px;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+            </div>
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Setting</label>
+              <textarea id="dna-con-setting" class="input-field" rows="2" placeholder="Environment and textures..." style="width:100%;font-size:12px;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+            </div>
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1" style="color:var(--text-muted)">Mood</label>
+              <textarea id="dna-con-mood" class="input-field" rows="2" placeholder="Atmosphere, lighting, tone..." style="width:100%;font-size:12px;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+            </div>
+          </div>
+
+          <!-- Live Preview -->
+          <div id="dna-con-preview" style="margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--bg-darkest);border:1px solid var(--border);font-size:11px;font-family:'JetBrains Mono',monospace;line-height:1.6;color:var(--text-secondary);white-space:pre-wrap;display:none"></div>
+
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="action-btn hover-accent" style="font-size:12px;padding:6px 16px" onclick="dnaSaveConsistency()">Save</button>
+          </div>
+        </section>
+
+        <!-- Section E: Blueprint Preview -->
+        <section id="dna-blueprint-section" class="card p-5 mb-4" style="display:none">
+          <div class="flex items-center justify-between mb-3">
+            <label class="block text-[10px] font-bold uppercase tracking-[0.15em]" style="color:var(--text-muted)">Blueprint</label>
+            <div style="display:flex;gap:6px">
+              <button class="action-btn hover-accent" style="font-size:10px;padding:4px 12px" onclick="dnaUseInPipeline()">Use in Pipeline</button>
+              <button class="action-btn" style="font-size:10px;padding:4px 12px;color:var(--text-muted)" onclick="dnaExportBlueprint()">Export JSON</button>
+            </div>
+          </div>
+          <div id="dna-blueprint-cards" style="display:grid;gap:10px"></div>
+        </section>
+
+        <!-- History -->
+        <section class="card p-5">
+          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3" style="color:var(--text-muted)">Analyzed Niches</label>
+          <div id="dna-history-list" style="max-height:300px;overflow-y:auto">
+            <p style="text-align:center;color:var(--text-muted);font-size:11px;padding:24px 0">Loading...</p>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- ========================================================== -->
     <!-- PAGE: PIPELINE (Auto Pipeline)                             -->
     <!-- ========================================================== -->
     <div id="page-pipeline" class="page">
-      <div class="max-w-2xl mx-auto px-6 py-8">
+      <div class="mx-auto px-6 py-8" style="max-width:780px">
 
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
@@ -419,8 +525,13 @@
 
         <!-- Input -->
         <section class="card p-5 mb-4">
-          <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
-            style="color:var(--text-muted)">Story Text</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <label class="block text-[10px] font-bold uppercase tracking-[0.15em]"
+              style="color:var(--text-muted)">Story Text</label>
+            <button onclick="pipelineRandomStory()" title="Load a random story excerpt" class="hover-accent"
+              style="padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;font-family:'JetBrains Mono',monospace;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer">&#x1F3B2;
+              Random</button>
+          </div>
           <textarea id="pipeline-text" class="input-field" rows="6" placeholder="Enter your story text..."
             style="width:100%;resize:vertical;font-family:inherit;font-size:13px;line-height:1.6"></textarea>
           <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
@@ -456,10 +567,23 @@
                 <option value="minimal">Minimal</option>
               </select>
             </div>
+            <div>
+              <label class="block text-[9px] font-bold uppercase tracking-[0.1em] mb-1"
+                style="color:var(--text-muted)">DNA Blueprint</label>
+              <select id="pipeline-blueprint" class="input-field" style="width:160px;font-size:12px">
+                <option value="">None</option>
+              </select>
+            </div>
           </div>
-          <button id="pipeline-run-btn" class="action-btn hover-accent"
-            style="margin-top:16px;padding:10px 24px;font-size:13px;font-weight:600" onclick="pipelineStart()">Run
-            Pipeline</button>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
+            <div id="pipeline-blueprint-badge" style="display:none;padding:0 14px;height:40px;background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.2);border-radius:8px;font-size:11px;color:var(--accent);align-items:center;gap:6px">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+              <span id="pipeline-blueprint-name"></span>
+            </div>
+            <button id="pipeline-run-btn" class="action-btn hover-accent"
+              style="padding:0 24px;height:40px;font-size:13px;font-weight:600" onclick="pipelineStart()">Run
+              Pipeline</button>
+          </div>
         </section>
 
         <!-- Progress -->
@@ -482,7 +606,7 @@
         <!-- History -->
         <section class="card p-5">
           <label class="block text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
-            style="color:var(--text-muted)">Recent Jobs</label>
+            style="color:var(--text-muted)">History</label>
           <div id="pipeline-jobs" style="max-height:300px;overflow-y:auto">
             <p style="text-align:center;color:var(--text-muted);font-size:11px;padding:24px 0">Loading...</p>
           </div>
@@ -495,7 +619,7 @@
     <!-- PAGE: TTS (Kokoro TTS)                                     -->
     <!-- ========================================================== -->
     <div id="page-tts" class="page active">
-      <div class="max-w-2xl mx-auto px-6 py-8">
+      <div class="mx-auto px-6 py-8" style="max-width:780px">
 
         <!-- Header -->
         <div class="flex items-center justify-between mb-6">
@@ -670,7 +794,7 @@
     <!-- PAGE: TIMING (Force Alignment)                             -->
     <!-- ========================================================== -->
     <div id="page-timing" class="page">
-      <div class="max-w-2xl mx-auto px-6 py-8">
+      <div class="mx-auto px-6 py-8" style="max-width:780px">
 
         <!-- Header -->
         <div class="mb-6">
@@ -786,7 +910,7 @@
     <!-- PAGE: SEGMENTER                                            -->
     <!-- ========================================================== -->
     <div id="page-segmenter" class="page">
-      <div class="max-w-2xl mx-auto px-6 py-8">
+      <div class="mx-auto px-6 py-8" style="max-width:780px">
 
         <!-- Header -->
         <div class="mb-6">
@@ -894,7 +1018,7 @@
     <!-- PAGE: SCENES (AI Scene Script Generator)                   -->
     <!-- ========================================================== -->
     <div id="page-scenes" class="page">
-      <div class="max-w-3xl mx-auto px-6 py-8">
+      <div class="mx-auto px-6 py-8" style="max-width:780px">
 
         <!-- Header -->
         <div class="mb-6">
@@ -1054,7 +1178,7 @@
         <!-- Scenes History -->
         <div style="margin-top:28px">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="font-display text-lg font-bold" style="color:var(--text)">Scene History</h3>
+            <h3 class="font-display text-lg font-bold" style="color:var(--text)">History</h3>
             <span id="scenes-history-count" class="font-mono text-xs" style="color:var(--text-muted)">0 projects</span>
           </div>
           <div id="scenes-history-list"></div>
@@ -1186,7 +1310,7 @@
                 <path d="M12 8v4l3 3" />
                 <circle cx="12" cy="12" r="10" />
               </svg>
-              <span style="font-size:12px;font-weight:600;color:var(--text)">Recent Projects</span>
+              <span style="font-size:12px;font-weight:600;color:var(--text)">History</span>
             </div>
             <button onclick="loadAssetsHistory()" class="action-btn"
               style="font-size:10px;padding:4px 10px;color:var(--text-muted)" title="Refresh">
@@ -1211,7 +1335,7 @@
     <!-- ========================================================== -->
     <div id="page-editor" class="page" style="height:100vh;overflow:hidden">
       <div id="editor-loading"
-        style="position:fixed;top:0;left:var(--sidebar-w,56px);right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;z-index:10">
+        style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;z-index:10">
         <div style="text-align:center;">
           <div
             style="width:36px;height:36px;border:2.5px solid rgba(255,255,255,0.08);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px">
@@ -1344,6 +1468,7 @@
   <script src="js/editor.js"></script>
   <script src="js/pipeline.js"></script>
   <script src="js/captions.js"></script>
+  <script src="js/dna.js"></script>
 </body>
 
 </html>

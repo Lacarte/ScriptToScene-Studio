@@ -8,7 +8,7 @@ import requests as http_requests
 from flask import Blueprint, jsonify, request
 from loguru import logger
 
-from config import SCENES_DIR, N8N_WEBHOOK_URL, generate_project_id
+from config import SCENES_DIR, ALIGN_DIR, N8N_WEBHOOK_URL, generate_project_id
 from studio.scenes.templates import SCENE_STYLE_TEMPLATES, TEMPLATES_BY_ID
 
 scenes_bp = Blueprint("scenes", __name__)
@@ -54,6 +54,12 @@ def generate_scenes():
         "style_prompt": data.get("style_prompt") or template.get("style_prompt", ""),
         "segments": data.get("segments", []),
     }
+
+    # Forward DNA context if present (injected by pipeline or manual request)
+    if data.get("dna_consistency"):
+        webhook_payload["dna_consistency"] = data["dna_consistency"]
+    if data.get("dna_constraints"):
+        webhook_payload["dna_constraints"] = data["dna_constraints"]
 
     webhook_url = data.get("webhook_url") or N8N_WEBHOOK_URL
 
@@ -165,3 +171,16 @@ def get_scenes(project_id):
             return jsonify(json.load(f))
     except (json.JSONDecodeError, OSError) as e:
         return jsonify({"error": f"Failed to read scene data: {e}"}), 500
+
+
+@scenes_bp.route("/api/scenes/audio/<source_folder>")
+def get_scene_audio(source_folder):
+    """Resolve audio file URL for a source folder."""
+    source_folder = os.path.basename(source_folder)
+    folder_path = os.path.join(ALIGN_DIR, source_folder)
+    if not os.path.isdir(folder_path):
+        return jsonify({"error": "Not found"}), 404
+    for f in os.listdir(folder_path):
+        if f.endswith((".wav", ".mp3")):
+            return jsonify({"url": f"/output/alignments/{source_folder}/{f}"})
+    return jsonify({"error": "No audio file found"}), 404

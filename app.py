@@ -39,6 +39,7 @@ logger.add(os.path.join(LOG_DIR, "studio_{time:YYYY-MM-DD}.log"),
 # Flask app + Blueprints
 # ---------------------------------------------------------------------------
 app = Flask(__name__, static_folder=None)
+app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB max request body
 CORS(app)
 
 from studio.tts import tts_bp
@@ -50,6 +51,7 @@ from studio.editor import editor_bp
 from studio.pipeline import pipeline_bp
 from studio.captions import captions_bp
 from studio.music import music_bp
+from studio.dna import dna_bp
 
 app.register_blueprint(tts_bp)
 app.register_blueprint(timing_bp)
@@ -60,6 +62,7 @@ app.register_blueprint(editor_bp)
 app.register_blueprint(pipeline_bp)
 app.register_blueprint(captions_bp)
 app.register_blueprint(music_bp)
+app.register_blueprint(dna_bp)
 
 
 # ---------------------------------------------------------------------------

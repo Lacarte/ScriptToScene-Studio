@@ -13,6 +13,7 @@ let _plSteps = [
 ];
 let _plStepStatus = {};
 let _plLog = [];
+let _plBlueprints = [];
 
 // ---- Start Pipeline ----
 
@@ -24,12 +25,18 @@ async function pipelineStart() {
   btn.disabled = true;
   btn.textContent = 'Starting...';
 
+  const blueprintPath = $('#pipeline-blueprint')?.value || '';
+
   const config = {
     text,
     voice: $('#pipeline-voice')?.value || 'af_heart',
     speed: parseFloat($('#pipeline-speed')?.value || '1.0'),
     style: $('#pipeline-style')?.value || 'cinematic',
   };
+
+  if (blueprintPath) {
+    config.blueprint_path = blueprintPath;
+  }
 
   try {
     const res = await api('/api/pipeline/run', {
@@ -198,15 +205,85 @@ async function pipelineLoadHistory() {
       list.innerHTML = '<p style="text-align:center;padding:24px;font-size:12px;color:var(--text-muted)">No pipeline jobs yet</p>';
       return;
     }
-    list.innerHTML = jobs.map(j => `
+    list.innerHTML = jobs.map(j => {
+      const color = j.status === 'done' ? '#26DE81' : j.status === 'error' ? '#FF6B6B' : 'var(--accent)';
+      const scenes = j.scene_count ? `${j.scene_count} scenes` : '';
+      return `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)">
-        <span style="width:8px;height:8px;border-radius:50%;background:${j.status === 'done' ? '#26DE81' : j.status === 'error' ? '#FF6B6B' : 'var(--accent)'};flex-shrink:0"></span>
-        <span class="font-mono" style="font-size:12px;color:var(--text)">${esc(j.project_id || j.job_id)}</span>
-        <span class="font-mono" style="font-size:10px;color:var(--text-muted);margin-left:auto">${j.status}</span>
-      </div>
-    `).join('');
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>
+        <div style="min-width:0;flex:1">
+          <div class="font-mono" style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.label || j.project_id)}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${esc(j.project_id)}${scenes ? ' · ' + scenes : ''}</div>
+        </div>
+        <span class="font-mono" style="font-size:10px;color:var(--text-muted);flex-shrink:0">${j.status}</span>
+      </div>`;
+    }).join('');
   } catch (e) { /* ignore */ }
+}
+
+// ---- Blueprint Selector ----
+
+async function pipelineLoadBlueprints() {
+  try {
+    const blueprints = await api('/api/dna/blueprints');
+    _plBlueprints = blueprints || [];
+    const sel = $('#pipeline-blueprint');
+    if (!sel) return;
+
+    sel.innerHTML = '<option value="">None</option>';
+    for (const bp of _plBlueprints) {
+      const opt = document.createElement('option');
+      opt.value = bp.path;
+      opt.textContent = bp.niche || bp.name || 'Blueprint';
+      sel.appendChild(opt);
+    }
+
+    // Restore from localStorage or STATE
+    const saved = (typeof STATE !== 'undefined' && STATE.activeBlueprintPath)
+      || localStorage.getItem('sts-active-blueprint');
+    if (saved) {
+      sel.value = saved;
+      _plUpdateBlueprintBadge();
+    }
+
+    sel.addEventListener('change', _plUpdateBlueprintBadge);
+  } catch (e) { /* blueprints API not available yet */ }
+}
+
+function _plUpdateBlueprintBadge() {
+  const sel = $('#pipeline-blueprint');
+  const badge = $('#pipeline-blueprint-badge');
+  const nameEl = $('#pipeline-blueprint-name');
+  if (!sel || !badge || !nameEl) return;
+
+  if (sel.value) {
+    const selectedOpt = sel.options[sel.selectedIndex];
+    nameEl.textContent = 'DNA: ' + (selectedOpt?.textContent || 'Active');
+    badge.style.display = 'inline-flex';
+    localStorage.setItem('sts-active-blueprint', sel.value);
+    if (typeof STATE !== 'undefined') STATE.activeBlueprintPath = sel.value;
+  } else {
+    badge.style.display = 'none';
+    localStorage.removeItem('sts-active-blueprint');
+    if (typeof STATE !== 'undefined') STATE.activeBlueprintPath = null;
+  }
+}
+
+// ---- Random Story ----
+let _plLastStoryIdx = -1;
+function pipelineRandomStory() {
+  if (typeof RANDOM_STORIES === 'undefined' || !RANDOM_STORIES.length) return;
+  let idx;
+  do { idx = Math.floor(Math.random() * RANDOM_STORIES.length); } while (idx === _plLastStoryIdx && RANDOM_STORIES.length > 1);
+  _plLastStoryIdx = idx;
+  const ta = $('#pipeline-text');
+  if (!ta) return;
+  ta.value = RANDOM_STORIES[idx];
+  ta.dispatchEvent(new Event('input'));
+  ta.focus();
+  toast('Random story loaded');
 }
 
 // Init
 pipelineLoadHistory();
+pipelineLoadBlueprints();

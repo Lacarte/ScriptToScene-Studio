@@ -157,8 +157,13 @@ def generate_captions():
     if not alignment or not isinstance(alignment, list):
         return jsonify({"error": "No alignment data provided"}), 400
 
-    words_per_group = max(2, min(5, int(data.get("words_per_group", 3))))
-    preset_id = data.get("preset", "bold_popup")
+    # Blueprint overrides take priority when provided
+    blueprint_caption = data.get("blueprint_caption") or {}
+    words_per_group = max(2, min(5, int(
+        blueprint_caption.get("max_words_per_line")
+        or data.get("words_per_group", 3)
+    )))
+    preset_id = blueprint_caption.get("style_preset") or data.get("preset", "bold_popup")
     style = dict(CAPTION_PRESETS.get(preset_id, CAPTION_PRESETS["bold_popup"]))
     style["preset"] = preset_id
 

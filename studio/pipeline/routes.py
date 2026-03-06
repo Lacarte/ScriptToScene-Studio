@@ -23,7 +23,7 @@ from flask import Blueprint, Response, jsonify, request
 from loguru import logger
 
 from config import (
-    TTS_DIR, ALIGN_DIR, SEGMENTER_DIR, SCENES_DIR,
+    TTS_DIR, ALIGN_DIR, SEGMENTER_DIR, SCENES_DIR, DNA_DIR,
     N8N_WEBHOOK_URL, generate_project_id,
 )
 
@@ -84,6 +84,7 @@ def run_pipeline():
         "style": data.get("style", "cinematic"),
         "segment_config": data.get("segment_config"),
         "webhook_url": data.get("webhook_url"),
+        "blueprint_path": data.get("blueprint_path"),
         "project_id": project_id,
     }
 
@@ -137,17 +138,46 @@ def pipeline_progress(job_id):
 
 @pipeline_bp.route("/api/pipeline/jobs")
 def list_jobs():
-    """List recent pipeline jobs."""
+    """List recent pipeline jobs from disk (pp_* folders in scenes dir)."""
+    items = []
+    if os.path.isdir(SCENES_DIR):
+        for entry in os.listdir(SCENES_DIR):
+            if not entry.startswith("pp_"):
+                continue
+            scenes_path = os.path.join(SCENES_DIR, entry, "scenes.json")
+            if not os.path.isfile(scenes_path):
+                continue
+            try:
+                mtime = os.path.getmtime(scenes_path)
+                with open(scenes_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                scene_count = data.get("scene_count", len(data.get("scenes", [])))
+                source = data.get("source_folder", "")
+                # extract short label from source folder
+                label = source.split("_2026")[0].replace("-", " ").strip() if source else entry
+                items.append({
+                    "project_id": entry,
+                    "label": label[:40],
+                    "scene_count": scene_count,
+                    "status": "done",
+                    "created": mtime,
+                    "timestamp": data.get("timestamp", ""),
+                })
+            except Exception:
+                continue
+    # Also include in-progress jobs from memory
     with _jobs_lock:
-        return jsonify([
-            {
-                "job_id": jid,
-                "project_id": j.get("project_id"),
-                "status": j.get("status"),
-                "created": j.get("created"),
-            }
-            for jid, j in _jobs.items()
-        ])
+        for jid, j in _jobs.items():
+            if j.get("status") == "running":
+                items.append({
+                    "project_id": j.get("project_id", jid),
+                    "label": "Running...",
+                    "scene_count": 0,
+                    "status": "running",
+                    "created": j.get("created", 0),
+                })
+    items.sort(key=lambda x: x.get("created", 0), reverse=True)
+    return jsonify(items)
 
 
 # ===================================================================
@@ -368,6 +398,84 @@ def _step_timing(tts_result, config, project_id):
     return result_data
 
 
+def _load_blueprint(blueprint_path):
+    """Load a blueprint JSON file, return dict or None."""
+    if not blueprint_path or not os.path.isfile(blueprint_path):
+        return None
+    try:
+        with open(blueprint_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("Failed to load blueprint {}: {}", blueprint_path, e)
+        return None
+
+
+def _blueprint_to_segment_config(blueprint):
+    """Convert blueprint segmentation rules to segmenter config dict."""
+    seg = blueprint.get("segmentation", {})
+    timing = seg.get("timing", {})
+    return {
+        "target_min": timing.get("min_duration", 1.5),
+        "target_max": timing.get("target_duration", 3.0),
+        "hard_max": timing.get("max_duration", 4.0),
+        "hard_min": timing.get("min_duration", 0.8) * 0.7,
+        "gap_filler": timing.get("pause_threshold", 0.3),
+        "break_weights": seg.get("break_weights"),
+    }
+
+
+def _build_dna_context(blueprint):
+    """Build DNA context strings for scene generation injection."""
+    consistency = blueprint.get("consistency", {})
+    visual = blueprint.get("visual", {})
+    hook = blueprint.get("hook", {})
+    seg = blueprint.get("segmentation", {})
+    timing = seg.get("timing", {})
+
+    # Block 1: Visual consistency
+    parts = []
+    if consistency.get("character"):
+        parts.append(f"CHARACTER: {consistency['character']}")
+    if consistency.get("setting"):
+        parts.append(f"SETTING: {consistency['setting']}")
+    if consistency.get("mood"):
+        parts.append(f"MOOD: {consistency['mood']}")
+
+    consistency_block = ""
+    if parts:
+        consistency_block = (
+            "VISUAL CONSISTENCY — Apply these to EVERY scene prompt you generate:\n"
+            + "\n".join(parts)
+            + "\n\nEvery image_prompt you generate MUST include the character description, "
+            "setting elements, and mood/lighting described above to maintain visual "
+            "consistency across all scenes."
+        )
+
+    # Block 2: Structural DNA constraints
+    palette_str = ", ".join(visual.get("dominant_palette", [])[:5])
+    constraints_block = (
+        f"STYLE DNA CONSTRAINTS:\n"
+        f"- Target scene duration: {timing.get('target_duration', 2.5):.1f}s "
+        f"(range {timing.get('min_duration', 0.8):.1f}–{timing.get('max_duration', 5.0):.1f}s)\n"
+        f"- Scene type mix: {_format_type_mix(visual.get('type_mix', {}))}\n"
+        f"- Motion: {visual.get('motion_level', 'dynamic')} | Color palette: {palette_str}\n"
+        f"- Hook ≤ {hook.get('duration', 2.5):.1f}s, {hook.get('visual_intensity', 'medium')} visual intensity\n"
+        f"- Pacing: fast hook → slower body → accelerating close"
+    )
+
+    return consistency_block, constraints_block
+
+
+def _format_type_mix(mix):
+    """Format type_mix dict for display."""
+    if not mix:
+        return "70% video, 20% image, 10% text"
+    parts = []
+    for k, v in mix.items():
+        parts.append(f"{int(v * 100)}% {k}")
+    return ", ".join(parts)
+
+
 def _step_segment(timing_result, config, project_id):
     """Run segmentation on alignment data."""
     from studio.timing.segmenter import run_segmenter, save_output
@@ -379,9 +487,17 @@ def _step_segment(timing_result, config, project_id):
         "transcript": timing_result.get("transcript", ""),
     }
 
+    # Use blueprint segmentation rules if available, else fall back to manual config
+    seg_config = config.get("segment_config")
+    blueprint = _load_blueprint(config.get("blueprint_path"))
+    if blueprint:
+        seg_config = _blueprint_to_segment_config(blueprint)
+        logger.info("Using blueprint segmentation: target={}, break_weights={}",
+                     seg_config.get("target_max"), seg_config.get("break_weights"))
+
     result = run_segmenter(
         timing_result["alignment"],
-        config.get("segment_config"),
+        seg_config,
         metadata,
     )
 
@@ -410,14 +526,27 @@ def _step_scenes(segment_result, config, project_id):
 
     webhook_url = config.get("webhook_url") or N8N_WEBHOOK_URL
 
+    payload = {
+        "script": config.get("text", ""),
+        "style": config.get("style", "cinematic"),
+        "style_prompt": config.get("style_prompt", ""),
+        "segments": segments,
+    }
+
+    # Inject DNA context when blueprint is active
+    blueprint = _load_blueprint(config.get("blueprint_path"))
+    if blueprint:
+        consistency_block, constraints_block = _build_dna_context(blueprint)
+        if consistency_block:
+            payload["dna_consistency"] = consistency_block
+        payload["dna_constraints"] = constraints_block
+        # Also store raw consistency for downstream asset prefix injection
+        payload["consistency"] = blueprint.get("consistency", {})
+        logger.info("Injecting DNA context into scene generation webhook")
+
     resp = http_requests.post(
         webhook_url,
-        json={
-            "script": config.get("text", ""),
-            "style": config.get("style", "cinematic"),
-            "style_prompt": config.get("style_prompt", ""),
-            "segments": segments,
-        },
+        json=payload,
         timeout=120,
     )
 

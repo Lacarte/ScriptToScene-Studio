@@ -12,7 +12,7 @@ import traceback
 from flask import Blueprint, send_from_directory, request, jsonify, send_file
 from loguru import logger
 
-from config import TIMELINE_EDITOR_DIR, OUTPUT_DIR, BIN_DIR, FONTS_DIR
+from config import TIMELINE_EDITOR_DIR, OUTPUT_DIR, BIN_DIR
 from studio.fonts import FONT_REGISTRY, get_font_path, get_font_url
 
 editor_bp = Blueprint("editor", __name__)
@@ -35,11 +35,6 @@ def serve_timeline_editor(filename):
     """Serve timeline editor static files."""
     return send_from_directory(TIMELINE_EDITOR_DIR, filename)
 
-
-@editor_bp.route("/fonts/<path:filepath>")
-def serve_font_file(filepath):
-    """Serve font files from the fonts/ directory for @font-face loading."""
-    return send_from_directory(FONTS_DIR, filepath)
 
 
 # ---------------------------------------------------------------------------

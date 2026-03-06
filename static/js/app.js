@@ -35,11 +35,22 @@ function switchPage(page) {
     b.classList.toggle('active', isActive);
   });
   if (page === 'editor') {
+    $('#main-content').style.overflowY = 'hidden';
     if (!localStorage.getItem('sts-editor-scenes')) {
-      toast('No scenes or assets available. Generate content first.', 'error');
+      // Hide the loading spinner and show empty state
+      const loadingEl = $('#editor-loading');
+      if (loadingEl) {
+        loadingEl.innerHTML = `
+          <div style="text-align:center">
+            <svg width="40" height="40" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 12px;opacity:0.4">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+            </svg>
+            <p style="color:var(--text-secondary);font-size:13px">No scenes or assets available</p>
+            <p style="font-size:11px;margin-top:6px;color:var(--text-muted);opacity:0.7">Generate content first, then open the editor</p>
+          </div>`;
+      }
       return;
     }
-    $('#main-content').style.overflowY = 'hidden';
     initEditorIframe();
   } else {
     $('#main-content').style.overflowY = 'auto';
@@ -114,6 +125,15 @@ window.STS_SETTINGS = {
   clean: localStorage.getItem('sts-clean') !== 'false',
 };
 
+// Sound notifications (default ON)
+window._stsSoundEnabled = localStorage.getItem('sts_sound_enabled') !== 'false';
+
+/** Play the completion chime if sound is enabled */
+window.playDoneSound = function () {
+  if (!window._stsSoundEnabled) return;
+  try { new Audio('/assets/sounds/effects/done.mp3').play(); } catch (_) {}
+};
+
 function settingsToggle(key, val) {
   STS_SETTINGS[key] = val;
   localStorage.setItem('sts-' + key, val);
@@ -130,6 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const sessionStorageEl = $('#setting-editor-sessionstorage');
   if (storageEl) storageEl.checked = localStorage.getItem('editor_storage_enabled') !== 'false';
   if (sessionStorageEl) sessionStorageEl.checked = localStorage.getItem('editor_session_storage_enabled') !== 'false';
+
+  const soundEl = $('#setting-sound-notifications');
+  if (soundEl) soundEl.checked = window._stsSoundEnabled;
 });
 
 // ---- Auto-Forward (Continue to Next Step) ----

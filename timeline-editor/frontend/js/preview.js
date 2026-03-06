@@ -995,15 +995,22 @@ export class CanvasPreview {
 
         const x = this.width / 2;
 
-        // Single-line mode: no word-wrap, force single line
+        // Single-line mode: wrap only if text exceeds canvas width
         const isSingleLine = animation === 'hard_cut' || style.preset === 'single_line';
         let lines, lineHeight, totalHeight, baseY;
 
         if (isSingleLine) {
-            lines = [text];
+            const maxWidth = this.width * 0.9;
+            // Set font before measuring
+            this.ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", sans-serif`;
+            if (this.ctx.measureText(text).width > maxWidth) {
+                lines = this._wrapText(text, maxWidth);
+            } else {
+                lines = [text];
+            }
             lineHeight = fontSize * 1.1;
-            totalHeight = lineHeight;
-            baseY = this.height * posY;
+            totalHeight = lines.length * lineHeight;
+            baseY = this.height * posY - (totalHeight - lineHeight) / 2;
         } else {
             const maxWidth = this.width * 0.85;
             lines = this._wrapText(text, maxWidth);

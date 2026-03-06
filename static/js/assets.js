@@ -747,6 +747,7 @@ function _startGrabberPolling(projectId) {
         loadAssetsHistory(); // refresh history
         if (data.status === 'done') {
           showContinueBar('assets-controls', 'editor', 'Auto-Assemble & Edit →', autoAssembleAndSendToEditor);
+          if (typeof playDoneSound === 'function') playDoneSound();
         }
       }
     } catch (e) {

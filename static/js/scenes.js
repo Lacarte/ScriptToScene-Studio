@@ -771,6 +771,18 @@ async function loadScenesProject(projectId) {
   try {
     const data = await api(`/api/scenes/${projectId}`);
     STATE.scenesResult = data;
+
+    // Restore segmenter data if missing (needed for segment text display)
+    if (!STATE.scenesSegData && data.source_folder) {
+      try {
+        const history = await api('/api/segmenter/history');
+        const match = history.find(h => h.source_folder === data.source_folder);
+        if (match) {
+          STATE.scenesSegData = await api(`/api/segmenter/${encodeURIComponent(match.folder)}`);
+        }
+      } catch { /* segment text just won't show */ }
+    }
+
     renderSceneResults(data);
     toast('Scenes loaded');
   } catch (e) { toast(e.message, 'error'); }

@@ -160,7 +160,7 @@ function _plUpdateStep(event) {
   if (step === 'done') {
     _plRenderProgress('done');
     $('#pipeline-current-step').innerHTML = `<span style="font-size:13px;color:#26DE81;font-weight:600">Pipeline complete</span>`;
-    try { new Audio('/assets/pipeline_done.mp3').play(); } catch (_) {}
+    if (typeof playDoneSound === 'function') playDoneSound();
     // Small delay to ensure scenes.json is flushed to disk before reading
     setTimeout(() => pipelineLoadHistory(), 500);
 

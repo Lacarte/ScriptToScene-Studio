@@ -74,7 +74,8 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex-shrink: 0;
+    flex: 1;
+    min-width: 0;
 }
 
 /* Source controls */
@@ -318,8 +319,59 @@ body {
 
 .history-controls {
     display: flex;
-    gap: 3px;
+    gap: 6px;
     align-items: center;
+}
+
+.history-btn-group {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 0;
+}
+
+.history-btn-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+
+.history-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+}
+
+.history-action-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+}
+
+.history-action-btn:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.94);
+}
+
+.history-action-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+.history-action-btn svg {
+    flex-shrink: 0;
 }
 
 .history-dropdown-container {
@@ -328,31 +380,44 @@ body {
 
 .history-toggle {
     position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    width: 32px;
+    height: 32px;
+}
+
+.history-toggle:hover:not(:disabled) {
+    border-color: var(--border-hover);
 }
 
 .history-badge {
     position: absolute;
-    top: -4px;
-    right: -4px;
-    background: var(--bg-elevated);
+    top: -5px;
+    right: -5px;
+    background: var(--bg-surface);
     color: var(--text-muted);
     border: 1px solid var(--border);
-    border-radius: 50%;
-    font-size: 8px;
+    border-radius: 10px;
+    font-size: 9px;
     font-family: var(--font-mono);
-    width: 16px;
+    min-width: 16px;
     height: 16px;
+    padding: 0 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1;
+    transition: all 0.2s ease;
 }
 
 .history-badge.has-history {
     background: var(--accent);
     color: var(--bg-darkest);
     border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(78, 205, 196, 0.3);
 }
 
 .history-dropdown {

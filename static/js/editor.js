@@ -8,7 +8,15 @@ function initEditorIframe() {
   if (STATE.editorLoaded && iframe.src.includes(targetSrc)) return;
   STATE.editorLoaded = false;
   iframe.style.display = 'none';
-  $('#editor-loading').style.display = 'flex';
+  const loadingEl = $('#editor-loading');
+  // Restore spinner in case it was replaced with empty-state message
+  loadingEl.innerHTML = `
+    <div style="text-align:center">
+      <div style="width:36px;height:36px;border:2.5px solid rgba(255,255,255,0.08);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
+      <p style="color:var(--text-secondary)">Loading Timeline Editor...</p>
+      <p style="font-size:11px;margin-top:4px;color:var(--text-muted);opacity:0.7">Make sure the editor server is running</p>
+    </div>`;
+  loadingEl.style.display = 'flex';
   // Cache-bust to force reload+onload when src is already set
   iframe.src = targetSrc + '?t=' + Date.now();
   iframe.onload = () => {

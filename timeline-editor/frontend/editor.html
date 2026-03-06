@@ -24,23 +24,26 @@
         </div>
         <div class="header-right">
             <div class="history-controls">
-                <button id="undo-btn" class="btn btn-icon" title="Undo (Ctrl+Z)" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="1 4 1 10 7 10"></polyline>
-                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                    </svg>
-                </button>
-                <button id="redo-btn" class="btn btn-icon" title="Redo (Ctrl+Y)" disabled>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"></path>
-                    </svg>
-                </button>
+                <div class="history-btn-group">
+                    <button id="undo-btn" class="history-action-btn" title="Undo (Ctrl+Z)" disabled>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                        </svg>
+                    </button>
+                    <div class="history-btn-divider"></div>
+                    <button id="redo-btn" class="history-action-btn" title="Redo (Ctrl+Y)" disabled>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"></path>
+                        </svg>
+                    </button>
+                </div>
                 <div class="history-dropdown-container">
-                    <button id="history-btn" class="btn btn-icon history-toggle" title="View History">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    <button id="history-btn" class="history-action-btn history-toggle" title="View History">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
                             <polyline points="12 6 12 12 16 14"></polyline>
@@ -79,6 +82,7 @@
                     </ul>
                 </div>
             </div>
+            <span style="flex:1"></span>
             <button id="preview-json" class="btn btn-secondary" title="Preview Export JSON">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -183,7 +187,7 @@
                         <!-- Effects grid -->
                         <div id="fx-grid" class="fx-grid" style="display:none">
                             <div class="fx-section-label">Motion Effects</div>
-                            <div class="fx-card-grid">
+                            <div class="fx-card-grid" id="fx-card-grid">
                                 <button class="fx-card" data-fx="static" title="No motion">
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -194,7 +198,8 @@
                                     </div>
                                     <span class="fx-card-label">Static</span>
                                 </button>
-                                <button class="fx-card" data-fx="zoom_in" title="Slowly zoom into the scene">
+                                <button class="fx-card in-pool" data-fx="zoom_in" title="Slowly zoom into the scene">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -205,7 +210,8 @@
                                     </div>
                                     <span class="fx-card-label">Zoom In</span>
                                 </button>
-                                <button class="fx-card" data-fx="zoom_out" title="Slowly zoom out from the scene">
+                                <button class="fx-card in-pool" data-fx="zoom_out" title="Slowly zoom out from the scene">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -216,7 +222,8 @@
                                     </div>
                                     <span class="fx-card-label">Zoom Out</span>
                                 </button>
-                                <button class="fx-card" data-fx="pan_left" title="Pan camera from right to left">
+                                <button class="fx-card in-pool" data-fx="pan_left" title="Pan camera from right to left">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -226,7 +233,8 @@
                                     </div>
                                     <span class="fx-card-label">Pan Left</span>
                                 </button>
-                                <button class="fx-card" data-fx="pan_right" title="Pan camera from left to right">
+                                <button class="fx-card in-pool" data-fx="pan_right" title="Pan camera from left to right">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -236,7 +244,8 @@
                                     </div>
                                     <span class="fx-card-label">Pan Right</span>
                                 </button>
-                                <button class="fx-card" data-fx="fade" title="Fade in from transparent">
+                                <button class="fx-card in-pool" data-fx="fade" title="Fade in from transparent">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -246,7 +255,8 @@
                                     </div>
                                     <span class="fx-card-label">Fade</span>
                                 </button>
-                                <button class="fx-card" data-fx="shake" title="Camera shake for impact">
+                                <button class="fx-card in-pool" data-fx="shake" title="Camera shake for impact">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -256,14 +266,29 @@
                                     <span class="fx-card-label">Shake</span>
                                 </button>
                             </div>
-                            <button class="fx-auto-btn" id="fx-auto-assign"
-                                title="Auto-assign effects based on scene roles">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                                </svg>
-                                Auto-assign all scenes
-                            </button>
+                            <div style="display:flex;gap:6px">
+                                <button class="fx-auto-btn" id="fx-auto-assign" style="flex:1"
+                                    title="Auto-assign effects based on scene roles">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                                    </svg>
+                                    Auto-assign all scenes
+                                </button>
+                                <button class="fx-auto-btn" id="fx-random-assign" style="flex:1"
+                                    title="Randomly assign effects to all scenes">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="2" y="2" width="20" height="20" rx="2" />
+                                        <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+                                        <circle cx="16" cy="8" r="1.5" fill="currentColor" />
+                                        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                                        <circle cx="8" cy="16" r="1.5" fill="currentColor" />
+                                        <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+                                    </svg>
+                                    <span class="fx-btn-label">Randomize all scenes</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -277,7 +302,7 @@
                         <!-- Transitions grid -->
                         <div id="tr-grid" class="fx-grid" style="display:none">
                             <div class="fx-section-label">Transition to next scene</div>
-                            <div class="fx-card-grid">
+                            <div class="fx-card-grid" id="tr-card-grid">
                                 <button class="fx-card" data-tr="none" title="No transition">
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -287,7 +312,8 @@
                                     </div>
                                     <span class="fx-card-label">None</span>
                                 </button>
-                                <button class="fx-card" data-tr="cut" title="Hard cut — instant switch">
+                                <button class="fx-card in-pool" data-tr="cut" title="Hard cut — instant switch">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -297,7 +323,8 @@
                                     </div>
                                     <span class="fx-card-label">Cut</span>
                                 </button>
-                                <button class="fx-card" data-tr="crossfade" title="Smooth crossfade blend">
+                                <button class="fx-card in-pool" data-tr="crossfade" title="Smooth crossfade blend">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -309,7 +336,8 @@
                                     </div>
                                     <span class="fx-card-label">Crossfade</span>
                                 </button>
-                                <button class="fx-card" data-tr="fade_black" title="Fade to black then reveal">
+                                <button class="fx-card in-pool" data-tr="fade_black" title="Fade to black then reveal">
+                                    <span class="fx-pool-dot"></span>
                                     <div class="fx-card-icon">
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="1.5">
@@ -327,14 +355,29 @@
                                 <input type="range" id="tr-duration-slider" min="0.1" max="1.0" step="0.1" value="0.3">
                                 <span id="tr-duration-value">0.3s</span>
                             </div>
-                            <button class="fx-auto-btn" id="tr-auto-assign"
-                                title="Auto-assign transitions based on scene roles">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                                </svg>
-                                Auto-assign all scenes
-                            </button>
+                            <div style="display:flex;gap:6px">
+                                <button class="fx-auto-btn" id="tr-auto-assign" style="flex:1"
+                                    title="Auto-assign transitions based on scene roles">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                                    </svg>
+                                    Auto-assign all scenes
+                                </button>
+                                <button class="fx-auto-btn" id="tr-random-assign" style="flex:1"
+                                    title="Randomly assign transitions to all scenes">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="2" y="2" width="20" height="20" rx="2" />
+                                        <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+                                        <circle cx="16" cy="8" r="1.5" fill="currentColor" />
+                                        <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                                        <circle cx="8" cy="16" r="1.5" fill="currentColor" />
+                                        <circle cx="16" cy="16" r="1.5" fill="currentColor" />
+                                    </svg>
+                                    <span class="fx-btn-label">Randomize all scenes</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -755,45 +798,21 @@
                     <div class="track-content" id="caption-track"></div>
                 </div>
 
-                <!-- Audio Track -->
-                <div class="track" data-track="audio">
-                    <div class="track-header">
-                        <svg class="track-toggle" title="Toggle Audio Track" width="13" height="13" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path d="M9 18V5l12-2v13" />
-                            <circle cx="6" cy="18" r="3" />
-                            <circle cx="18" cy="16" r="3" />
-                        </svg>
-                        <button id="add-audio" class="tl-btn tl-btn-xs" title="Add Audio">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5">
-                                <path d="M12 5v14M5 12h14" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="track-content" id="audio-track">
-                        <div class="audio-placeholder"></div>
-                    </div>
+                <!-- Dynamic Audio Tracks -->
+                <div id="audio-tracks-container">
+                    <!-- Audio tracks rendered dynamically by JS -->
                 </div>
-
-                <!-- Background Music Track -->
-                <div class="track" data-track="bgmusic">
-                    <div class="track-header">
-                        <svg class="track-toggle" title="Toggle Background Music Track" width="13" height="13"
-                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <circle cx="5.5" cy="17.5" r="2.5" />
-                            <circle cx="17.5" cy="15.5" r="2.5" />
-                            <path d="M8 17.5V5l12-2v12.5" />
-                        </svg>
-                        <button id="add-bgmusic" class="tl-btn tl-btn-xs" title="Add Background Music">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5">
+                <div class="add-track-row" id="add-track-row">
+                    <div class="add-track-header">
+                        <button id="add-audio-track-btn" class="add-track-btn" title="Add Audio Track">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round">
                                 <path d="M12 5v14M5 12h14" />
                             </svg>
                         </button>
                     </div>
-                    <div class="track-content" id="bgmusic-track">
-                        <span class="bgmusic-placeholder">Background music</span>
+                    <div class="add-track-content">
+                        <span class="add-track-label">Add audio track</span>
                     </div>
                 </div>
             </div>

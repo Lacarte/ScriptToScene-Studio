@@ -65,6 +65,49 @@ const STORAGE_KEYS = {
 // Maximum history entries per project
 const MAX_HISTORY_ENTRIES = 50;
 
+// ---------------------------------------------------------------------------
+// Universal Audio Track System
+// ---------------------------------------------------------------------------
+let _audioTrackIdCounter = 0;
+function nextAudioTrackId() { return `at_${++_audioTrackIdCounter}`; }
+
+const AUDIO_TRACK_COLORS = {
+    voice: 'rgba(78, 205, 196, 0.8)',
+    music: 'rgba(167, 139, 250, 0.8)',
+    fx: 'rgba(255, 183, 77, 0.8)',
+};
+
+function createAudioTrack(overrides = {}) {
+    return {
+        id: nextAudioTrackId(),
+        label: 'Audio',
+        type: 'voice',           // 'voice' | 'music' | 'fx'
+        file: null,
+        path: null,
+        duration: 0,
+        trimmedDuration: null,
+        volume: 1.0,
+        loop: false,
+        duckingEnabled: false,
+        duckingLevel: 0.03,
+        fadeIn: 0,
+        fadeOut: 0,
+        loaded: false,
+        error: false,
+        muted: false,
+        element: null,           // HTML Audio element
+        color: AUDIO_TRACK_COLORS.voice,
+        ...overrides,
+    };
+}
+
+function getVoiceTrack() {
+    return EditorState.audioTracks.find(t => t.type === 'voice');
+}
+function getAudioTrackById(id) {
+    return EditorState.audioTracks.find(t => t.id === id);
+}
+
 // Load saved settings from localStorage
 function loadSavedSettings() {
     const savedZoom = localStorage.getItem(STORAGE_KEYS.ZOOM_LEVEL);
@@ -94,8 +137,9 @@ const EditorState = {
     timelineHeight: savedSettings.timelineHeight, // Restored from localStorage
     pixelsPerSecond: 20,
     preview: null,  // CanvasPreview instance
-    audio: null,    // Audio info
-    audioElement: null,  // HTML Audio element for playback
+    audio: null,    // DEPRECATED — use audioTracks[0] (voice)
+    audioElement: null,  // DEPRECATED — use audioTracks[0].element
+    audioTracks: [],     // Universal multi-track audio array
     isMuted: false,  // Audio mute state
     editHistory: [],  // History of edits for undo
     historyIndex: -1,  // Current position in history (-1 = no history)
@@ -104,8 +148,8 @@ const EditorState = {
     captionData: null,      // Caption data { captions: [], style: {} }
     captionsEnabled: false, // Whether caption track is visible
     selectedExportProfile: 'yt_shorts',  // Export profile ID
-    bgMusic: null,          // { file, path, duration, volume, duckingEnabled, duckingLevel, fadeIn, fadeOut, loop }
-    bgMusicElement: null,   // HTML Audio element for bgmusic playback
+    bgMusic: null,          // DEPRECATED — use audioTracks (type: 'music')
+    bgMusicElement: null,   // DEPRECATED — use audioTracks[].element
     disabledTracks: new Set(), // Keep track of which tracks are disabled
     storageEnabled: localStorage.getItem('editor_storage_enabled') !== 'false', // localStorage toggle (default ON)
     sessionStorageEnabled: localStorage.getItem('editor_session_storage_enabled') !== 'false' // sessionStorage toggle (default ON)
@@ -313,12 +357,13 @@ function undoEdit() {
 
     const entry = EditorState.editHistory[EditorState.historyIndex];
 
-    // Handle audio edits
-    if (entry.sceneId === 'audio') {
-        if (entry.field === 'trimmedDuration' && EditorState.audio) {
-            EditorState.audio.trimmedDuration = entry.oldValue;
+    // Handle audio edits (legacy 'audio' key or track ID like 'at_1')
+    if (entry.sceneId === 'audio' || entry.sceneId?.startsWith('at_')) {
+        const track = entry.sceneId === 'audio' ? getVoiceTrack() : getAudioTrackById(entry.sceneId);
+        if (entry.field === 'trimmedDuration' && track) {
+            track.trimmedDuration = entry.oldValue;
             recalculateDuration();
-            renderAudioTrack();
+            renderAllAudioTracks();
             renderTimeRuler();
             if (EditorState.preview) {
                 EditorState.preview.setDuration(getTotalDuration());
@@ -371,12 +416,13 @@ function redoEdit() {
     EditorState.historyIndex++;
     const entry = EditorState.editHistory[EditorState.historyIndex];
 
-    // Handle audio edits
-    if (entry.sceneId === 'audio') {
-        if (entry.field === 'trimmedDuration' && EditorState.audio) {
-            EditorState.audio.trimmedDuration = entry.newValue;
+    // Handle audio edits (legacy 'audio' key or track ID like 'at_1')
+    if (entry.sceneId === 'audio' || entry.sceneId?.startsWith('at_')) {
+        const track = entry.sceneId === 'audio' ? getVoiceTrack() : getAudioTrackById(entry.sceneId);
+        if (entry.field === 'trimmedDuration' && track) {
+            track.trimmedDuration = entry.newValue;
             recalculateDuration();
-            renderAudioTrack();
+            renderAllAudioTracks();
             renderTimeRuler();
             if (EditorState.preview) {
                 EditorState.preview.setDuration(getTotalDuration());
@@ -796,12 +842,20 @@ function getScenesDuration() {
 function getTotalDuration() {
     const scenesDuration = getScenesDuration();
 
-    // Use trimmed duration if set, otherwise use full audio duration
-    const audioDuration = EditorState.audio?.loaded
-        ? (EditorState.audio.trimmedDuration || EditorState.audio.duration)
-        : 0;
-
-    const bgMusicDuration = EditorState.bgMusic?.duration || 0;
+    // Compute max duration across all audio tracks
+    let maxAudioDur = 0;
+    for (const track of EditorState.audioTracks) {
+        let dur = 0;
+        if (track.loaded || track.file) {
+            if (track.trimmedDuration) {
+                dur = track.trimmedDuration;
+            } else if (!track.loop) {
+                dur = track.duration || 0;
+            }
+            // Looping tracks without explicit trim don't contribute to total (they fill whatever length)
+        }
+        if (dur > maxAudioDur) maxAudioDur = dur;
+    }
 
     let captionsDuration = 0;
     if (EditorState.captionsEnabled && EditorState.captionData?.captions?.length > 0) {
@@ -809,7 +863,7 @@ function getTotalDuration() {
         captionsDuration = lastCaption.end || 0;
     }
 
-    return Math.max(scenesDuration, audioDuration, bgMusicDuration, captionsDuration);
+    return Math.max(scenesDuration, maxAudioDur, captionsDuration);
 }
 
 /**
@@ -888,7 +942,7 @@ const elements = {
     textTrack: document.getElementById('text-track'),
     captionTrack: document.getElementById('caption-track'),
     captionTrackRow: document.getElementById('caption-track-row'),
-    audioTrack: document.getElementById('audio-track'),
+    audioTracksContainer: document.getElementById('audio-tracks-container'),
     previewCanvas: document.getElementById('preview-canvas'),
     previewPlaceholder: document.getElementById('preview-placeholder'),
     currentTime: document.getElementById('current-time'),
@@ -984,6 +1038,7 @@ function buildFontOptions(selectEl, selectedFamily) {
     selectEl.innerHTML = '';
     const custom = _fontRegistry.filter(f => f.source === 'custom');
     const system = _fontRegistry.filter(f => f.source === 'system');
+    let found = false;
 
     if (custom.length) {
         const grp = document.createElement('optgroup');
@@ -993,7 +1048,7 @@ function buildFontOptions(selectEl, selectedFamily) {
             opt.value = f.family;
             opt.textContent = f.family;
             opt.style.fontFamily = `'${f.family}', sans-serif`;
-            if (f.family === selectedFamily) opt.selected = true;
+            if (f.family === selectedFamily) { opt.selected = true; found = true; }
             grp.appendChild(opt);
         }
         selectEl.appendChild(grp);
@@ -1007,10 +1062,20 @@ function buildFontOptions(selectEl, selectedFamily) {
             opt.value = f.family;
             opt.textContent = f.family;
             opt.style.fontFamily = `'${f.family}', sans-serif`;
-            if (f.family === selectedFamily) opt.selected = true;
+            if (f.family === selectedFamily) { opt.selected = true; found = true; }
             grp.appendChild(opt);
         }
         selectEl.appendChild(grp);
+    }
+
+    // If selected font isn't in registry, add it so the dropdown isn't blank
+    if (!found && selectedFamily) {
+        const opt = document.createElement('option');
+        opt.value = selectedFamily;
+        opt.textContent = selectedFamily;
+        opt.style.fontFamily = `'${selectedFamily}', sans-serif`;
+        opt.selected = true;
+        selectEl.insertBefore(opt, selectEl.firstChild);
     }
 }
 
@@ -1118,22 +1183,36 @@ function loadProjectData(data) {
                 updateTimeScrubber();
                 updatePlayhead();
 
-                if (EditorState.isPlaying && elements.timelineTracks) {
-                    scrollTimelineToTime(time);
+                // Enforce trimmed duration on non-looping tracks during playback
+                if (EditorState.isPlaying) {
+                    for (const track of EditorState.audioTracks) {
+                        if (!track.element || track.muted || track.loop || !track.file) continue;
+                        const trackEnd = track.trimmedDuration || track.duration;
+                        if (trackEnd && track.element.currentTime >= trackEnd && !track.element.paused) {
+                            track.element.pause();
+                        }
+                    }
+                    if (elements.timelineTracks) {
+                        scrollTimelineToTime(time);
+                    }
                 }
             },
             onPlaybackEnd: () => {
                 if (EditorState.isLooping) {
                     EditorState.playbackPosition = 0;
-                    if (EditorState.audioElement && EditorState.audio?.loaded) {
-                        EditorState.audioElement.currentTime = 0;
-                        EditorState.audioElement.play().catch(e => console.warn('Loop audio play failed:', e));
+                    // Restart all audio tracks
+                    seekAudio(0);
+                    for (const track of EditorState.audioTracks) {
+                        if (track.element && track.file && !track.muted) {
+                            track.element.play().catch(() => {});
+                        }
                     }
                     if (EditorState.preview) {
                         EditorState.preview.seek(0);
                         EditorState.preview.play();
-                        if (EditorState.audioElement && EditorState.audio?.loaded) {
-                            EditorState.preview.setTimeSource(() => EditorState.audioElement.currentTime);
+                        const voiceTrack = getVoiceTrack();
+                        if (voiceTrack?.element && voiceTrack.loaded) {
+                            EditorState.preview.setTimeSource(() => voiceTrack.element.currentTime);
                         }
                     }
                     if (elements.timelineTracks) {
@@ -1145,9 +1224,12 @@ function loadProjectData(data) {
                 }
 
                 EditorState.isPlaying = false;
-                if (EditorState.audioElement) {
-                    EditorState.audioElement.pause();
-                    EditorState.audioElement.currentTime = 0;
+                // Stop all audio tracks
+                for (const track of EditorState.audioTracks) {
+                    if (track.element) {
+                        track.element.pause();
+                        track.element.currentTime = 0;
+                    }
                 }
                 if (EditorState.preview) {
                     EditorState.preview.setTimeSource(null);
@@ -1648,6 +1730,7 @@ function getVideoMeta(videoUrl) {
 
 /**
  * Load audio — uses staged alignment URL when available, falls back to working-assets/
+ * Creates or updates the voice track in audioTracks[].
  */
 function loadDefaultAudio(stagedData) {
     const projectId = EditorState.project?.id || 'default';
@@ -1664,32 +1747,41 @@ function loadDefaultAudio(stagedData) {
         console.log('No staged audio — falling back to:', audioPath);
     }
 
-    // Create audio element
-    const audio = new Audio(audioPath);
-    EditorState.audioElement = audio;
+    // Create or reuse voice track
+    let voiceTrack = getVoiceTrack();
+    if (!voiceTrack) {
+        voiceTrack = createAudioTrack({ label: 'Voice', type: 'voice', color: AUDIO_TRACK_COLORS.voice });
+        EditorState.audioTracks.unshift(voiceTrack);
+    }
 
-    // Store audio info in state
-    EditorState.audio = {
-        file: audioFileName,
-        path: audioPath,
-        duration: stagedData?.audio?.duration || 0,
-        loaded: false
-    };
+    // Stop previous element if any
+    if (voiceTrack.element) { voiceTrack.element.pause(); voiceTrack.element.src = ''; }
+
+    const audio = new Audio(audioPath);
+    voiceTrack.element = audio;
+    voiceTrack.file = audioFileName;
+    voiceTrack.path = audioPath;
+    voiceTrack.duration = stagedData?.audio?.duration || 0;
+    voiceTrack.loaded = false;
+    voiceTrack.error = false;
+
+    // Legacy compat
+    EditorState.audioElement = audio;
+    EditorState.audio = voiceTrack;
 
     // When audio metadata is loaded, get the duration
     audio.addEventListener('loadedmetadata', () => {
-        EditorState.audio.duration = audio.duration;
-        EditorState.audio.loaded = true;
+        voiceTrack.duration = audio.duration;
+        voiceTrack.loaded = true;
 
         // Restore saved audio trim duration if available
         if (EditorState.savedAudioSettings?.trimmedDuration) {
-            EditorState.audio.trimmedDuration = EditorState.savedAudioSettings.trimmedDuration;
-            console.log('Restored audio trim duration:', EditorState.audio.trimmedDuration);
+            voiceTrack.trimmedDuration = EditorState.savedAudioSettings.trimmedDuration;
+            console.log('Restored audio trim duration:', voiceTrack.trimmedDuration);
         }
 
         // Extend last scene to fill any trailing gap between segments and actual audio end.
-        // Segmenter segments may end before the audio file's true duration (trailing silence).
-        const audioDur = EditorState.audio.trimmedDuration || audio.duration;
+        const audioDur = voiceTrack.trimmedDuration || audio.duration;
         const scenesDur = getScenesDuration();
         if (EditorState.scenes.length > 0 && audioDur > scenesDur + 0.05) {
             const lastScene = EditorState.scenes[EditorState.scenes.length - 1];
@@ -1699,8 +1791,8 @@ function loadDefaultAudio(stagedData) {
         }
 
         recalculateDuration();
-        renderAudioTrack();
-        showToast('Audio loaded: ' + formatTimestamp(EditorState.audio.trimmedDuration || audio.duration), 'success');
+        renderAllAudioTracks();
+        showToast('Audio loaded: ' + formatTimestamp(voiceTrack.trimmedDuration || audio.duration), 'success');
     });
 
     audio.addEventListener('error', (e) => {
@@ -1708,7 +1800,6 @@ function loadDefaultAudio(stagedData) {
 
         // Try alternative extension before failing
         if (!stagedData?._triedAltExtensionFallback && !stagedData?.audio?.url) {
-            const projectId = EditorState.project?.id || 'default';
             const altFileName = audioFileName.endsWith('.wav')
                 ? audioFileName.replace('.wav', '.mp3')
                 : audioFileName.replace('.mp3', '.wav');
@@ -1721,9 +1812,9 @@ function loadDefaultAudio(stagedData) {
             return;
         }
 
-        EditorState.audio.loaded = false;
-        EditorState.audio.error = true;
-        renderAudioTrack();
+        voiceTrack.loaded = false;
+        voiceTrack.error = true;
+        renderAllAudioTracks();
 
         // Only show toast if we aren't about to successfully load from picker
         if (stagedData?._triedAltExtensionFallback) {
@@ -1732,32 +1823,39 @@ function loadDefaultAudio(stagedData) {
     });
 
     // Initial render (before duration is known)
-    renderAudioTrack();
+    renderAllAudioTracks();
 }
 
 /**
  * Load audio from a URL (used by TTS picker and other sources)
+ * Updates the voice track in audioTracks[].
  */
 function loadAudioFromURL(audioPath, audioFileName, hintDuration) {
-    // Stop any existing audio
-    if (EditorState.audioElement) {
-        EditorState.audioElement.pause();
-        EditorState.audioElement.src = '';
+    // Create or reuse voice track
+    let voiceTrack = getVoiceTrack();
+    if (!voiceTrack) {
+        voiceTrack = createAudioTrack({ label: 'Voice', type: 'voice', color: AUDIO_TRACK_COLORS.voice });
+        EditorState.audioTracks.unshift(voiceTrack);
     }
 
-    const audio = new Audio(audioPath);
-    EditorState.audioElement = audio;
+    // Stop previous element
+    if (voiceTrack.element) { voiceTrack.element.pause(); voiceTrack.element.src = ''; }
 
-    EditorState.audio = {
-        file: audioFileName,
-        path: audioPath,
-        duration: hintDuration || 0,
-        loaded: false
-    };
+    const audio = new Audio(audioPath);
+    voiceTrack.element = audio;
+    voiceTrack.file = audioFileName;
+    voiceTrack.path = audioPath;
+    voiceTrack.duration = hintDuration || 0;
+    voiceTrack.loaded = false;
+    voiceTrack.error = false;
+
+    // Legacy compat
+    EditorState.audioElement = audio;
+    EditorState.audio = voiceTrack;
 
     audio.addEventListener('loadedmetadata', () => {
-        EditorState.audio.duration = audio.duration;
-        EditorState.audio.loaded = true;
+        voiceTrack.duration = audio.duration;
+        voiceTrack.loaded = true;
 
         const audioDur = audio.duration;
         const scenesDur = getScenesDuration();
@@ -1768,19 +1866,19 @@ function loadAudioFromURL(audioPath, audioFileName, hintDuration) {
         }
 
         recalculateDuration();
-        renderAudioTrack();
+        renderAllAudioTracks();
         saveProjectEdits();
         showToast('Audio loaded: ' + formatTimestamp(audio.duration), 'success');
     });
 
     audio.addEventListener('error', () => {
-        EditorState.audio.loaded = false;
-        EditorState.audio.error = true;
-        renderAudioTrack();
+        voiceTrack.loaded = false;
+        voiceTrack.error = true;
+        renderAllAudioTracks();
         showToast(`Audio not found: ${audioFileName}`, 'warning');
     });
 
-    renderAudioTrack();
+    renderAllAudioTracks();
 }
 
 // Listen for audio load requests from the TTS picker
@@ -1920,6 +2018,251 @@ function startAudioResize(startEvent) {
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+}
+
+// ---------------------------------------------------------------------------
+// Universal Audio Track Renderer
+// ---------------------------------------------------------------------------
+
+/**
+ * Render all audio tracks into #audio-tracks-container.
+ * Replaces both renderAudioTrack() and renderBgMusicTrack().
+ */
+function renderAllAudioTracks() {
+    const container = document.getElementById('audio-tracks-container');
+    if (!container) return;
+
+    const tracks = EditorState.audioTracks;
+    if (!tracks.length) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const pps = EditorState.pixelsPerSecond * EditorState.zoomLevel;
+    const timelineDur = getTotalDuration() || EditorState.project?.totalDuration || 60;
+
+    container.innerHTML = tracks.map(track => {
+        const isVoice = track.type === 'voice';
+        const color = track.color || AUDIO_TRACK_COLORS[track.type] || AUDIO_TRACK_COLORS.voice;
+        const trackLabel = track.label || (isVoice ? 'Voice' : track.type === 'music' ? 'Music' : 'FX');
+
+        // Build clip HTML
+        let clipHTML;
+        if (track.file) {
+            const duration = isVoice
+                ? (track.trimmedDuration || (track.loaded ? track.duration : (EditorState.project?.totalDuration || 0)))
+                : (track.trimmedDuration || (track.loop ? timelineDur : track.duration));
+            const width = duration * pps;
+            const errorClass = track.error ? 'audio-clip-universal-error' : '';
+            const statusText = track.error ? '(not found)' : formatTimestamp(duration);
+
+            // Music icon for music tracks, waveform icon for voice/fx
+            const icon = track.type === 'music'
+                ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:0.5"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><path d="M8 17.5V5l12-2v12.5"/></svg>`
+                : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:0.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+
+            clipHTML = `
+                <div class="audio-clip-universal ${errorClass}" data-track-id="${track.id}" style="width:${width}px; border-left: 3px solid ${color};">
+                    ${icon}
+                    <span class="audio-clip-name">${track.file}</span>
+                    <span class="audio-clip-duration">${statusText}</span>
+                    <div class="audio-resize-handle-universal" data-track-id="${track.id}"></div>
+                </div>`;
+        } else {
+            clipHTML = `<div class="audio-placeholder" style="opacity:0.3; font-size:0.55rem; padding:0 8px; font-style:italic; color:var(--text-muted)">Click + to add ${isVoice ? 'voice audio' : 'audio'}</div>`;
+        }
+
+        // Speaker icon (for volume popup)
+        const mutedClass = track.muted ? ' muted' : '';
+        const speakerIcon = track.muted
+            ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`
+            : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.08"/></svg>`;
+
+        // Remove button (only for non-voice tracks)
+        const removeBtn = !isVoice
+            ? `<button class="audio-track-remove-btn" data-track-id="${track.id}" title="Remove track">&times;</button>`
+            : '';
+
+        return `
+            <div class="track" data-track="audio-${track.id}" data-audio-track-id="${track.id}">
+                <div class="track-header" style="display:flex; align-items:center; gap:2px;">
+                    <button class="audio-track-speaker-btn${mutedClass}" data-track-id="${track.id}" title="${trackLabel} — Vol ${Math.round(track.volume * 100)}%">
+                        ${speakerIcon}
+                    </button>
+                    ${removeBtn}
+                </div>
+                <div class="track-content" style="display:flex; align-items:center; min-height:28px;">
+                    ${clipHTML}
+                </div>
+            </div>`;
+    }).join('');
+
+    // Wire up resize handles
+    setupAllAudioResizeHandlers();
+
+    // Wire up speaker buttons (volume popup)
+    container.querySelectorAll('.audio-track-speaker-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const trackId = btn.dataset.trackId;
+            toggleVolumePopup(trackId, btn);
+        });
+    });
+
+    // Wire up remove buttons
+    container.querySelectorAll('.audio-track-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const trackId = btn.dataset.trackId;
+            removeAudioTrack(trackId);
+        });
+    });
+}
+
+/**
+ * Setup resize handlers for all audio track clips
+ */
+function setupAllAudioResizeHandlers() {
+    document.querySelectorAll('.audio-resize-handle-universal').forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+            const trackId = handle.dataset.trackId;
+            const track = getAudioTrackById(trackId);
+            if (!track || (!track.loaded && track.type === 'voice')) return;
+            startUniversalAudioResize(e, track);
+        });
+    });
+}
+
+/**
+ * Generic audio resize for any track
+ */
+function startUniversalAudioResize(startEvent, track) {
+    const startX = startEvent.clientX;
+    const timelineDur = getTotalDuration() || 60;
+    const startDuration = track.trimmedDuration || (track.loop ? timelineDur : track.duration);
+    const maxDuration = track.loop ? 3600 : (track.duration || 600); // looping tracks can extend up to 1hr
+
+    const clip = document.querySelector(`.audio-clip-universal[data-track-id="${track.id}"]`);
+    const durationSpan = clip?.querySelector('.audio-clip-duration');
+
+    const onMouseMove = (e) => {
+        const deltaX = e.clientX - startX;
+        const deltaDuration = pixelsToTime(deltaX);
+
+        let newDuration = Math.max(1, Math.min(maxDuration, startDuration + deltaDuration));
+        newDuration = Math.round(newDuration * 2) / 2; // snap 0.5s
+
+        track.trimmedDuration = newDuration;
+
+        if (clip) clip.style.width = `${timeToPixels(newDuration)}px`;
+        if (durationSpan) durationSpan.textContent = formatTimestamp(newDuration);
+    };
+
+    const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        const newDuration = track.trimmedDuration || track.duration;
+        if (newDuration !== startDuration) {
+            recordEdit(`Resize ${track.label} duration`, track.id, 'trimmedDuration', startDuration, newDuration);
+        }
+        recalculateDuration();
+        renderTimeRuler();
+        if (EditorState.preview) EditorState.preview.setDuration(getTotalDuration());
+        showToast(`${track.label} duration: ${formatTimestamp(newDuration)}`, 'info');
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+}
+
+/**
+ * Toggle volume popup for a given audio track
+ */
+function toggleVolumePopup(trackId, anchorBtn) {
+    const track = getAudioTrackById(trackId);
+    if (!track) return;
+
+    // Close any existing popup
+    const existing = document.querySelector('.volume-popup');
+    if (existing) {
+        const existingTrackId = existing.dataset.trackId;
+        existing.remove();
+        if (existingTrackId === trackId) return; // was toggling same popup off
+    }
+
+    const popup = document.createElement('div');
+    popup.className = 'volume-popup';
+    popup.dataset.trackId = trackId;
+    popup.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; padding:8px 10px;">
+            <button class="volume-mute-toggle" title="${track.muted ? 'Unmute' : 'Mute'}" style="background:none;border:none;color:${track.muted ? 'var(--coral)' : 'var(--text)'};cursor:pointer;padding:2px;">
+                ${track.muted
+                    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'
+                    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.08"/></svg>'}
+            </button>
+            <input type="range" class="volume-slider" min="0" max="100" value="${Math.round(track.volume * 100)}" style="width:90px; accent-color:${track.color || 'var(--accent)'};">
+            <span class="volume-label" style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted); min-width:28px; text-align:right;">${Math.round(track.volume * 100)}%</span>
+        </div>
+    `;
+
+    // Position popup near the speaker button
+    const rect = anchorBtn.getBoundingClientRect();
+    popup.style.position = 'fixed';
+    popup.style.left = `${rect.right + 4}px`;
+    popup.style.top = `${rect.top - 4}px`;
+    popup.style.zIndex = '200';
+    document.body.appendChild(popup);
+
+    // Wire slider
+    const slider = popup.querySelector('.volume-slider');
+    const label = popup.querySelector('.volume-label');
+    slider.addEventListener('input', () => {
+        const vol = parseInt(slider.value) / 100;
+        track.volume = vol;
+        if (track.element) track.element.volume = track.muted ? 0 : vol;
+        label.textContent = `${slider.value}%`;
+        anchorBtn.title = `${track.label} — Vol ${slider.value}%`;
+    });
+
+    // Wire mute toggle
+    popup.querySelector('.volume-mute-toggle').addEventListener('click', () => {
+        track.muted = !track.muted;
+        if (track.element) track.element.muted = track.muted;
+        popup.remove();
+        renderAllAudioTracks();
+    });
+
+    // Close on click outside
+    const closeHandler = (e) => {
+        if (!popup.contains(e.target) && e.target !== anchorBtn && !anchorBtn.contains(e.target)) {
+            popup.remove();
+            document.removeEventListener('mousedown', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('mousedown', closeHandler), 0);
+}
+
+/**
+ * Remove an audio track by ID (voice track is protected)
+ */
+function removeAudioTrack(trackId) {
+    const track = getAudioTrackById(trackId);
+    if (!track) return;
+    if (track.type === 'voice') {
+        showToast('Cannot remove voice track', 'warning');
+        return;
+    }
+    if (track.element) {
+        track.element.pause();
+        track.element.src = '';
+    }
+    EditorState.audioTracks = EditorState.audioTracks.filter(t => t.id !== trackId);
+    recalculateDuration();
+    renderAllAudioTracks();
+    renderTimeRuler();
+    showToast(`${track.label} removed`, 'info');
 }
 
 /**
@@ -2134,7 +2477,7 @@ function setupCaptionControls() {
             subtitle_bar: { font_family: 'Inter', font_size: 48, font_weight: '600', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 85, animation: 'none', text_transform: 'none', bg_bar: true },
             karaoke: { font_family: 'Bebas Neue', font_size: 72, font_weight: '400', color: '#FFFFFF', stroke_color: '#000000', stroke_width: 3, position_y: 70, animation: 'none', text_transform: 'uppercase', highlight: true },
             minimal: { font_family: 'DM Sans', font_size: 42, font_weight: '500', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 80, animation: 'none', text_transform: 'none' },
-            single_line: { font_family: 'Bebas Neue', font_size: 80, font_weight: '900', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, background: 'none', position_y: 81, animation: 'hard_cut', text_transform: 'uppercase', letter_spacing: -0.03, blend_mode: 'difference', shadow_color: 'rgba(0,0,0,1.00)', shadow_blur: 6, shadow_offset_x: 3, shadow_offset_y: 3, diff_strength: 0.59, overlay_strength: 0.37, overlay_color: '#ffffff' },
+            single_line: { font_family: 'Montserrat', font_size: 64, font_weight: '900', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, background: 'none', position_y: 81, animation: 'hard_cut', text_transform: 'uppercase', letter_spacing: -0.03, blend_mode: 'difference', shadow_color: 'rgba(0,0,0,1.00)', shadow_blur: 6, shadow_offset_x: 3, shadow_offset_y: 3, diff_strength: 0.59, overlay_strength: 0.37, overlay_color: '#ffffff' },
         };
         const p = PRESETS[presetSel.value];
         if (p && EditorState.captionData) {
@@ -2181,7 +2524,10 @@ function _capSyncStyleUI() {
     if (!style) return;
     const s = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
     s('cap-ed-preset', style.preset || 'bold_popup');
-    s('cap-ed-font', style.font_family || 'Montserrat');
+
+    // Rebuild font dropdown with correct selection (ensures preset fonts appear even if not in registry)
+    const fontSel = document.getElementById('cap-ed-font');
+    if (fontSel) buildFontOptions(fontSel, style.font_family || 'Montserrat');
     s('cap-ed-size', style.font_size || 64);
     s('cap-ed-color', style.color || '#FFFFFF');
     s('cap-ed-stroke', style.stroke_color || '#000000');
@@ -2395,7 +2741,7 @@ function recalculateDuration() {
 
     updateProjectInfo();
     updateTimeScrubber();
-    renderAudioTrack();
+    renderAllAudioTracks();
     renderTimeRuler();
 }
 
@@ -2692,10 +3038,28 @@ function renderTimeRuler() {
     if (!elements.timeRuler) return;
 
     const totalSeconds = getTotalDuration();
-    const interval = EditorState.zoomLevel >= 1 ? 5 : 10; // Show markers every 5s or 10s
+    const pps = EditorState.pixelsPerSecond * EditorState.zoomLevel;
+
+    // Adaptive tick intervals based on effective pixels-per-second
+    let majorInterval, minorInterval;
+    if (pps >= 80) { majorInterval = 1; minorInterval = 0.5; }
+    else if (pps >= 40) { majorInterval = 2; minorInterval = 1; }
+    else if (pps >= 20) { majorInterval = 5; minorInterval = 1; }
+    else if (pps >= 10) { majorInterval = 10; minorInterval = 5; }
+    else { majorInterval = 30; minorInterval = 10; }
+
     let markers = '';
 
-    for (let t = 0; t <= totalSeconds; t += interval) {
+    // Minor ticks
+    for (let t = 0; t <= totalSeconds; t += minorInterval) {
+        // Skip positions that coincide with major ticks
+        if (Math.abs(t % majorInterval) < 0.001 || Math.abs(t % majorInterval - majorInterval) < 0.001) continue;
+        const left = timeToPixels(t);
+        markers += `<span class="time-tick-minor" style="left:${left}px"></span>`;
+    }
+
+    // Major ticks with labels
+    for (let t = 0; t <= totalSeconds; t += majorInterval) {
         const left = timeToPixels(t);
         markers += `<span class="time-marker" style="left: ${left}px">${formatTimestamp(t)}</span>`;
     }
@@ -3082,6 +3446,141 @@ function setupEventListeners() {
             updatePreviewFromDisabledTracks();
         });
     });
+
+    // Add Track row — click anywhere on the row to show dropdown
+    const addTrackRow = document.getElementById('add-track-row');
+    addTrackRow?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showAddTrackMenu(addTrackRow);
+    });
+}
+
+/**
+ * Show dropdown menu for adding a new audio track
+ */
+function showAddTrackMenu(anchor) {
+    // Close any existing menu
+    document.querySelector('.add-track-menu')?.remove();
+
+    const rect = anchor.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.className = 'add-track-menu';
+    menu.style.left = `${rect.left + 36}px`;
+    menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+
+    menu.innerHTML = `
+        <button class="add-track-menu-item" data-action="music">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.9)" stroke-width="1.5">
+                <circle cx="5.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/>
+                <path d="M8 17.5V5l12-2v12.5"/>
+            </svg>
+            Music
+        </button>
+        <button class="add-track-menu-item" data-action="fx">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,183,77,0.9)" stroke-width="1.5">
+                <path d="M2 12h4l3-9 4 18 3-9h4"/>
+            </svg>
+            Sound FX
+        </button>
+        <button class="add-track-menu-item" data-action="upload">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Upload File
+        </button>
+    `;
+
+    document.body.appendChild(menu);
+
+    // Handle menu clicks
+    menu.querySelectorAll('.add-track-menu-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = item.dataset.action;
+            menu.remove();
+
+            if (action === 'music') {
+                // Open music picker
+                const dialog = document.getElementById('music-picker-dialog');
+                if (dialog) {
+                    dialog.classList.remove('hidden');
+                    dialog.style.display = 'flex';
+                    fetch('/api/music/library').then(r => r.json()).then(files => {
+                        renderMusicList(files);
+                    }).catch(() => {});
+                }
+            } else if (action === 'fx') {
+                // Create an empty FX track
+                const fxTrack = createAudioTrack({
+                    label: `FX ${EditorState.audioTracks.filter(t => t.type === 'fx').length + 1}`,
+                    type: 'fx',
+                    color: AUDIO_TRACK_COLORS.fx,
+                    volume: 1.0,
+                });
+                EditorState.audioTracks.push(fxTrack);
+                renderAllAudioTracks();
+                showToast('FX track added — drop an audio file to populate', 'info');
+            } else if (action === 'upload') {
+                // File picker for any audio
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.mp3,.wav,.ogg,.m4a,.aac';
+                input.onchange = () => {
+                    if (!input.files?.length) return;
+                    _handleAudioFileUpload(input.files[0]);
+                };
+                input.click();
+            }
+        });
+    });
+
+    // Close on click outside
+    const closeHandler = (e) => {
+        if (!menu.contains(e.target) && !anchor.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('mousedown', closeHandler);
+        }
+    };
+    setTimeout(() => document.addEventListener('mousedown', closeHandler), 0);
+}
+
+/**
+ * Handle audio file upload — creates a new audio track with the uploaded file
+ */
+async function _handleAudioFileUpload(file) {
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+        const res = await fetch('/api/music/upload', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        // Add as a new audio track
+        const ext = file.name.split('.').pop().toLowerCase();
+        const type = ['mp3', 'wav', 'ogg', 'm4a', 'aac'].includes(ext) ? 'fx' : 'fx';
+        const track = createAudioTrack({
+            label: file.name.replace(/\.[^.]+$/, ''),
+            type: type,
+            file: data.filename || file.name,
+            path: data.path || `/output/music/${file.name}`,
+            volume: 1.0,
+            color: AUDIO_TRACK_COLORS[type],
+            loaded: true,
+        });
+        const audio = new Audio(track.path);
+        audio.volume = track.volume;
+        track.element = audio;
+        audio.addEventListener('loadedmetadata', () => {
+            track.duration = audio.duration;
+            track.loaded = true;
+            renderAllAudioTracks();
+        });
+        EditorState.audioTracks.push(track);
+        renderAllAudioTracks();
+        showToast(`Added: ${file.name}`, 'success');
+    } catch (e) {
+        showToast('Upload failed: ' + e.message, 'error');
+    }
 }
 
 /**
@@ -3097,22 +3596,15 @@ function updatePreviewFromDisabledTracks() {
         }
     }
 
-    // 2. Audio track disabled - Mute/Unmute main audio
-    if (EditorState.audioElement) {
-        if (EditorState.disabledTracks.has('audio') || EditorState.isMuted) {
-            EditorState.audioElement.muted = true;
-        } else {
-            EditorState.audioElement.muted = false;
-        }
-    }
-
-    // 3. Background Music disabled - Mute/Unmute bg music
-    if (EditorState.bgMusicElement) {
-        if (EditorState.disabledTracks.has('bgmusic') || EditorState.isMuted) {
-            EditorState.bgMusicElement.muted = true;
-        } else {
-            EditorState.bgMusicElement.muted = false;
-        }
+    // 2. Audio tracks — mute/unmute based on global mute or per-track disable
+    for (const track of EditorState.audioTracks) {
+        if (!track.element) continue;
+        const trackKey = `audio-${track.id}`;
+        const globalMuted = EditorState.isMuted;
+        const trackDisabled = EditorState.disabledTracks.has(trackKey)
+            || EditorState.disabledTracks.has('audio')   // legacy: mute all audio
+            || EditorState.disabledTracks.has('bgmusic'); // legacy: mute music
+        track.element.muted = globalMuted || trackDisabled || track.muted;
     }
 
     // 4. Caption track disabled - Hide/Show captions in preview
@@ -3338,10 +3830,12 @@ function togglePlayback() {
 function skipToStart() {
     EditorState.playbackPosition = 0;
     if (EditorState.preview) EditorState.preview.seek(0);
-    if (EditorState.audioElement) EditorState.audioElement.currentTime = 0;
-    if (EditorState.bgMusicElement) EditorState.bgMusicElement.currentTime = 0;
+    seekAudio(0);
     updatePlayhead();
     updateTimeScrubber();
+
+    // Scroll timeline to start
+    if (elements.timelineTracks) elements.timelineTracks.scrollLeft = 0;
 }
 
 /**
@@ -3356,9 +3850,16 @@ function skipToEnd() {
 
     EditorState.playbackPosition = Math.max(0, totalDuration - 0.01);
     if (EditorState.preview) EditorState.preview.seek(EditorState.playbackPosition);
-    if (EditorState.audioElement) EditorState.audioElement.currentTime = Math.min(EditorState.playbackPosition, EditorState.audioElement.duration || 999);
+    seekAudio(EditorState.playbackPosition);
     updatePlayhead();
     updateTimeScrubber();
+
+    // Scroll timeline so the end is visible
+    if (elements.timelineTracks) {
+        const pixelPos = timeToPixels(totalDuration);
+        const containerWidth = elements.timelineTracks.clientWidth;
+        elements.timelineTracks.scrollLeft = Math.max(0, pixelPos - containerWidth + TRACK_BASE_OFFSET + 40);
+    }
 }
 
 /**
@@ -3418,12 +3919,9 @@ function toggleLoop() {
 function toggleMute() {
     EditorState.isMuted = !EditorState.isMuted;
 
-    // Apply mute to audio elements
-    if (EditorState.audioElement) {
-        EditorState.audioElement.muted = EditorState.isMuted;
-    }
-    if (EditorState.bgMusicElement) {
-        EditorState.bgMusicElement.muted = EditorState.isMuted;
+    // Apply mute to all audio track elements
+    for (const track of EditorState.audioTracks) {
+        if (track.element) track.element.muted = EditorState.isMuted || track.muted;
     }
 
     // Update button icon
@@ -3460,39 +3958,60 @@ function updateVolumeIcon() {
  * Sync audio with current playback state
  */
 function syncAudioPlayback() {
-    if (!EditorState.audioElement || !EditorState.audio?.loaded) return;
+    const voiceTrack = getVoiceTrack();
 
     if (EditorState.isPlaying) {
-        // Always sync time when starting playback
-        EditorState.audioElement.currentTime = EditorState.playbackPosition;
-        EditorState.audioElement.play().catch(e => console.warn('Audio play failed:', e));
+        // Play all audio tracks
+        const voicePlaying = voiceTrack?.loaded && voiceTrack.element && !voiceTrack.muted;
 
-        // Sync bgMusic
-        if (EditorState.bgMusicElement && EditorState.bgMusic) {
-            EditorState.bgMusicElement.currentTime = EditorState.playbackPosition % (EditorState.bgMusic.duration || 999);
-            EditorState.bgMusicElement.play().catch(() => { });
+        for (const track of EditorState.audioTracks) {
+            if (!track.element || !track.file) continue;
+            if (track.muted) { track.element.pause(); continue; }
+
+            // Determine effective end time for this track
+            const trackEnd = track.trimmedDuration || track.duration || Infinity;
+
+            if (track.loop) {
+                track.element.currentTime = EditorState.playbackPosition % (track.duration || 999);
+            } else {
+                // Don't play past trimmed/actual duration
+                if (EditorState.playbackPosition >= trackEnd) {
+                    track.element.pause();
+                    continue;
+                }
+                track.element.currentTime = EditorState.playbackPosition;
+            }
+
+            // Apply ducking on music tracks when voice is playing
+            if (track.type === 'music' && track.duckingEnabled && voicePlaying) {
+                track.element.volume = Math.min(track.duckingLevel || 0.03, track.volume);
+            } else {
+                track.element.volume = track.volume;
+            }
+
+            track.element.play().catch(() => {});
         }
 
-        // Use audio as master clock for perfect sync, fallback to system time if audio ends but timeline is longer
+        // Use voice track as master clock for preview sync
         if (EditorState.preview) {
             const startSysTime = performance.now();
             const startPlayPos = EditorState.playbackPosition;
             EditorState.preview.setTimeSource(() => {
-                const audioEnd = EditorState.audioElement ? (EditorState.audioElement.duration || 0) : 0;
-                const audioTrimEnd = EditorState.audio?.loaded ? (EditorState.audio.trimmedDuration || audioEnd) : audioEnd;
-
                 const timeFromStart = startPlayPos + (performance.now() - startSysTime) / 1000;
-
-                if (EditorState.audioElement && EditorState.audioElement.currentTime < audioTrimEnd && !EditorState.audioElement.paused) {
-                    return EditorState.audioElement.currentTime;
-                } else {
-                    return timeFromStart;
+                if (voiceTrack?.element && voiceTrack.loaded && !voiceTrack.element.paused) {
+                    const audioTrimEnd = voiceTrack.trimmedDuration || voiceTrack.element.duration || 0;
+                    if (voiceTrack.element.currentTime < audioTrimEnd) {
+                        return voiceTrack.element.currentTime;
+                    }
                 }
+                return timeFromStart;
             });
         }
     } else {
-        EditorState.audioElement.pause();
-        if (EditorState.bgMusicElement) EditorState.bgMusicElement.pause();
+        // Pause all tracks
+        for (const track of EditorState.audioTracks) {
+            if (track.element) track.element.pause();
+        }
 
         // Clear external time source when paused
         if (EditorState.preview) {
@@ -3505,11 +4024,13 @@ function syncAudioPlayback() {
  * Seek audio to specific time
  */
 function seekAudio(time) {
-    if (EditorState.audioElement && EditorState.audio?.loaded) {
-        EditorState.audioElement.currentTime = Math.min(time, EditorState.audioElement.duration || 999);
-    }
-    if (EditorState.bgMusicElement && EditorState.bgMusic) {
-        EditorState.bgMusicElement.currentTime = time % (EditorState.bgMusic.duration || 999);
+    for (const track of EditorState.audioTracks) {
+        if (!track.element) continue;
+        if (track.loop) {
+            track.element.currentTime = time % (track.duration || 999);
+        } else {
+            track.element.currentTime = Math.min(time, track.element.duration || 999);
+        }
     }
 }
 
@@ -3603,7 +4124,7 @@ function updateZoom() {
     }
     renderTimeline();
     renderTimeRuler();
-    renderAudioTrack();
+    renderAllAudioTracks();
 
     // Keep playhead visible after zoom by scrolling to current position
     if (elements.timelineTracks) {
@@ -3843,19 +4364,23 @@ function getExportData() {
     console.log('[Editor] Scenes:', EditorState.scenes?.length);
     console.log('[Editor] Selected profile:', EditorState.selectedExportProfile);
 
-    // Prepare audio config if audio is loaded
-    const audioConfig = EditorState.audio?.loaded ? {
-        file: EditorState.audio.file,
-        path: EditorState.audio.path,
-        duration: EditorState.audio.duration,
-        trimmedDuration: EditorState.audio.trimmedDuration,
-        volume: 1.0,
+    // Prepare audio config from voice track
+    const voiceTrack = getVoiceTrack();
+    const audioConfig = voiceTrack?.loaded ? {
+        file: voiceTrack.file,
+        path: voiceTrack.path,
+        duration: voiceTrack.duration,
+        trimmedDuration: voiceTrack.trimmedDuration,
+        volume: voiceTrack.volume || 1.0,
         start_offset: 0
     } : null;
 
+    // Find first music track for legacy bgMusic export
+    const firstMusicTrack = EditorState.audioTracks.find(t => t.type === 'music');
+
     console.log('[Editor] Audio config:', audioConfig ? { file: audioConfig.file, path: audioConfig.path, dur: audioConfig.duration } : 'none');
     console.log('[Editor] Captions enabled:', EditorState.captionsEnabled, '| entries:', EditorState.captionData?.captions?.length || 0);
-    console.log('[Editor] BgMusic:', EditorState.bgMusic ? { file: EditorState.bgMusic.file, vol: EditorState.bgMusic.volume } : 'none');
+    console.log('[Editor] Music tracks:', EditorState.audioTracks.filter(t => t.type === 'music').length);
 
     // Prepare export data with selected profile and bgMusic
     const profile = EXPORT_PROFILES[EditorState.selectedExportProfile] || EXPORT_PROFILES.yt_shorts;
@@ -3884,7 +4409,7 @@ function getExportData() {
         audioConfig,
         EditorState.captionsEnabled && !EditorState.disabledTracks.has('caption') ? EditorState.captionData : null,
         profile,
-        EditorState.disabledTracks.has('bgmusic') ? null : EditorState.bgMusic
+        firstMusicTrack || null
     );
 
     console.log('[Editor] Export data prepared:', data.scenes?.length, 'scenes,', data.timeline?.total_duration + 's total');
@@ -4085,6 +4610,10 @@ function showExportComplete(downloadUrl) {
         elements.downloadExportBtn.classList.remove('hidden');
     }
     showToast('Export completed!', 'success');
+    // Sound check — iframe reads parent's localStorage setting
+    if (localStorage.getItem('sts_sound_enabled') !== 'false') {
+        try { new Audio('/assets/sounds/effects/done.mp3').play(); } catch (_) {}
+    }
 }
 
 /**
@@ -4260,61 +4789,54 @@ function renderMusicList(files) {
 }
 
 window.selectBgMusic = function (filename, path, duration) {
-    EditorState.bgMusic = {
+    // Create a new music track via the universal audio track system
+    const musicTrack = createAudioTrack({
+        label: `Music ${EditorState.audioTracks.filter(t => t.type === 'music').length + 1}`,
+        type: 'music',
         file: filename,
         path: path,
         duration: duration,
-        volume: 0.15,
+        volume: 0.08,
+        loop: true,
         duckingEnabled: true,
-        duckingLevel: 0.08,
+        duckingLevel: 0.03,
         fadeIn: 2.0,
         fadeOut: 3.0,
-        loop: true
-    };
+        color: AUDIO_TRACK_COLORS.music,
+        loaded: true,
+    });
 
     // Create audio element
-    if (EditorState.bgMusicElement) {
-        EditorState.bgMusicElement.pause();
-        EditorState.bgMusicElement = null;
-    }
     const audio = new Audio(path);
-    audio.volume = EditorState.bgMusic.volume;
+    audio.volume = musicTrack.volume;
     audio.loop = true;
+    musicTrack.element = audio;
+
+    // Update duration when metadata loads
+    audio.addEventListener('loadedmetadata', () => {
+        musicTrack.duration = audio.duration;
+        musicTrack.loaded = true;
+        renderAllAudioTracks();
+    });
+
+    EditorState.audioTracks.push(musicTrack);
+
+    // Legacy compat — keep bgMusic/bgMusicElement pointing at latest music track
+    EditorState.bgMusic = musicTrack;
     EditorState.bgMusicElement = audio;
 
-    renderBgMusicTrack();
+    renderAllAudioTracks();
     window.editorCloseMusicPicker();
-    showToast('Background music added', 'success');
+    showToast('Music track added', 'success');
 };
 
-function renderBgMusicTrack() {
-    const track = document.getElementById('bgmusic-track');
-    if (!track) return;
-    const m = EditorState.bgMusic;
-    if (!m) {
-        track.innerHTML = '<span class="bgmusic-placeholder">Background music</span>';
-        return;
-    }
-    const totalDur = EditorState.project?.totalDuration || 60;
-    const pps = EditorState.pixelsPerSecond * EditorState.zoomLevel;
-    const width = totalDur * pps;
-    track.innerHTML = `
-        <div class="bgmusic-clip" style="width:${width}px">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;opacity:0.5"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><path d="M8 17.5V5l12-2v12.5"/></svg>
-            <span class="bgmusic-clip-label">${m.file}</span>
-            <button class="bgmusic-remove" onclick="removeBgMusic()" title="Remove">&times;</button>
-        </div>
-    `;
-}
+// Legacy stubs — delegate to universal system
+function renderBgMusicTrack() { renderAllAudioTracks(); }
 
 window.removeBgMusic = function () {
-    if (EditorState.bgMusicElement) {
-        EditorState.bgMusicElement.pause();
-        EditorState.bgMusicElement = null;
-    }
-    EditorState.bgMusic = null;
-    renderBgMusicTrack();
-    showToast('Background music removed', 'info');
+    // Remove the first music track
+    const musicTrack = EditorState.audioTracks.find(t => t.type === 'music');
+    if (musicTrack) removeAudioTrack(musicTrack.id);
 };
 
 /**
@@ -4447,9 +4969,15 @@ function setupEffectsTab() {
     const grid = document.getElementById('fx-grid');
     if (!grid) return;
 
-    // Click on effect cards
+    // Click on effect cards — apply to selected scene, or toggle pool if clicking the dot
+    const fxCardGrid = document.getElementById('fx-card-grid');
     grid.querySelectorAll('.fx-card[data-fx]').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+            // Toggle pool membership if clicking the pool dot
+            if (e.target.closest('.fx-pool-dot')) {
+                card.classList.toggle('in-pool');
+                return;
+            }
             const scene = EditorState.selectedScene;
             if (!scene || scene.type === 'text' || scene.type === 'cta') return;
 
@@ -4461,6 +4989,10 @@ function setupEffectsTab() {
             renderSceneProperties();
         });
     });
+
+    // Toggle pool-mode on randomize button click
+    const fxRandomBtn = document.getElementById('fx-random-assign');
+    let fxPoolMode = false;
 
     // Auto-assign all
     document.getElementById('fx-auto-assign')?.addEventListener('click', () => {
@@ -4494,6 +5026,59 @@ function setupEffectsTab() {
         renderSceneProperties();
         showToast('Effects auto-assigned', 'success');
     });
+
+    // Random-assign toggle: first click enters pool selection, second click applies
+    fxRandomBtn?.addEventListener('click', () => {
+        if (!EditorState.scenes.length) return;
+
+        if (!fxPoolMode) {
+            // Enter pool selection mode — show dots, select all by default
+            fxPoolMode = true;
+            fxCardGrid.classList.add('pool-mode');
+            fxRandomBtn.classList.add('pool-active');
+            fxRandomBtn.querySelector('.fx-btn-label').textContent = 'Apply randomize';
+            // Select all non-static effects by default
+            fxCardGrid.querySelectorAll('.fx-card[data-fx]').forEach(c => {
+                if (c.dataset.fx !== 'static') c.classList.add('in-pool');
+            });
+        } else {
+            // Apply randomization from pool, then exit
+            const poolFx = Array.from(fxCardGrid.querySelectorAll('.fx-card.in-pool[data-fx]'))
+                .map(c => c.dataset.fx);
+
+            if (!poolFx.length) {
+                showToast('No effects selected — click dots to pick effects', 'info');
+                return;
+            }
+
+            let lastFx = '';
+            EditorState.scenes.forEach(scene => {
+                const old = scene.visual_fx;
+                if (scene.type === 'text' || scene.type === 'cta') {
+                    scene.visual_fx = 'static';
+                } else {
+                    let fx;
+                    do { fx = poolFx[Math.floor(Math.random() * poolFx.length)]; } while (fx === lastFx && poolFx.length > 1);
+                    lastFx = fx;
+                    scene.visual_fx = fx;
+                }
+                if (old !== scene.visual_fx) {
+                    recordEdit(`Random effect (Scene ${scene.id})`, scene.id, 'visual_fx', old, scene.visual_fx);
+                }
+            });
+
+            // Exit pool mode
+            fxPoolMode = false;
+            fxCardGrid.classList.remove('pool-mode');
+            fxRandomBtn.classList.remove('pool-active');
+            fxRandomBtn.querySelector('.fx-btn-label').textContent = 'Randomize all scenes';
+            fxCardGrid.querySelectorAll('.fx-card').forEach(c => c.classList.remove('in-pool'));
+
+            updateEffectsTab();
+            renderSceneProperties();
+            showToast(`Effects randomized (${poolFx.length} in pool)`, 'success');
+        }
+    });
 }
 
 function updateEffectsTab() {
@@ -4525,9 +5110,14 @@ function setupTransitionsTab() {
     const durationSlider = document.getElementById('tr-duration-slider');
     const durationValue = document.getElementById('tr-duration-value');
 
-    // Click on transition cards
+    // Click on transition cards — apply to selected scene, or toggle pool if clicking the dot
+    const trCardGrid = document.getElementById('tr-card-grid');
     grid.querySelectorAll('.fx-card[data-tr]').forEach(card => {
-        card.addEventListener('click', () => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.fx-pool-dot')) {
+                card.classList.toggle('in-pool');
+                return;
+            }
             const scene = EditorState.selectedScene;
             if (!scene) return;
 
@@ -4543,6 +5133,10 @@ function setupTransitionsTab() {
             updateTransitionsTab();
         });
     });
+
+    // Toggle pool-mode on randomize button click
+    const trRandomBtn = document.getElementById('tr-random-assign');
+    let trPoolMode = false;
 
     // Duration slider
     durationSlider?.addEventListener('input', (e) => {
@@ -4582,6 +5176,60 @@ function setupTransitionsTab() {
 
         updateTransitionsTab();
         showToast('Transitions auto-assigned', 'success');
+    });
+
+    // Random-assign toggle: first click enters pool selection, second click applies
+    trRandomBtn?.addEventListener('click', () => {
+        if (!EditorState.scenes.length) return;
+
+        if (!trPoolMode) {
+            // Enter pool selection mode
+            trPoolMode = true;
+            trCardGrid.classList.add('pool-mode');
+            trRandomBtn.classList.add('pool-active');
+            trRandomBtn.querySelector('.fx-btn-label').textContent = 'Apply randomize';
+            // Select all non-none transitions by default
+            trCardGrid.querySelectorAll('.fx-card[data-tr]').forEach(c => {
+                if (c.dataset.tr !== 'none') c.classList.add('in-pool');
+            });
+        } else {
+            // Apply randomization from pool, then exit
+            const poolTr = Array.from(trCardGrid.querySelectorAll('.fx-card.in-pool[data-tr]'))
+                .map(c => c.dataset.tr);
+
+            if (!poolTr.length) {
+                showToast('No transitions selected — click dots to pick transitions', 'info');
+                return;
+            }
+
+            const durations = { cut: 0, crossfade: 0.3, fade_black: 0.4 };
+            let lastTr = '';
+
+            EditorState.scenes.forEach((scene, i) => {
+                const old = scene.transition ? JSON.stringify(scene.transition) : 'none';
+                if (i >= EditorState.scenes.length - 1) {
+                    scene.transition = { type: 'none', duration: 0 };
+                } else {
+                    let tr;
+                    do { tr = poolTr[Math.floor(Math.random() * poolTr.length)]; } while (tr === lastTr && poolTr.length > 1);
+                    lastTr = tr;
+                    scene.transition = { type: tr, duration: durations[tr] || 0 };
+                }
+                if (old !== JSON.stringify(scene.transition)) {
+                    recordEdit(`Random transition (Scene ${scene.id})`, scene.id, 'transition', old, JSON.stringify(scene.transition));
+                }
+            });
+
+            // Exit pool mode
+            trPoolMode = false;
+            trCardGrid.classList.remove('pool-mode');
+            trRandomBtn.classList.remove('pool-active');
+            trRandomBtn.querySelector('.fx-btn-label').textContent = 'Randomize all scenes';
+            trCardGrid.querySelectorAll('.fx-card').forEach(c => c.classList.remove('in-pool'));
+
+            updateTransitionsTab();
+            showToast(`Transitions randomized (${poolTr.length} in pool)`, 'success');
+        }
     });
 }
 

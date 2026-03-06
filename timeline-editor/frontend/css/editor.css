@@ -344,6 +344,40 @@
     color: var(--accent);
 }
 
+.fx-card {
+    position: relative;
+}
+
+.fx-card .fx-pool-dot {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    display: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.fx-card-grid.pool-mode .fx-pool-dot {
+    display: block;
+}
+
+.fx-card.in-pool .fx-pool-dot {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 4px rgba(99, 102, 241, 0.5);
+}
+
+.fx-auto-btn.pool-active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
 .fx-card-icon {
     display: flex;
     align-items: center;
@@ -491,14 +525,14 @@
 }
 
 .bgmusic-clip {
-    position: absolute;
-    height: calc(100% - 6px);
-    top: 3px;
-    left: 0;
+    position: relative;
+    flex-shrink: 0;
+    height: 28px;
     display: flex;
     align-items: center;
     gap: 4px;
     padding: 0 6px;
+    padding-right: 16px;
     background: rgba(167, 139, 250, 0.12);
     border: 1px solid rgba(167, 139, 250, 0.3);
     border-radius: 4px;
@@ -516,6 +550,10 @@
 }
 
 .bgmusic-remove {
+    position: absolute;
+    right: 2px;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     color: rgba(167, 139, 250, 0.5);
@@ -523,11 +561,30 @@
     padding: 2px;
     font-size: 12px;
     line-height: 1;
-    margin-left: auto;
 }
 
 .bgmusic-remove:hover {
     color: var(--coral);
+}
+
+.bgmusic-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 6px;
+    height: 100%;
+    background: rgba(167, 139, 250, 0.5);
+    cursor: ew-resize;
+    border-radius: 0 4px 4px 0;
+    transition: background 0.15s;
+}
+
+.bgmusic-resize-handle:hover {
+    background: rgba(167, 139, 250, 0.9);
+}
+
+.bgmusic-resize-handle:hover {
+    background: rgba(167, 139, 250, 0.8);
 }
 
 /* ---- Media Grid (CapCut-style thumbnails) ---- */
@@ -1806,6 +1863,14 @@
     padding-bottom: 2px;
 }
 
+.time-tick-minor {
+    position: absolute;
+    width: 1px;
+    height: 40%;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.04);
+}
+
 /* ---- Timeline tracks ---- */
 .timeline-tracks {
     flex: 1;
@@ -1877,6 +1942,47 @@
 .track.disabled .track-toggle {
     opacity: 0.2;
     color: var(--text-muted);
+}
+
+/* Mini volume slider in track header */
+.track-vol {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    margin: 1px 0;
+}
+
+.track-vol::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    border: none;
+    transition: background 0.15s;
+}
+
+.track-vol::-webkit-slider-thumb:hover {
+    background: var(--accent);
+}
+
+.track-vol::-moz-range-thumb {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    border: none;
+}
+
+.track-vol::-moz-range-track {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
 }
 
 .track.disabled .track-content {
@@ -2171,18 +2277,19 @@
     accent-color: var(--accent, #4ECDC4);
 }
 
-/* ---- Audio ---- */
+/* ---- Audio (legacy + universal) ---- */
 .audio-placeholder {
     height: 100%;
 }
 
-.audio-clip {
+.audio-clip,
+.audio-clip-universal {
     position: relative;
     flex-shrink: 0;
     height: 28px;
     background: rgba(78, 205, 196, 0.08);
     border-radius: 4px;
-    border: 1px solid rgba(78, 205, 196, 0.2);
+    border: 1px solid rgba(78, 205, 196, 0.15);
     display: flex;
     align-items: center;
     padding: 0 8px;
@@ -2191,34 +2298,39 @@
     box-sizing: border-box;
 }
 
-.audio-clip svg {
+.audio-clip svg,
+.audio-clip-universal svg {
     color: var(--accent);
     flex-shrink: 0;
     opacity: 0.6;
 }
 
-.audio-resize-handle {
+.audio-resize-handle,
+.audio-resize-handle-universal {
     position: absolute;
     top: 0;
     right: 0;
     width: 5px;
     height: 100%;
-    background: rgba(78, 205, 196, 0.3);
+    background: rgba(255, 255, 255, 0.15);
     cursor: ew-resize;
     opacity: 0;
-    transition: opacity 0.1s ease;
+    transition: opacity 0.15s ease;
     border-radius: 0 4px 4px 0;
 }
 
-.audio-clip:hover .audio-resize-handle {
+.audio-clip:hover .audio-resize-handle,
+.audio-clip-universal:hover .audio-resize-handle-universal {
     opacity: 1;
 }
 
-.audio-resize-handle:hover {
+.audio-resize-handle:hover,
+.audio-resize-handle-universal:hover {
     background: var(--accent);
 }
 
-.audio-clip.audio-clip-error {
+.audio-clip.audio-clip-error,
+.audio-clip-universal.audio-clip-universal-error {
     background: rgba(255, 107, 107, 0.06);
     border: 1px dashed rgba(255, 107, 107, 0.3);
     opacity: 0.6;
@@ -2232,12 +2344,158 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
 }
 
 .audio-clip-duration {
     font-family: var(--font-mono);
     font-size: 0.48rem;
     color: rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+}
+
+/* ---- Audio Track Controls ---- */
+.audio-track-speaker-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    opacity: 0.6;
+    transition: opacity 0.12s, color 0.12s;
+    display: flex;
+    align-items: center;
+}
+.audio-track-speaker-btn:hover { opacity: 1; }
+.audio-track-speaker-btn.muted { color: var(--coral, #ff6b6b); opacity: 0.8; }
+
+.audio-track-remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 1px 3px;
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0.4;
+    transition: opacity 0.12s, color 0.12s;
+}
+.audio-track-remove-btn:hover { opacity: 1; color: var(--coral, #ff6b6b); }
+
+/* ---- Volume Popup ---- */
+.volume-popup {
+    background: var(--bg-darker, #1a1a2e);
+    border: 1px solid var(--border, #2a2a3e);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 200;
+}
+
+.volume-popup .volume-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+.volume-popup .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent, #4ecdc4);
+    cursor: pointer;
+}
+
+/* ---- Add Track Row ---- */
+.add-track-row {
+    display: flex;
+    min-height: 28px;
+    border-top: 1px solid rgba(255, 255, 255, 0.02);
+    opacity: 0.35;
+    transition: opacity 0.2s;
+    cursor: pointer;
+}
+.add-track-row:hover {
+    opacity: 0.8;
+    background: rgba(255, 255, 255, 0.015);
+}
+.add-track-header {
+    width: 36px;
+    min-width: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.add-track-btn {
+    background: none;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.add-track-row:hover .add-track-btn {
+    border-color: rgba(78, 205, 196, 0.4);
+    color: var(--accent);
+    background: rgba(78, 205, 196, 0.06);
+}
+.add-track-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+}
+.add-track-label {
+    font-size: 0.55rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+
+/* ---- Add Track Dropdown Menu ---- */
+.add-track-menu {
+    position: fixed;
+    background: var(--bg-darker, #1a1a2e);
+    border: 1px solid var(--border, #2a2a3e);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 200;
+    padding: 4px;
+    min-width: 150px;
+}
+.add-track-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    border-radius: 5px;
+    width: 100%;
+    transition: background 0.1s, color 0.1s;
+}
+.add-track-menu-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+}
+.add-track-menu-item svg {
+    opacity: 0.6;
+    flex-shrink: 0;
 }
 
 /* ---- Playhead ---- */

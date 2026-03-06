@@ -1436,6 +1436,25 @@
           </div>
         </section>
 
+        <!-- Notifications -->
+        <section class="card p-5 mb-4">
+          <label
+            style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-muted);margin-bottom:12px">Notifications</label>
+
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:8px;background:var(--bg-darkest)">
+            <div style="flex:1;min-width:0">
+              <span style="font-size:13px;color:var(--text);font-weight:500">Sound Notifications</span>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:2px">Play a sound when pipeline, export, or asset download completes</p>
+            </div>
+            <label class="sts-toggle" style="flex-shrink:0;margin-left:12px">
+              <input type="checkbox" id="setting-sound-notifications"
+                onchange="localStorage.setItem('sts_sound_enabled', this.checked); window._stsSoundEnabled = this.checked">
+              <span class="sts-toggle-slider"></span>
+            </label>
+          </div>
+        </section>
+
         <!-- Features Status -->
         <section class="card p-5 mb-4">
           <label

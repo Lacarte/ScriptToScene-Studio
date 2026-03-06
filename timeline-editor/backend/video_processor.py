@@ -890,9 +890,24 @@ class VideoProcessor:
 
     def _resolve_font_path(self, family, weight='normal'):
         """Resolve a font family name to a filesystem path for FFmpeg drawtext."""
-        # Try custom fonts first
-        variant = 'bold' if weight == 'bold' else 'regular'
+        # Map numeric/string weights to font variant names
+        weight_str = str(weight).strip().lower()
+        _weight_variant_map = {
+            'bold': 'bold', '700': 'bold',
+            '800': 'extrabold', 'extrabold': 'extrabold', 'extra-bold': 'extrabold',
+            '900': 'black', 'black': 'black',
+            '600': 'semibold', 'semibold': 'semibold', 'semi-bold': 'semibold',
+            '500': 'medium', 'medium': 'medium',
+            '300': 'light', 'light': 'light',
+            '100': 'thin', 'thin': 'thin',
+            '200': 'extralight', 'extralight': 'extralight',
+        }
+        variant = _weight_variant_map.get(weight_str, 'regular')
+
+        # Try custom fonts first — try exact variant, then bold fallback for heavy weights
         custom_path = _custom_font_path(family, variant)
+        if not custom_path and variant in ('extrabold', 'black', 'semibold'):
+            custom_path = _custom_font_path(family, 'bold')
         if custom_path and os.path.isfile(custom_path):
             logger.debug("Font resolved (custom): {} {} -> {}", family, variant, custom_path)
             return custom_path
@@ -900,7 +915,7 @@ class VideoProcessor:
         current_os = platform.system().lower()
         os_key = 'win32' if current_os == 'windows' else ('darwin' if current_os == 'darwin' else 'linux')
 
-        if weight == 'bold' and family in FONT_BOLD_MAP:
+        if variant in ('bold', 'extrabold', 'black') and family in FONT_BOLD_MAP:
             bold_name = FONT_BOLD_MAP[family]
             candidates = []
             if os_key == 'win32':
@@ -931,6 +946,46 @@ class VideoProcessor:
             return fb
         logger.warning("No font found for '{}', using arial.ttf", family)
         return 'arial.ttf'
+
+    def _wrap_caption_text(self, text, font_path, font_size, max_width):
+        """Word-wrap caption text to fit within max_width using Pillow for measurement."""
+        try:
+            pil_font = ImageFont.truetype(font_path, font_size)
+        except (OSError, IOError):
+            # Can't measure — estimate ~0.6 chars per pixel at this font size
+            avg_char_w = font_size * 0.6
+            chars_per_line = max(1, int(max_width / avg_char_w))
+            words = text.split()
+            lines, line = [], ''
+            for w in words:
+                test = f"{line} {w}".strip()
+                if len(test) > chars_per_line and line:
+                    lines.append(line)
+                    line = w
+                else:
+                    line = test
+            if line:
+                lines.append(line)
+            return lines
+
+        words = text.split()
+        lines = []
+        current_line = ''
+
+        for word in words:
+            test_line = f"{current_line} {word}".strip() if current_line else word
+            bbox = pil_font.getbbox(test_line)
+            text_w = bbox[2] - bbox[0] if bbox else 0
+            if text_w > max_width and current_line:
+                lines.append(current_line)
+                current_line = word
+            else:
+                current_line = test_line
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines if lines else [text]
 
     def _burn_captions(self, video_path, output_path):
         """Burn caption overlays into the video using FFmpeg drawtext filter."""
@@ -965,8 +1020,12 @@ class VideoProcessor:
         font_path = self._resolve_font_path(font_family, font_weight)
         font_path_esc = font_path.replace('\\', '/').replace(':', '\\:')
 
-        logger.info("Burning {} captions: font={} {}px color=#{} stroke={}px pos_y={}%",
-                     len(entries), font_family, font_size, font_color, stroke_width, position_y)
+        # Max text width: 85% of video width (matches preview canvas wrapping)
+        max_text_width = int(self.width * 0.85)
+        line_height = int(font_size * 1.25)
+
+        logger.info("Burning {} captions: font={} {}px color=#{} stroke={}px pos_y={}% max_w={}",
+                     len(entries), font_family, font_size, font_color, stroke_width, position_y, max_text_width)
 
         drawtext_parts = []
         for i, entry in enumerate(entries):
@@ -980,43 +1039,51 @@ class VideoProcessor:
             start = entry.get('start', 0)
             end = entry.get('end', start + 1)
 
-            escaped = (text
-                       .replace("\\", "\\\\")
-                       .replace("'", "\u2019")
-                       .replace(":", "\\:")
-                       .replace("%", "%%")
-                       .replace("\n", " "))
+            # Word-wrap text to fit within video width
+            lines = self._wrap_caption_text(text, font_path, font_size, max_text_width)
+            num_lines = len(lines)
 
-            y_expr = f"h*{position_y}/100-{font_size}/2"
+            # Render each line as a separate drawtext filter, stacked vertically
+            # Center the block around position_y
+            block_height = num_lines * line_height
+            base_y_px = int(self.height * position_y / 100 - block_height / 2)
 
-            dt = (
-                f"drawtext=fontfile='{font_path_esc}'"
-                f":text='{escaped}'"
-                f":fontsize={font_size}"
-                f":fontcolor=#{font_color}"
-                f":x=(w-text_w)/2"
-                f":y={y_expr}"
-                f":enable='between(t,{start},{end})'"
-            )
+            for line_idx, line_text in enumerate(lines):
+                escaped = (line_text
+                           .replace("\\", "\\\\")
+                           .replace("'", "\u2019")
+                           .replace(":", "\\:")
+                           .replace("%", "%%"))
 
-            if stroke_width and stroke_color and stroke_color != 'none':
-                dt += f":borderw={stroke_width}:bordercolor=#{stroke_color}"
+                line_y = base_y_px + line_idx * line_height
 
-            if bg_color and bg_color not in ('transparent', 'none'):
-                bg_hex = bg_color.lstrip('#')
-                pad = max(box_padding_x, box_padding_y, 8)
-                dt += f":box=1:boxcolor=#{bg_hex}:boxborderw={pad}"
+                dt = (
+                    f"drawtext=fontfile='{font_path_esc}'"
+                    f":text='{escaped}'"
+                    f":fontsize={font_size}"
+                    f":fontcolor=#{font_color}"
+                    f":x=(w-text_w)/2"
+                    f":y={line_y}"
+                    f":enable='between(t,{start},{end})'"
+                )
 
-            if shadow_color and shadow_color not in ('none', 'transparent'):
-                # Parse rgba or hex to hex for FFmpeg shadowcolor
-                sc = shadow_color.lstrip('#')
-                if sc.startswith('rgba') or sc.startswith('rgb'):
-                    # FFmpeg shadowcolor only supports hex; use black fallback
-                    sc = '000000'
-                dt += f":shadowcolor=#{sc}:shadowx={shadow_x}:shadowy={shadow_y}"
+                if stroke_width and stroke_color and stroke_color != 'none':
+                    dt += f":borderw={stroke_width}:bordercolor=#{stroke_color}"
 
-            drawtext_parts.append(dt)
-            logger.debug("  Caption {}: [{:.1f}s-{:.1f}s] '{}'", i + 1, start, end, text[:40])
+                if bg_color and bg_color not in ('transparent', 'none'):
+                    bg_hex = bg_color.lstrip('#')
+                    pad = max(box_padding_x, box_padding_y, 8)
+                    dt += f":box=1:boxcolor=#{bg_hex}:boxborderw={pad}"
+
+                if shadow_color and shadow_color not in ('none', 'transparent'):
+                    sc = shadow_color.lstrip('#')
+                    if sc.startswith('rgba') or sc.startswith('rgb'):
+                        sc = '000000'
+                    dt += f":shadowcolor=#{sc}:shadowx={shadow_x}:shadowy={shadow_y}"
+
+                drawtext_parts.append(dt)
+
+            logger.debug("  Caption {}: [{:.1f}s-{:.1f}s] {} line(s) '{}'", i + 1, start, end, num_lines, text[:40])
 
         if not drawtext_parts:
             logger.debug("No valid caption entries after filtering")

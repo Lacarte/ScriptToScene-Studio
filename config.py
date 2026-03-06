@@ -32,10 +32,10 @@ TTS_TRASH_DIR = os.path.join(TTS_DIR, "TRASH")
 MODELS_DIR = os.path.join(ROOT_DIR, "models")
 TIMELINE_EDITOR_DIR = os.path.join(ROOT_DIR, "timeline-editor", "frontend")
 BIN_DIR = os.path.join(ROOT_DIR, "bin")
-FONTS_DIR = os.path.join(ROOT_DIR, "fonts")
+FONTS_DIR = os.path.join(ROOT_DIR, "assets", "fonts")
 DNA_DIR = os.path.join(OUTPUT_DIR, "dna")
 APP_ASSETS_DIR = os.path.join(ROOT_DIR, "assets")
-NICHE_INPUT_DIR = os.path.join(ROOT_DIR, "niche-analyzer")
+NICHE_INPUT_DIR = os.path.join(ROOT_DIR, "assets", "niche-analyzer")
 
 # ---------------------------------------------------------------------------
 # Ensure output directories exist

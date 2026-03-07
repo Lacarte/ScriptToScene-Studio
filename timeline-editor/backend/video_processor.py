@@ -1004,7 +1004,15 @@ class VideoProcessor:
         font_family = style.get('fontFamily', style.get('font_family', 'Inter'))
         font_weight = style.get('fontWeight', style.get('font_weight', 'bold'))
         font_size = style.get('fontSize', style.get('font_size', 48))
-        font_color = style.get('color', '#FFFFFF').lstrip('#')
+        font_color_raw = style.get('color', '#FFFFFF')
+        # Parse rgba() to FFmpeg color@alpha format, or strip # for hex
+        _rgba_match = re.match(r'rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\)', font_color_raw)
+        if _rgba_match:
+            r, g, b = int(_rgba_match.group(1)), int(_rgba_match.group(2)), int(_rgba_match.group(3))
+            a = float(_rgba_match.group(4)) if _rgba_match.group(4) else 1.0
+            font_color = f"{r:02x}{g:02x}{b:02x}@{a:.2f}"
+        else:
+            font_color = font_color_raw.lstrip('#')
         bg_color = style.get('backgroundColor', style.get('background', ''))
         text_transform = style.get('textTransform', style.get('text_transform', 'none'))
         stroke_width = style.get('strokeWidth', style.get('stroke_width', 2))
@@ -1017,15 +1025,56 @@ class VideoProcessor:
         shadow_y = style.get('shadowOffsetY', style.get('shadow_offset_y', 0))
         blend_mode = style.get('blendMode', style.get('blend_mode', 'normal'))
 
+        # Highlight settings
+        do_highlight = style.get('highlight', False)
+        highlight_mode = style.get('highlight_mode', style.get('highlightMode', 'text'))  # 'text' or 'box'
+        highlight_color_raw = style.get('highlight_color', style.get('highlightColor', '#4ECDC4'))
+        highlight_color_hex = highlight_color_raw.lstrip('#') if highlight_color_raw.startswith('#') else '4ECDC4'
+
         font_path = self._resolve_font_path(font_family, font_weight)
         font_path_esc = font_path.replace('\\', '/').replace(':', '\\:')
+
+        # Pillow font for word width measurement (used by highlight box mode)
+        pil_font = None
+        if do_highlight:
+            try:
+                pil_font = ImageFont.truetype(font_path, font_size)
+            except (OSError, IOError):
+                pil_font = None
 
         # Max text width: 85% of video width (matches preview canvas wrapping)
         max_text_width = int(self.width * 0.85)
         line_height = int(font_size * 1.25)
 
-        logger.info("Burning {} captions: font={} {}px color=#{} stroke={}px pos_y={}% max_w={}",
-                     len(entries), font_family, font_size, font_color, stroke_width, position_y, max_text_width)
+        logger.info("Burning {} captions: font={} {}px color=#{} stroke={}px pos_y={}% max_w={} highlight={}",
+                     len(entries), font_family, font_size, font_color, stroke_width, position_y, max_text_width,
+                     f"{highlight_mode}({highlight_color_hex})" if do_highlight else "off")
+
+        def _escape_text(t):
+            return (t.replace("\\", "\\\\")
+                     .replace("'", "\u2019")
+                     .replace(":", "\\:")
+                     .replace("%", "%%"))
+
+        def _shadow_suffix():
+            if shadow_color and shadow_color not in ('none', 'transparent'):
+                sc = shadow_color.lstrip('#')
+                if sc.startswith('rgba') or sc.startswith('rgb'):
+                    sc = '000000'
+                return f":shadowcolor=#{sc}:shadowx={shadow_x}:shadowy={shadow_y}"
+            return ''
+
+        def _stroke_suffix():
+            if stroke_width and stroke_color and stroke_color != 'none':
+                return f":borderw={stroke_width}:bordercolor=#{stroke_color}"
+            return ''
+
+        def _measure_text(text):
+            """Measure text width in pixels using Pillow."""
+            if pil_font:
+                bbox = pil_font.getbbox(text)
+                return bbox[2] - bbox[0] if bbox else int(len(text) * font_size * 0.6)
+            return int(len(text) * font_size * 0.6)
 
         drawtext_parts = []
         for i, entry in enumerate(entries):
@@ -1038,52 +1087,143 @@ class VideoProcessor:
 
             start = entry.get('start', 0)
             end = entry.get('end', start + 1)
+            words = entry.get('words', [])
 
             # Word-wrap text to fit within video width
             lines = self._wrap_caption_text(text, font_path, font_size, max_text_width)
             num_lines = len(lines)
 
-            # Render each line as a separate drawtext filter, stacked vertically
             # Center the block around position_y
             block_height = num_lines * line_height
             base_y_px = int(self.height * position_y / 100 - block_height / 2)
 
-            for line_idx, line_text in enumerate(lines):
-                escaped = (line_text
-                           .replace("\\", "\\\\")
-                           .replace("'", "\u2019")
-                           .replace(":", "\\:")
-                           .replace("%", "%%"))
+            if do_highlight and words:
+                # --- Highlight mode: render each word individually ---
+                # Build a flat list of (word_text, begin, end) with uppercase applied
+                word_timings = []
+                for w in words:
+                    wt = w.get('word', '')
+                    if text_transform == 'uppercase':
+                        wt = wt.upper()
+                    word_timings.append({
+                        'text': wt,
+                        'begin': w.get('begin', start),
+                        'end': w.get('end', end),
+                    })
 
-                line_y = base_y_px + line_idx * line_height
+                # Map words to lines (split each line to match word count)
+                word_idx = 0
+                for line_idx, line_text in enumerate(lines):
+                    line_y = base_y_px + line_idx * line_height
+                    line_words = line_text.split(' ')
+                    n_line_words = len(line_words)
 
-                dt = (
-                    f"drawtext=fontfile='{font_path_esc}'"
-                    f":text='{escaped}'"
-                    f":fontsize={font_size}"
-                    f":fontcolor=#{font_color}"
-                    f":x=(w-text_w)/2"
-                    f":y={line_y}"
-                    f":enable='between(t,{start},{end})'"
-                )
+                    # Calculate x positions for each word in this line
+                    full_line_w = _measure_text(line_text)
+                    line_start_x = int((self.width - full_line_w) / 2)
+                    space_w = _measure_text(' ')
 
-                if stroke_width and stroke_color and stroke_color != 'none':
-                    dt += f":borderw={stroke_width}:bordercolor=#{stroke_color}"
+                    word_x = line_start_x
+                    for lw_idx in range(n_line_words):
+                        if word_idx >= len(word_timings):
+                            break
+                        wt = word_timings[word_idx]
+                        word_w = _measure_text(wt['text'])
+                        escaped_word = _escape_text(wt['text'])
 
-                if bg_color and bg_color not in ('transparent', 'none'):
-                    bg_hex = bg_color.lstrip('#')
-                    pad = max(box_padding_x, box_padding_y, 8)
-                    dt += f":box=1:boxcolor=#{bg_hex}:boxborderw={pad}"
+                        # For each word, render in dim color for full caption duration
+                        # then overlay in highlight color during its active window
+                        dim_color = font_color  # base color (may be dim for single_line_highlight)
 
-                if shadow_color and shadow_color not in ('none', 'transparent'):
-                    sc = shadow_color.lstrip('#')
-                    if sc.startswith('rgba') or sc.startswith('rgb'):
-                        sc = '000000'
-                    dt += f":shadowcolor=#{sc}:shadowx={shadow_x}:shadowy={shadow_y}"
+                        # Dim pass: show word in base color for entire caption
+                        dt_dim = (
+                            f"drawtext=fontfile='{font_path_esc}'"
+                            f":text='{escaped_word}'"
+                            f":fontsize={font_size}"
+                            f":fontcolor=#{dim_color}"
+                            f":x={word_x}"
+                            f":y={line_y}"
+                            f":enable='between(t,{start},{end})'"
+                        )
+                        dt_dim += _stroke_suffix() + _shadow_suffix()
+                        drawtext_parts.append(dt_dim)
 
-                drawtext_parts.append(dt)
+                        # Highlight pass: override with highlight color during this word's time
+                        w_begin = wt['begin']
+                        # Active until next word starts (or caption ends)
+                        if word_idx + 1 < len(word_timings):
+                            w_active_end = word_timings[word_idx + 1]['begin']
+                        else:
+                            w_active_end = end
 
-            logger.debug("  Caption {}: [{:.1f}s-{:.1f}s] {} line(s) '{}'", i + 1, start, end, num_lines, text[:40])
+                        if highlight_mode == 'box':
+                            # Draw colored box behind word, then white text on top
+                            box_pad = int(font_size * 0.15)
+                            box_x = word_x - box_pad
+                            box_y = line_y - int(font_size * 0.1) - box_pad
+                            box_w = word_w + box_pad * 2
+                            box_h = int(font_size * 1.1) + box_pad * 2
+
+                            dt_box = (
+                                f"drawbox=x={box_x}:y={box_y}:w={box_w}:h={box_h}"
+                                f":color=#{highlight_color_hex}:t=fill"
+                                f":enable='between(t,{w_begin},{w_active_end})'"
+                            )
+                            drawtext_parts.append(dt_box)
+
+                            # Redraw word in white on top of box
+                            dt_active = (
+                                f"drawtext=fontfile='{font_path_esc}'"
+                                f":text='{escaped_word}'"
+                                f":fontsize={font_size}"
+                                f":fontcolor=#FFFFFF"
+                                f":x={word_x}"
+                                f":y={line_y}"
+                                f":enable='between(t,{w_begin},{w_active_end})'"
+                            )
+                            drawtext_parts.append(dt_active)
+                        else:
+                            # Text highlight: redraw word in highlight color
+                            dt_active = (
+                                f"drawtext=fontfile='{font_path_esc}'"
+                                f":text='{escaped_word}'"
+                                f":fontsize={font_size}"
+                                f":fontcolor=#{highlight_color_hex}"
+                                f":x={word_x}"
+                                f":y={line_y}"
+                                f":enable='between(t,{w_begin},{w_active_end})'"
+                            )
+                            drawtext_parts.append(dt_active)
+
+                        word_x += word_w + space_w
+                        word_idx += 1
+            else:
+                # --- Standard mode: render full lines ---
+                for line_idx, line_text in enumerate(lines):
+                    escaped = _escape_text(line_text)
+                    line_y = base_y_px + line_idx * line_height
+
+                    dt = (
+                        f"drawtext=fontfile='{font_path_esc}'"
+                        f":text='{escaped}'"
+                        f":fontsize={font_size}"
+                        f":fontcolor=#{font_color}"
+                        f":x=(w-text_w)/2"
+                        f":y={line_y}"
+                        f":enable='between(t,{start},{end})'"
+                    )
+                    dt += _stroke_suffix()
+
+                    if bg_color and bg_color not in ('transparent', 'none'):
+                        bg_hex = bg_color.lstrip('#')
+                        pad = max(box_padding_x, box_padding_y, 8)
+                        dt += f":box=1:boxcolor=#{bg_hex}:boxborderw={pad}"
+
+                    dt += _shadow_suffix()
+                    drawtext_parts.append(dt)
+
+            logger.debug("  Caption {}: [{:.1f}s-{:.1f}s] {} line(s) '{}'{}", i + 1, start, end, num_lines, text[:40],
+                         f" [highlight {highlight_mode}]" if do_highlight and words else "")
 
         if not drawtext_parts:
             logger.debug("No valid caption entries after filtering")
@@ -1135,25 +1275,56 @@ class VideoProcessor:
         else:
             vf = vf_drawtext
 
-        cmd = [
-            FFMPEG_BIN, '-y',
-            '-i', video_path,
-            '-vf', vf,
-            '-c:v', self.codec,
-            '-crf', str(self.crf),
-            '-preset', 'fast',
-            '-pix_fmt', self.pixel_format,
-            '-c:a', 'copy',
-            output_path
-        ]
+        is_complex = blend_mode == 'difference'
+        logger.info("Running caption burn-in ({} drawtext filters, vf len={}, complex={})...",
+                     len(drawtext_parts), len(vf), is_complex)
 
-        logger.info("Running caption burn-in ({} drawtext filters)...", len(drawtext_parts))
-        logger.debug("Caption cmd: {} ... (vf len={})", ' '.join(cmd[:6]), len(vf))
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.error("Caption burn-in failed:\nstdout: {}\nstderr: {}",
-                          result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
-            raise RuntimeError(f"Caption burn-in failed: {result.stderr[-500:] if result.stderr else ''}")
+        # Write filter to a temp file to avoid Windows command-line length limits
+        vf_file = None
+        try:
+            vf_fd, vf_file = tempfile.mkstemp(suffix='.txt', prefix='caption_vf_')
+            with os.fdopen(vf_fd, 'w', encoding='utf-8') as f:
+                f.write(vf)
+
+            if is_complex:
+                # Complex filter graph (split/blend) needs -filter_complex_script
+                cmd = [
+                    FFMPEG_BIN, '-y',
+                    '-i', video_path,
+                    '-filter_complex_script', vf_file,
+                    '-c:v', self.codec,
+                    '-crf', str(self.crf),
+                    '-preset', 'fast',
+                    '-pix_fmt', self.pixel_format,
+                    '-c:a', 'copy',
+                    output_path
+                ]
+            else:
+                # Simple filter chain uses -filter_script:v
+                cmd = [
+                    FFMPEG_BIN, '-y',
+                    '-i', video_path,
+                    '-filter_script:v', vf_file,
+                    '-c:v', self.codec,
+                    '-crf', str(self.crf),
+                    '-preset', 'fast',
+                    '-pix_fmt', self.pixel_format,
+                    '-c:a', 'copy',
+                    output_path
+                ]
+
+            logger.debug("Caption cmd: {} ... (vf file={})", ' '.join(cmd[:6]), vf_file)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error("Caption burn-in failed:\nstdout: {}\nstderr: {}",
+                              result.stdout[:300], result.stderr[-1000:] if result.stderr else "")
+                raise RuntimeError(f"Caption burn-in failed: {result.stderr[-500:] if result.stderr else ''}")
+        finally:
+            if vf_file and os.path.exists(vf_file):
+                try:
+                    os.unlink(vf_file)
+                except OSError:
+                    pass
 
         logger.success("Caption burn-in complete: {}", output_path)
         return output_path

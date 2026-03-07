@@ -969,7 +969,7 @@ export class CanvasPreview {
         const posY = (style.position_y || 75) / 100;
         const transform = style.text_transform || 'uppercase';
         const animation = style.animation || 'pop';
-        const letterSpacing = style.letter_spacing || 0; // em units
+        const letterSpacing = (style.letter_spacing || 0) * scale; // px units, scaled
         const bgColor = style.background || 'none';
         const blendMode = style.blend_mode || 'source-over';
         const boxPadX = (style.box_padding_x || 0) * scale;
@@ -990,7 +990,7 @@ export class CanvasPreview {
 
         // Apply letter-spacing via canvas letterSpacing (widely supported)
         if (letterSpacing) {
-            this.ctx.letterSpacing = `${letterSpacing}em`;
+            this.ctx.letterSpacing = `${letterSpacing}px`;
         }
 
         const x = this.width / 2;
@@ -1071,7 +1071,7 @@ export class CanvasPreview {
             this.ctx.font = fontStr;
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
-            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}em`;
+            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}px`;
             this.ctx.globalCompositeOperation = 'source-over';
             this.ctx.shadowColor = shadowColor || 'rgba(0,0,0,0.45)';
             this.ctx.shadowBlur = shadowBlur || 6 * scale;
@@ -1088,7 +1088,7 @@ export class CanvasPreview {
             this.ctx.font = fontStr;
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
-            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}em`;
+            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}px`;
             this.ctx.globalCompositeOperation = 'difference';
             this.ctx.fillStyle = diffFill;
             for (let i = 0; i < lines.length; i++) {
@@ -1101,7 +1101,7 @@ export class CanvasPreview {
             this.ctx.font = fontStr;
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
-            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}em`;
+            if (letterSpacing) this.ctx.letterSpacing = `${letterSpacing}px`;
             this.ctx.globalCompositeOperation = 'overlay';
             this.ctx.fillStyle = overlayFill;
             for (let i = 0; i < lines.length; i++) {
@@ -1110,6 +1110,18 @@ export class CanvasPreview {
             this.ctx.restore();
         } else {
             // --- Standard rendering ---
+            const doHighlight = style.highlight && active.words?.length > 0;
+            const highlightColor = style.highlight_color || '#4ECDC4';
+            const highlightMode = style.highlight_mode || 'text'; // 'text' = color word, 'box' = bg rectangle
+
+            // Find active word index for highlighting
+            let activeWordIdx = -1;
+            if (doHighlight) {
+                for (let w = active.words.length - 1; w >= 0; w--) {
+                    if (time >= active.words[w].begin) { activeWordIdx = w; break; }
+                }
+            }
+
             for (let i = 0; i < lines.length; i++) {
                 const ly = baseY + i * lineHeight;
 
@@ -1140,9 +1152,68 @@ export class CanvasPreview {
                     this.ctx.shadowOffsetY = shadowOffY;
                 }
 
-                // Fill text
-                this.ctx.fillStyle = color;
-                this.ctx.fillText(lines[i], x, ly);
+                if (doHighlight) {
+                    // Two-pass rendering: shadow pass (full line), then word-by-word color pass
+                    const lineWords = lines[i].split(' ');
+                    const fullLineW = this.ctx.measureText(lines[i]).width;
+
+                    // Compute word offset within the full caption for this line
+                    let wordOffset = 0;
+                    for (let li = 0; li < i; li++) {
+                        wordOffset += lines[li].split(' ').length;
+                    }
+
+                    // Pass 1: draw full line with shadow (uniform shadow on all words)
+                    this.ctx.fillStyle = color;
+                    this.ctx.fillText(lines[i], x, ly);
+
+                    // Clear shadow for pass 2
+                    if (shadowColor && shadowColor !== 'none') {
+                        this.ctx.shadowColor = 'transparent';
+                        this.ctx.shadowBlur = 0;
+                        this.ctx.shadowOffsetX = 0;
+                        this.ctx.shadowOffsetY = 0;
+                    }
+
+                    // Pass 2: redraw word-by-word with highlight colors (no shadow)
+                    this.ctx.textAlign = 'left';
+                    const spaceW = this.ctx.measureText(' ').width;
+                    const boxPad = fontSize * 0.15;
+                    const boxRadius = fontSize * 0.12;
+                    let drawX = x - fullLineW / 2;
+
+                    for (let w = 0; w < lineWords.length; w++) {
+                        const globalWordIdx = wordOffset + w;
+                        const isActive = globalWordIdx === activeWordIdx;
+                        const wordText = lineWords[w];
+                        const wordW = this.ctx.measureText(wordText).width;
+
+                        // Box mode: draw colored rectangle behind active word
+                        if (isActive && highlightMode === 'box') {
+                            const bx = drawX - boxPad;
+                            const by = ly - fontSize * 0.55 - boxPad;
+                            const bw = wordW + boxPad * 2;
+                            const bh = fontSize * 1.1 + boxPad * 2;
+                            this.ctx.fillStyle = highlightColor;
+                            this.ctx.beginPath();
+                            this.ctx.roundRect(bx, by, bw, bh, boxRadius);
+                            this.ctx.fill();
+                        }
+
+                        // Redraw word: text-mode highlights active word color, box-mode keeps white
+                        if (isActive || highlightMode === 'box') {
+                            this.ctx.fillStyle = (isActive && highlightMode === 'text') ? highlightColor : color;
+                            this.ctx.fillText(wordText, drawX, ly);
+                        }
+
+                        drawX += wordW + (w < lineWords.length - 1 ? spaceW : 0);
+                    }
+                    this.ctx.textAlign = 'center';
+                } else {
+                    // Fill text (no highlight)
+                    this.ctx.fillStyle = color;
+                    this.ctx.fillText(lines[i], x, ly);
+                }
 
                 // Reset shadow
                 if (shadowColor && shadowColor !== 'none') {

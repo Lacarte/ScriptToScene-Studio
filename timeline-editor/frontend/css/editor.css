@@ -2248,33 +2248,82 @@
 .cap-select,
 .cap-input {
     width: 100%;
-    padding: 5px 8px;
+    padding: 6px 8px;
     font-size: 11px;
-    background: var(--bg-darker);
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    background: var(--bg-darkest, #0d0d14);
     border: 1px solid var(--border-subtle);
-    border-radius: 5px;
+    border-radius: 6px;
     color: var(--text);
     outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cap-input[type="number"] {
+    -moz-appearance: textfield;
+    text-align: center;
+}
+.cap-input[type="number"]::-webkit-inner-spin-button,
+.cap-input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .cap-select:focus,
 .cap-input:focus {
     border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.12);
 }
 
 .cap-color-input {
     width: 100%;
-    height: 28px;
+    height: 30px;
     border: 1px solid var(--border-subtle);
-    border-radius: 5px;
+    border-radius: 6px;
     cursor: pointer;
-    background: none;
-    padding: 2px;
+    background: var(--bg-darkest, #0d0d14);
+    padding: 3px;
+    transition: border-color 0.15s;
+}
+.cap-color-input:hover {
+    border-color: rgba(255, 255, 255, 0.15);
 }
 
 .cap-range {
+    -webkit-appearance: none;
+    appearance: none;
     width: 100%;
-    accent-color: var(--accent, #4ECDC4);
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    outline: none;
+    transition: background 0.15s;
+}
+.cap-range:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+.cap-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent, #4ECDC4);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(78, 205, 196, 0.3);
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+.cap-range::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 10px rgba(78, 205, 196, 0.45);
+}
+.cap-range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent, #4ECDC4);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(78, 205, 196, 0.3);
 }
 
 /* ---- Audio (legacy + universal) ---- */
@@ -2385,11 +2434,12 @@
 
 /* ---- Volume Popup ---- */
 .volume-popup {
-    background: var(--bg-darker, #1a1a2e);
+    background: var(--bg-darkest, #0d0d14);
     border: 1px solid var(--border, #2a2a3e);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
     z-index: 200;
+    backdrop-filter: blur(12px);
 }
 
 .volume-popup .volume-slider {
@@ -2397,17 +2447,43 @@
     appearance: none;
     height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     outline: none;
+    transition: background 0.15s;
+}
+.volume-popup .volume-slider:hover {
+    background: rgba(255, 255, 255, 0.12);
 }
 .volume-popup .volume-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: var(--accent, #4ecdc4);
     cursor: pointer;
+    box-shadow: 0 0 8px rgba(78, 205, 196, 0.35);
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+.volume-popup .volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 12px rgba(78, 205, 196, 0.5);
+}
+.volume-popup .volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent, #4ecdc4);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(78, 205, 196, 0.35);
+}
+.volume-popup .volume-mute-toggle {
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+.volume-popup .volume-mute-toggle:hover {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 /* ---- Add Track Row ---- */

@@ -437,16 +437,25 @@ export function prepareExportData(project, scenes, mediaFolder, audioConfig = nu
             return sceneData;
         }),
 
-        // Captions overlay data
-        captions: captionData ? {
-            style: captionData.style || {},
-            entries: (captionData.captions || []).map(c => ({
-                text: c.text,
-                start: c.start,
-                end: c.end,
-                words: c.words || []
-            }))
-        } : null,
+        // Captions overlay data (apply clean-special-chars if enabled)
+        captions: captionData ? (() => {
+            const cleanEnabled = document.getElementById('cap-clean-text-toggle')?.checked;
+            const clean = cleanEnabled
+                ? (t) => t.replace(/[^\p{L}\p{N}\s!?]/gu, '').replace(/\s{2,}/g, ' ').trim()
+                : (t) => t;
+            return {
+                style: captionData.style || {},
+                entries: (captionData.captions || []).map(c => ({
+                    text: clean(c.text),
+                    start: c.start,
+                    end: c.end,
+                    words: (c.words || []).map(w => ({
+                        ...w,
+                        word: clean(w.word),
+                    }))
+                }))
+            };
+        })() : null,
 
         // Background music layer
         bgMusic: bgMusicConfig ? {

@@ -77,8 +77,17 @@ const AUDIO_TRACK_COLORS = {
     fx: 'rgba(255, 183, 77, 0.8)',
 };
 
+function _getSavedVolume(type) {
+    try { const v = parseFloat(localStorage.getItem(`sts-vol-${type}`)); return isNaN(v) ? null : v; } catch { return null; }
+}
+function _saveVolume(type, vol) {
+    try { localStorage.setItem(`sts-vol-${type}`, vol); } catch {}
+}
+
 function createAudioTrack(overrides = {}) {
-    return {
+    const type = overrides.type || 'voice';
+    const savedVol = _getSavedVolume(type);
+    const defaults = {
         id: nextAudioTrackId(),
         label: 'Audio',
         type: 'voice',           // 'voice' | 'music' | 'fx'
@@ -97,8 +106,12 @@ function createAudioTrack(overrides = {}) {
         muted: false,
         element: null,           // HTML Audio element
         color: AUDIO_TRACK_COLORS.voice,
-        ...overrides,
     };
+    // Apply saved volume if no explicit volume override
+    if (savedVol !== null && !('volume' in overrides)) {
+        defaults.volume = savedVol;
+    }
+    return { ...defaults, ...overrides };
 }
 
 function getVoiceTrack() {
@@ -2195,15 +2208,16 @@ function toggleVolumePopup(trackId, anchorBtn) {
     const popup = document.createElement('div');
     popup.className = 'volume-popup';
     popup.dataset.trackId = trackId;
+    const volPct = Math.round(track.volume * 100);
     popup.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px; padding:8px 10px;">
-            <button class="volume-mute-toggle" title="${track.muted ? 'Unmute' : 'Mute'}" style="background:none;border:none;color:${track.muted ? 'var(--coral)' : 'var(--text)'};cursor:pointer;padding:2px;">
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px;">
+            <button class="volume-mute-toggle" title="${track.muted ? 'Unmute' : 'Mute'}" style="background:none;border:none;color:${track.muted ? 'var(--coral)' : 'var(--text-secondary)'};cursor:pointer;padding:4px;display:flex;">
                 ${track.muted
                     ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>'
                     : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.08"/></svg>'}
             </button>
-            <input type="range" class="volume-slider" min="0" max="100" value="${Math.round(track.volume * 100)}" style="width:90px; accent-color:${track.color || 'var(--accent)'};">
-            <span class="volume-label" style="font-size:10px; font-family:var(--font-mono); color:var(--text-muted); min-width:28px; text-align:right;">${Math.round(track.volume * 100)}%</span>
+            <input type="range" class="volume-slider" min="0" max="100" value="${volPct}" style="width:100px;">
+            <span class="volume-label" style="font-size:10px; font-family:var(--font-mono); color:var(--text-secondary); min-width:32px; text-align:right;">${volPct}%</span>
         </div>
     `;
 
@@ -2215,16 +2229,30 @@ function toggleVolumePopup(trackId, anchorBtn) {
     popup.style.zIndex = '200';
     document.body.appendChild(popup);
 
-    // Wire slider
+    // Wire slider — update volume immediately on every drag tick
     const slider = popup.querySelector('.volume-slider');
     const label = popup.querySelector('.volume-label');
-    slider.addEventListener('input', () => {
+    const applyVolume = () => {
         const vol = parseInt(slider.value) / 100;
         track.volume = vol;
-        if (track.element) track.element.volume = track.muted ? 0 : vol;
+        _saveVolume(track.type, vol);
         label.textContent = `${slider.value}%`;
         anchorBtn.title = `${track.label} — Vol ${slider.value}%`;
-    });
+        // Apply to audio element immediately (respect mute and ducking)
+        if (track.element) {
+            if (track.muted) {
+                track.element.volume = 0;
+            } else if (track.type === 'music' && track.duckingEnabled) {
+                const voiceTrack = getVoiceTrack();
+                const voicePlaying = voiceTrack?.loaded && voiceTrack.element && !voiceTrack.element.paused && !voiceTrack.muted;
+                track.element.volume = voicePlaying ? Math.min(track.duckingLevel || 0.03, vol) : vol;
+            } else {
+                track.element.volume = vol;
+            }
+        }
+    };
+    slider.addEventListener('input', applyVolume);
+    slider.addEventListener('change', applyVolume);
 
     // Wire mute toggle
     popup.querySelector('.volume-mute-toggle').addEventListener('click', () => {
@@ -2473,11 +2501,14 @@ function setupCaptionControls() {
 
     presetSel?.addEventListener('change', () => {
         const PRESETS = {
-            bold_popup: { font_family: 'Montserrat', font_size: 64, font_weight: '800', color: '#FFFFFF', stroke_color: '#000000', stroke_width: 4, position_y: 75, animation: 'pop', text_transform: 'uppercase' },
-            subtitle_bar: { font_family: 'Inter', font_size: 48, font_weight: '600', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 85, animation: 'none', text_transform: 'none', bg_bar: true },
-            karaoke: { font_family: 'Bebas Neue', font_size: 72, font_weight: '400', color: '#FFFFFF', stroke_color: '#000000', stroke_width: 3, position_y: 70, animation: 'none', text_transform: 'uppercase', highlight: true },
-            minimal: { font_family: 'DM Sans', font_size: 42, font_weight: '500', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 80, animation: 'none', text_transform: 'none' },
-            single_line: { font_family: 'Montserrat', font_size: 64, font_weight: '900', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, background: 'none', position_y: 81, animation: 'hard_cut', text_transform: 'uppercase', letter_spacing: -0.03, blend_mode: 'difference', shadow_color: 'rgba(0,0,0,1.00)', shadow_blur: 6, shadow_offset_x: 3, shadow_offset_y: 3, diff_strength: 0.59, overlay_strength: 0.37, overlay_color: '#ffffff' },
+            bold_popup: { font_family: 'Montserrat', font_size: 64, font_weight: '800', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 75, animation: 'pop', text_transform: 'uppercase', shadow_color: '#000000', shadow_blur: 8, shadow_offset_x: 2, shadow_offset_y: 2 },
+            popup_highlight: { font_family: 'Montserrat', font_size: 64, font_weight: '800', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 75, animation: 'pop', text_transform: 'uppercase', shadow_color: '#000000', shadow_blur: 8, shadow_offset_x: 2, shadow_offset_y: 2, highlight: true, highlight_color: '#4ECDC4' },
+            popup_highlight_box: { font_family: 'Montserrat', font_size: 64, font_weight: '800', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 75, animation: 'pop', text_transform: 'uppercase', shadow_color: '#000000', shadow_blur: 8, shadow_offset_x: 2, shadow_offset_y: 2, highlight: true, highlight_mode: 'box', highlight_color: '#2563EB' },
+            subtitle_bar: { font_family: 'Inter', font_size: 48, font_weight: '600', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 85, animation: 'none', text_transform: 'none', bg_bar: true, shadow_color: '#000000', shadow_blur: 6, shadow_offset_x: 1, shadow_offset_y: 1 },
+            karaoke: { font_family: 'Bebas Neue', font_size: 72, font_weight: '400', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 70, animation: 'none', text_transform: 'uppercase', highlight: true, shadow_color: '#000000', shadow_blur: 10, shadow_offset_x: 2, shadow_offset_y: 2 },
+            minimal: { font_family: 'DM Sans', font_size: 42, font_weight: '500', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, position_y: 80, animation: 'none', text_transform: 'none', shadow_color: '#000000', shadow_blur: 6, shadow_offset_x: 1, shadow_offset_y: 1 },
+            single_line: { font_family: 'Montserrat', font_size: 64, font_weight: '900', color: '#FFFFFF', stroke_color: 'none', stroke_width: 0, background: 'none', position_y: 81, animation: 'hard_cut', text_transform: 'uppercase', letter_spacing: -2, blend_mode: 'difference', shadow_color: 'rgba(0,0,0,1.00)', shadow_blur: 6, shadow_offset_x: 3, shadow_offset_y: 3, diff_strength: 0.59, overlay_strength: 0.37, overlay_color: '#ffffff' },
+            single_line_highlight: { font_family: 'Montserrat', font_size: 64, font_weight: '900', color: 'rgba(255,255,255,0.35)', stroke_color: 'none', stroke_width: 0, background: 'none', position_y: 81, animation: 'hard_cut', text_transform: 'uppercase', letter_spacing: -2, shadow_color: '#000000', shadow_blur: 8, shadow_offset_x: 2, shadow_offset_y: 2, highlight: true, highlight_color: '#FFFFFF' },
         };
         const p = PRESETS[presetSel.value];
         if (p && EditorState.captionData) {
@@ -2493,19 +2524,38 @@ function setupCaptionControls() {
     sizeInput?.addEventListener('change', () => updateStyle('font_size', parseInt(sizeInput.value)));
     colorInput?.addEventListener('input', () => updateStyle('color', colorInput.value));
     strokeInput?.addEventListener('input', () => updateStyle('stroke_color', strokeInput.value));
+
+    // Stroke width (px)
+    const strokeWidthInput = document.getElementById('cap-ed-stroke-width');
+    strokeWidthInput?.addEventListener('change', () => updateStyle('stroke_width', parseInt(strokeWidthInput.value) || 0));
+
     posInput?.addEventListener('input', () => {
         if (posVal) posVal.textContent = posInput.value + '%';
         updateStyle('position_y', parseInt(posInput.value));
     });
 
-    // Letter spacing slider (-0.10 to 0.10 em, step 0.01)
+    // Letter spacing slider (-5 to 20 px, step 1)
     const lsInput = document.getElementById('cap-ed-letter-spacing');
     const lsVal = document.getElementById('cap-ed-ls-val');
     lsInput?.addEventListener('input', () => {
-        const em = parseInt(lsInput.value) / 100;
-        if (lsVal) lsVal.textContent = em.toFixed(2) + 'em';
-        updateStyle('letter_spacing', em);
+        const px = parseInt(lsInput.value);
+        if (lsVal) lsVal.textContent = px + 'px';
+        updateStyle('letter_spacing', px);
     });
+
+    // Shadow controls
+    const shadowColorInput = document.getElementById('cap-ed-shadow-color');
+    const shadowBlurInput = document.getElementById('cap-ed-shadow-blur');
+    const shadowXInput = document.getElementById('cap-ed-shadow-x');
+    const shadowYInput = document.getElementById('cap-ed-shadow-y');
+    shadowColorInput?.addEventListener('input', () => updateStyle('shadow_color', shadowColorInput.value));
+    shadowBlurInput?.addEventListener('change', () => updateStyle('shadow_blur', parseInt(shadowBlurInput.value) || 0));
+    shadowXInput?.addEventListener('change', () => updateStyle('shadow_offset_x', parseInt(shadowXInput.value) || 0));
+    shadowYInput?.addEventListener('change', () => updateStyle('shadow_offset_y', parseInt(shadowYInput.value) || 0));
+
+    // Highlight color
+    const highlightColorInput = document.getElementById('cap-ed-highlight-color');
+    highlightColorInput?.addEventListener('input', () => updateStyle('highlight_color', highlightColorInput.value));
 
     // Clean special characters checkbox
     const cleanToggle = document.getElementById('cap-clean-text-toggle');
@@ -2531,24 +2581,44 @@ function _capSyncStyleUI() {
     s('cap-ed-size', style.font_size || 64);
     s('cap-ed-color', style.color || '#FFFFFF');
     s('cap-ed-stroke', style.stroke_color || '#000000');
+    s('cap-ed-stroke-width', style.stroke_width ?? 4);
     s('cap-ed-position', style.position_y || 75);
     const posVal = document.getElementById('cap-ed-pos-val');
     if (posVal) posVal.textContent = (style.position_y || 75) + '%';
 
     const ls = style.letter_spacing || 0;
-    s('cap-ed-letter-spacing', Math.round(ls * 100));
+    s('cap-ed-letter-spacing', ls);
     const lsVal = document.getElementById('cap-ed-ls-val');
-    if (lsVal) lsVal.textContent = ls.toFixed(2) + 'em';
+    if (lsVal) lsVal.textContent = ls + 'px';
+
+    // Shadow
+    // Convert rgba/named shadow_color to hex for color input
+    const sc = style.shadow_color || '#000000';
+    if (sc.startsWith('#')) {
+        s('cap-ed-shadow-color', sc);
+    } else {
+        // rgba(...) → parse to hex
+        const m = sc.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+        if (m) s('cap-ed-shadow-color', '#' + [m[1],m[2],m[3]].map(v => parseInt(v).toString(16).padStart(2,'0')).join(''));
+    }
+    s('cap-ed-shadow-blur', style.shadow_blur || 0);
+    s('cap-ed-shadow-x', style.shadow_offset_x || 0);
+    s('cap-ed-shadow-y', style.shadow_offset_y || 0);
+
+    // Highlight
+    const hlSection = document.getElementById('cap-highlight-section');
+    if (hlSection) hlSection.style.display = style.highlight ? '' : 'none';
+    s('cap-ed-highlight-color', style.highlight_color || '#4ECDC4');
 }
 
 /**
- * Strip special characters from caption text, keeping only letters, numbers,
- * basic punctuation, and spaces.
+ * Strip all punctuation/symbols from caption text, keeping only
+ * letters, numbers, spaces, ! and ?
  */
 function _cleanCaptionSpecialChars(text) {
     return text
-        .replace(/[^\w\s.,!?;:'"()\-—–]/g, '')  // keep word chars, spaces, basic punctuation
-        .replace(/\s{2,}/g, ' ')                  // collapse multiple spaces
+        .replace(/[^\p{L}\p{N}\s!?]/gu, '')
+        .replace(/\s{2,}/g, ' ')
         .trim();
 }
 
@@ -4796,7 +4866,7 @@ window.selectBgMusic = function (filename, path, duration) {
         file: filename,
         path: path,
         duration: duration,
-        volume: 0.08,
+        volume: _getSavedVolume('music') ?? 0.08,
         loop: true,
         duckingEnabled: true,
         duckingLevel: 0.03,

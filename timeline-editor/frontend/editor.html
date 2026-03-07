@@ -447,10 +447,13 @@
                                     style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Preset</label>
                                 <select id="cap-ed-preset" class="cap-select">
                                     <option value="bold_popup">Bold Pop-up</option>
+                                    <option value="popup_highlight">Pop-up Highlight</option>
+                                    <option value="popup_highlight_box">Pop-up Highlight 2</option>
                                     <option value="subtitle_bar">Subtitle Bar</option>
                                     <option value="karaoke">Karaoke</option>
                                     <option value="minimal">Minimal</option>
                                     <option value="single_line">Single Line</option>
+                                    <option value="single_line_highlight">Single Line 2</option>
                                 </select>
                             </div>
 
@@ -472,10 +475,20 @@
                                         style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Color</label>
                                     <input id="cap-ed-color" type="color" value="#FFFFFF" class="cap-color-input">
                                 </div>
+                            </div>
+
+                            <div style="display:flex;gap:8px">
                                 <div style="flex:1">
                                     <label
                                         style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Stroke</label>
                                     <input id="cap-ed-stroke" type="color" value="#000000" class="cap-color-input">
+                                </div>
+                                <div style="flex:1">
+                                    <label
+                                        style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Stroke
+                                        Width</label>
+                                    <input id="cap-ed-stroke-width" type="number" value="4" min="0" max="20" step="1"
+                                        class="cap-input" style="width:100%">
                                 </div>
                             </div>
 
@@ -489,9 +502,62 @@
                             <div>
                                 <label
                                     style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Letter
-                                    Spacing: <span id="cap-ed-ls-val">0em</span></label>
-                                <input id="cap-ed-letter-spacing" type="range" min="-10" max="10" value="0" step="1"
+                                    Spacing: <span id="cap-ed-ls-val">0px</span></label>
+                                <input id="cap-ed-letter-spacing" type="range" min="-5" max="20" value="0" step="1"
                                     class="cap-range">
+                            </div>
+
+                            <div style="border-top:1px solid var(--border-subtle);padding-top:10px;margin-top:2px">
+                                <div
+                                    style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:8px">
+                                    Shadow</div>
+
+                                <div style="display:flex;gap:8px;margin-bottom:8px">
+                                    <div style="flex:1">
+                                        <label
+                                            style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Color</label>
+                                        <input id="cap-ed-shadow-color" type="color" value="#000000"
+                                            class="cap-color-input">
+                                    </div>
+                                    <div style="flex:1">
+                                        <label
+                                            style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Blur</label>
+                                        <input id="cap-ed-shadow-blur" type="number" value="0" min="0" max="40"
+                                            step="1" class="cap-input">
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:8px">
+                                    <div style="flex:1">
+                                        <label
+                                            style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Offset
+                                            X</label>
+                                        <input id="cap-ed-shadow-x" type="number" value="0" min="-20" max="20"
+                                            step="1" class="cap-input">
+                                    </div>
+                                    <div style="flex:1">
+                                        <label
+                                            style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Offset
+                                            Y</label>
+                                        <input id="cap-ed-shadow-y" type="number" value="0" min="-20" max="20"
+                                            step="1" class="cap-input">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="cap-highlight-section"
+                                style="border-top:1px solid var(--border-subtle);padding-top:10px;margin-top:2px;display:none">
+                                <div
+                                    style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:8px">
+                                    Highlight</div>
+                                <div style="display:flex;gap:8px;align-items:flex-end">
+                                    <div style="flex:1">
+                                        <label
+                                            style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:3px">Active
+                                            Word Color</label>
+                                        <input id="cap-ed-highlight-color" type="color" value="#4ECDC4"
+                                            class="cap-color-input">
+                                    </div>
+                                </div>
                             </div>
 
                             <div style="border-top:1px solid var(--border-subtle);padding-top:10px;margin-top:2px">
@@ -500,7 +566,7 @@
                                     Options</div>
                                 <label
                                     style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;font-size:11px;color:var(--text)">
-                                    <input type="checkbox" id="cap-clean-text-toggle"
+                                    <input type="checkbox" id="cap-clean-text-toggle" checked
                                         style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
                                     Clean special characters
                                 </label>

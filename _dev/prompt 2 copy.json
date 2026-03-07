@@ -1,0 +1,134 @@
+{
+  "scenes": [
+    {
+      "title": "It Refused To Die",
+      "scene": 1,
+      "start": 2.54,
+      "end": 4.29,
+      "prompt": "Extreme close-up of a vibrant green sprout pushing through cracked, dry, dark soil, surrounded by a few withered, brown leaves, with warm golden backlighting creating a soft glow around the tiny sprout, shallow depth of field, abstract impressionistic texture, rich emerald green and earthy brown tones, cinematic realistic",
+      "image_to_video": "Slow push-in towards the resilient sprout, with very subtle dust motes floating in the light, 1.75s",
+      "type_of_scene": "video",
+      "_duration": 1.75,
+      "_words": "but it refused to die."
+    },
+    {
+      "title": "Abandoned For Decades",
+      "scene": 2,
+      "start": 0.06,
+      "end": 2.38,
+      "prompt": "Bold white sans-serif text 'ABANDONED FOR DECADES' centered on a dark, mossy, blurred background of tangled vines and damp stone, soft diffuse light, high contrast, clean typography, subtle paper texture, cinematic realistic",
+      "image_to_video": "Gentle zoom out with a slight pulse, 2.32s",
+      "type_of_scene": "text",
+      "_duration": 2.32,
+      "_words": "The garden had been abandoned for decades,"
+    },
+    {
+      "title": "Thorns Locking It Shut",
+      "scene": 3,
+      "start": 4.88,
+      "end": 9.16,
+      "prompt": "Close-up of a rusted wrought-iron gate, completely entwined with thorny rose vines, some thorns interlocking, drops of dew visible on the iron and petals, soft natural light, deep shadows, shallow depth of field, 35mm lens, cinematic realistic",
+      "image_to_video": "Slow tilt up along the thorny gate, 4.28s",
+      "type_of_scene": "video",
+      "_duration": 4.28,
+      "_words": "Roses climbed the iron gate, their thorns locking it shut."
+    },
+    {
+      "title": "Ivy Skin",
+      "scene": 4,
+      "start": 9.24,
+      "end": 12.22,
+      "prompt": "Eye-level medium shot of an ancient stone wall, entirely covered in a thick, dense layer of dark green ivy, revealing minimal stone, soft, diffuse light filtering through leaves, cool green and grey tones, abstract painterly texture, cinematic realistic",
+      "image_to_video": "Static hold with subtle light shifts, 2.98s",
+      "type_of_scene": "image",
+      "_duration": 2.98,
+      "_words": "Ivy covered the stone walls like a second skin."
+    },
+    {
+      "title": "Crooked Apple Tree",
+      "scene": 5,
+      "start": 12.36,
+      "end": 18.06,
+      "prompt": "Wide shot of a crooked, gnarled apple tree standing wild in the center of an overgrown garden, surrounded by tall weeds and remnants of a crumbled stone fountain base, overcast soft light, muted earthy tones, abstract painterly texture, cinematic realistic",
+      "image_to_video": "Slow dolly-in towards the apple tree, 5.7s",
+      "type_of_scene": "video",
+      "_duration": 5.70,
+      "_words": "And at the center, where a fountain had once stood, a single apple tree grew crooked and wild,"
+    },
+    {
+      "title": "No One Picked",
+      "scene": 6,
+      "start": 18.24,
+      "end": 21.01,
+      "prompt": "Extreme close-up of a single ripe red apple hanging heavy on a branch, partially obscured by green leaves, with hints of an overgrown garden bokeh in the background, soft autumn light, shallow depth of field, 85mm lens, cinematic realistic",
+      "image_to_video": "Gentle sway of the apple, as if in a soft breeze, 2.77s",
+      "type_of_scene": "video",
+      "_duration": 2.77,
+      "_words": "its branches heavy with fruit that no one picked."
+    },
+    {
+      "title": "Birds Came and Went",
+      "scene": 7,
+      "start": 21.7,
+      "end": 23.1,
+      "prompt": "Medium shot of empty bird's nest woven into a thick branch of an apple tree, sunlight dappling through the leaves, soft focus background, natural rustic textures, cinematic realistic",
+      "image_to_video": "Slow zoom out revealing a bit more of the tree canopy, 1.4s",
+      "type_of_scene": "video",
+      "_duration": 1.40,
+      "_words": "Birds came and went."
+    },
+    {
+      "title": "Seasons Turned",
+      "scene": 8,
+      "start": 23.4,
+      "end": 24.02,
+      "prompt": "Bold white sans-serif text 'SEASONS TURNED' centered on a blurred background of autumn leaves in red, orange, and gold, high contrast, clean typography, subtle textured paper feel, cinematic realistic",
+      "image_to_video": "Gentle pulse with a subtle color shift, 0.62s",
+      "type_of_scene": "text",
+      "_duration": 0.62,
+      "_words": "Seasons turned."
+    },
+    {
+      "title": "Answering To No One",
+      "scene": 9,
+      "start": 24.76,
+      "end": 27.86,
+      "prompt": "Wide shot of the wild, untamed garden at dusk, long shadows stretching, golden hour light illuminating parts of the overgrown foliage, mysterious and peaceful atmosphere, cinematic realistic",
+      "image_to_video": "Static shot with a subtle shift in light and shadow, 3.1s",
+      "type_of_scene": "video",
+      "_duration": 3.10,
+      "_words": "The garden kept its own time, answering to no one."
+    }
+  ],
+  "_analysis": {
+    "total_duration": "27.86s audio",
+    "total_scenes": 9,
+    "type_mix": {
+      "video": "7 (78%)",
+      "image": "1 (11%)",
+      "text": "2 (22%)"
+    },
+    "violations": [
+      "🔴 CHRONOLOGICAL ORDER: Scene 1 starts at 2.54s, Scene 2 starts at 0.06s — OUT OF ORDER",
+      "🔴 DURATION: Scene 5 = 5.70s — EXCEEDS 4.5s MAX",
+      "🔴 DURATION: Scene 8 = 0.62s — BELOW 0.8s MIN for text",
+      "🟡 GAP: Scene 2→1 = broken (out of order, can't validate)",
+      "🟡 GAP: Scene 1→3 = 0.59s — NO FILLER (rule: >0.3s needs filler)",
+      "🟡 GAP: Scene 6→7 = 0.69s — NO FILLER",
+      "🟡 GAP: Scene 8→9 = 0.74s — NO FILLER",
+      "🟡 MIX: image at 11% — below 20% minimum",
+      "🟡 MIX: video at 78% — above 65% maximum"
+    ],
+    "correct_chronological_order": [
+      {"scene": 1, "start": 0.06, "title": "Abandoned For Decades"},
+      {"scene": 2, "start": 2.54, "title": "It Refused To Die"},
+      {"scene": 3, "start": 4.88, "title": "Thorns Locking It Shut"},
+      {"scene": 4, "start": 9.24, "title": "Ivy Skin"},
+      {"scene": 5, "start": 12.36, "title": "Crooked Apple Tree — NEEDS SPLIT"},
+      {"scene": 6, "start": 18.24, "title": "No One Picked"},
+      {"scene": 7, "start": 21.7, "title": "Birds Came and Went"},
+      {"scene": 8, "start": 23.4, "title": "Seasons Turned — TOO SHORT"},
+      {"scene": 9, "start": 24.76, "title": "Answering To No One"}
+    ]
+  }
+}

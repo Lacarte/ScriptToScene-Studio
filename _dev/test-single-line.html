@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Single Line Caption Test</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #111; display: flex; font-family: sans-serif; color: #fff; height: 100vh; overflow: hidden; }
+  .sidebar { width: 320px; min-width: 320px; background: #1a1a1a; border-right: 1px solid #333; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .sidebar h3 { margin: 0; font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.1em; }
+  .section { background: #222; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #666; margin: 0; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row label { font-size: 11px; color: #aaa; min-width: 70px; flex-shrink: 0; }
+  .row input[type=range] { flex: 1; accent-color: #4ECDC4; }
+  .row .val { font-size: 10px; color: #4ECDC4; font-family: monospace; min-width: 50px; text-align: right; }
+  .row select, .row input[type=text] { flex: 1; background: #333; color: #fff; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
+  .row input[type=color] { width: 32px; height: 24px; border: 1px solid #444; border-radius: 4px; padding: 0; cursor: pointer; background: none; }
+  .canvas-area { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  canvas { border: 1px solid #333; border-radius: 4px; max-height: calc(100vh - 32px); }
+  .toggle { display: flex; align-items: center; gap: 6px; }
+  .toggle input[type=checkbox] { accent-color: #4ECDC4; width: 14px; height: 14px; }
+  .toggle span { font-size: 11px; color: #aaa; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@800;900&family=Impact&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="sidebar">
+  <h3>Single Line Effect</h3>
+
+  <!-- Text -->
+  <div class="section">
+    <div class="section-title">Text</div>
+    <div class="row">
+      <label>Content</label>
+      <input id="text" type="text" value="ALL OVER SOCIALS">
+    </div>
+    <div class="row">
+      <label>Font</label>
+      <select id="font">
+        <option value="Bebas Neue" selected>Bebas Neue</option>
+        <option value="Montserrat">Montserrat</option>
+        <option value="Impact">Impact</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>Size</label>
+      <input id="fontSize" type="range" min="40" max="160" value="80">
+      <span class="val" id="fontSizeVal">80px</span>
+    </div>
+    <div class="row">
+      <label>Spacing</label>
+      <input id="ls" type="range" min="-10" max="10" value="-3">
+      <span class="val" id="lsVal">-0.03em</span>
+    </div>
+    <div class="row">
+      <label>Position Y</label>
+      <input id="posY" type="range" min="10" max="90" value="50">
+      <span class="val" id="posYVal">50%</span>
+    </div>
+    <div class="row">
+      <label>Mode</label>
+      <select id="mode">
+        <option value="difference" selected>Difference Blend</option>
+        <option value="nobox">White (no box)</option>
+        <option value="box">White on Black</option>
+        <option value="inverted">Black on White</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Shadow -->
+  <div class="section">
+    <div class="section-title">Drop Shadow</div>
+    <div class="toggle">
+      <input type="checkbox" id="shadowOn" checked>
+      <span>Enable</span>
+    </div>
+    <div class="row">
+      <label>Color</label>
+      <input id="shadowColor" type="color" value="#000000">
+    </div>
+    <div class="row">
+      <label>Opacity</label>
+      <input id="shadowAlpha" type="range" min="0" max="100" value="45">
+      <span class="val" id="shadowAlphaVal">0.45</span>
+    </div>
+    <div class="row">
+      <label>Blur</label>
+      <input id="shadowBlur" type="range" min="0" max="30" value="6">
+      <span class="val" id="shadowBlurVal">6</span>
+    </div>
+    <div class="row">
+      <label>Offset X</label>
+      <input id="shadowX" type="range" min="-20" max="20" value="3">
+      <span class="val" id="shadowXVal">3</span>
+    </div>
+    <div class="row">
+      <label>Offset Y</label>
+      <input id="shadowY" type="range" min="-20" max="20" value="3">
+      <span class="val" id="shadowYVal">3</span>
+    </div>
+  </div>
+
+  <!-- Difference Pass -->
+  <div class="section">
+    <div class="section-title">Difference Pass</div>
+    <div class="toggle">
+      <input type="checkbox" id="diffOn" checked>
+      <span>Enable</span>
+    </div>
+    <div class="row">
+      <label>Strength</label>
+      <input id="diffStrength" type="range" min="0" max="100" value="100">
+      <span class="val" id="diffStrengthVal">100%</span>
+    </div>
+  </div>
+
+  <!-- Overlay Pass -->
+  <div class="section">
+    <div class="section-title">Overlay Pass (Brightness)</div>
+    <div class="toggle">
+      <input type="checkbox" id="overlayOn" checked>
+      <span>Enable</span>
+    </div>
+    <div class="row">
+      <label>Strength</label>
+      <input id="overlayStrength" type="range" min="0" max="100" value="35">
+      <span class="val" id="overlayStrengthVal">0.35</span>
+    </div>
+    <div class="row">
+      <label>Color</label>
+      <input id="overlayColor" type="color" value="#ffffff">
+    </div>
+  </div>
+
+  <!-- Image Adjustments -->
+  <div class="section">
+    <div class="section-title">Background Image</div>
+    <div class="row">
+      <label>Brightness</label>
+      <input id="imgBright" type="range" min="50" max="200" value="100">
+      <span class="val" id="imgBrightVal">100%</span>
+    </div>
+    <div class="row">
+      <label>Contrast</label>
+      <input id="imgContrast" type="range" min="50" max="200" value="100">
+      <span class="val" id="imgContrastVal">100%</span>
+    </div>
+    <div class="row">
+      <label>Saturation</label>
+      <input id="imgSat" type="range" min="0" max="200" value="100">
+      <span class="val" id="imgSatVal">100%</span>
+    </div>
+    <div class="row">
+      <label>Hue Rotate</label>
+      <input id="imgHue" type="range" min="0" max="360" value="0">
+      <span class="val" id="imgHueVal">0°</span>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <button onclick="loadNewImage()" style="flex:1;padding:6px;background:#333;border:1px solid #555;border-radius:4px;color:#fff;cursor:pointer;font-size:11px">New Random Image</button>
+    </div>
+  </div>
+
+  <!-- JSON Export -->
+  <div class="section">
+    <div class="section-title">Config JSON</div>
+    <textarea id="jsonOut" readonly style="width:100%;height:180px;background:#111;color:#4ECDC4;border:1px solid #444;border-radius:4px;padding:8px;font-family:monospace;font-size:10px;resize:vertical;white-space:pre"></textarea>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('jsonOut').value);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy JSON',1000)" style="width:100%;padding:6px;background:#4ECDC4;border:none;border-radius:4px;color:#111;cursor:pointer;font-size:11px;font-weight:700;margin-top:4px">Copy JSON</button>
+  </div>
+</div>
+
+<div class="canvas-area">
+  <canvas id="c" width="1080" height="1920"></canvas>
+</div>
+
+<script>
+const bgImg = new Image();
+bgImg.crossOrigin = 'anonymous';
+bgImg.src = 'https://picsum.photos/1080/1920?' + Date.now();
+bgImg.onload = () => draw();
+bgImg.onerror = () => draw();
+
+function loadNewImage() {
+  bgImg.src = 'https://picsum.photos/1080/1920?' + Date.now();
+}
+
+const canvas = document.getElementById('c');
+canvas.style.width = '360px';
+canvas.style.height = '640px';
+const ctx = canvas.getContext('2d');
+
+// Helper: hex to rgb
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return [r, g, b];
+}
+
+function v(id) { return document.getElementById(id).value; }
+function vn(id) { return parseInt(v(id)); }
+function vc(id) { return document.getElementById(id).checked; }
+
+function draw() {
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // Draw background with CSS filter for brightness/contrast/saturation/hue
+  ctx.save();
+  const bright = vn('imgBright') / 100;
+  const contrast = vn('imgContrast') / 100;
+  const sat = vn('imgSat') / 100;
+  const hue = vn('imgHue');
+  ctx.filter = `brightness(${bright}) contrast(${contrast}) saturate(${sat}) hue-rotate(${hue}deg)`;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  if (bgImg.complete && bgImg.naturalWidth) {
+    ctx.drawImage(bgImg, 0, 0, W, H);
+  }
+  ctx.restore();
+
+  // Text params
+  const fontFamily = v('font');
+  const fontSize = vn('fontSize');
+  const letterSpacing = vn('ls') / 100;
+  const posY = vn('posY') / 100;
+  const text = v('text').toUpperCase();
+  const mode = v('mode');
+  const fontStr = `900 ${fontSize}px "${fontFamily}", sans-serif`;
+
+  function setFont(context) {
+    context.font = fontStr;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    if (letterSpacing && context.letterSpacing !== undefined) {
+      context.letterSpacing = `${letterSpacing}em`;
+    }
+  }
+
+  const x = W / 2;
+  const y = H * posY;
+
+  if (mode === 'difference') {
+    // --- PASS 1: Drop Shadow ---
+    if (vc('shadowOn')) {
+      ctx.save();
+      setFont(ctx);
+      ctx.globalCompositeOperation = 'source-over';
+      const [sr, sg, sb] = hexToRgb(v('shadowColor'));
+      const sa = vn('shadowAlpha') / 100;
+      ctx.shadowColor = `rgba(${sr},${sg},${sb},${sa})`;
+      ctx.shadowBlur = vn('shadowBlur');
+      ctx.shadowOffsetX = vn('shadowX');
+      ctx.shadowOffsetY = vn('shadowY');
+      ctx.fillStyle = 'rgba(0,0,0,0)';
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    // --- PASS 2: Difference ---
+    if (vc('diffOn')) {
+      const diffAlpha = vn('diffStrength') / 100;
+      // For partial strength, use gray instead of pure white
+      const c = Math.round(255 * diffAlpha);
+      ctx.save();
+      setFont(ctx);
+      ctx.globalCompositeOperation = 'difference';
+      ctx.fillStyle = `rgb(${c},${c},${c})`;
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    // --- PASS 3: Overlay brightness ---
+    if (vc('overlayOn')) {
+      const oa = vn('overlayStrength') / 100;
+      const [or, og, ob] = hexToRgb(v('overlayColor'));
+      ctx.save();
+      setFont(ctx);
+      ctx.globalCompositeOperation = 'overlay';
+      ctx.fillStyle = `rgba(${or},${og},${ob},${oa})`;
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+  } else {
+    // Non-difference modes
+    ctx.save();
+    setFont(ctx);
+
+    const padX = 24, padY = 12;
+    const textW = ctx.measureText(text).width;
+
+    if (mode === 'box' || mode === 'inverted') {
+      ctx.fillStyle = mode === 'box' ? '#000' : '#FFF';
+      ctx.fillRect(x - textW/2 - padX, y - fontSize/2 - padY, textW + padX*2, fontSize + padY*2);
+    }
+
+    ctx.fillStyle = mode === 'inverted' ? '#000' : '#FFF';
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  updateJSON();
+}
+
+function updateJSON() {
+  const [sr, sg, sb] = hexToRgb(v('shadowColor'));
+  const config = {
+    font_family: v('font'),
+    font_size: vn('fontSize'),
+    font_weight: '900',
+    color: '#FFFFFF',
+    text_transform: 'uppercase',
+    letter_spacing: vn('ls') / 100,
+    position_y: vn('posY'),
+    animation: 'hard_cut',
+    blend_mode: v('mode') === 'difference' ? 'difference' : 'source-over',
+    background: v('mode') === 'box' ? '#000000' : v('mode') === 'inverted' ? '#FFFFFF' : 'none',
+    stroke_color: 'none',
+    stroke_width: 0,
+    shadow: {
+      enabled: vc('shadowOn'),
+      color: `rgba(${sr},${sg},${sb},${(vn('shadowAlpha')/100).toFixed(2)})`,
+      blur: vn('shadowBlur'),
+      offset_x: vn('shadowX'),
+      offset_y: vn('shadowY')
+    },
+    difference_pass: {
+      enabled: vc('diffOn'),
+      strength: vn('diffStrength') / 100
+    },
+    overlay_pass: {
+      enabled: vc('overlayOn'),
+      strength: vn('overlayStrength') / 100,
+      color: v('overlayColor')
+    }
+  };
+  document.getElementById('jsonOut').value = JSON.stringify(config, null, 2);
+}
+
+// Wire all controls
+document.querySelectorAll('.sidebar input, .sidebar select').forEach(el => {
+  el.addEventListener('input', () => {
+    // Update value displays
+    document.getElementById('fontSizeVal').textContent = v('fontSize') + 'px';
+    document.getElementById('lsVal').textContent = (vn('ls') / 100).toFixed(2) + 'em';
+    document.getElementById('posYVal').textContent = v('posY') + '%';
+    document.getElementById('shadowAlphaVal').textContent = (vn('shadowAlpha') / 100).toFixed(2);
+    document.getElementById('shadowBlurVal').textContent = v('shadowBlur');
+    document.getElementById('shadowXVal').textContent = v('shadowX');
+    document.getElementById('shadowYVal').textContent = v('shadowY');
+    document.getElementById('diffStrengthVal').textContent = v('diffStrength') + '%';
+    document.getElementById('overlayStrengthVal').textContent = (vn('overlayStrength') / 100).toFixed(2);
+    document.getElementById('imgBrightVal').textContent = v('imgBright') + '%';
+    document.getElementById('imgContrastVal').textContent = v('imgContrast') + '%';
+    document.getElementById('imgSatVal').textContent = v('imgSat') + '%';
+    document.getElementById('imgHueVal').textContent = v('imgHue') + '°';
+    draw();
+  });
+});
+</script>
+</body>
+</html>
